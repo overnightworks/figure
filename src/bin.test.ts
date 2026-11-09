@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildGlb } from './glb-builder.js';
+import { buildGlb } from '../tests/glbBuilder.js';
 
 const binPath = join(import.meta.dirname, '..', 'dist', 'bin.js');
 
@@ -58,7 +58,7 @@ describe('the figure entry module', () => {
 		writeFileSync(path, buildGlb());
 		vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'figure', 'check', path]);
 		const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
-		await import('../src/bin.js');
+		await import('./bin.js');
 		expect(stdout).toHaveBeenCalledTimes(1);
 		expect(process.exitCode).toBe(0);
 	});
@@ -66,7 +66,7 @@ describe('the figure entry module', () => {
 	it('writes the reason to stderr and sets exit code 2 when no file is named', async () => {
 		vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'figure', 'check']);
 		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
-		await import('../src/bin.js');
+		await import('./bin.js');
 		expect(stderr).toHaveBeenCalledTimes(1);
 		expect(process.exitCode).toBe(2);
 	});

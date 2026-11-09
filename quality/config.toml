@@ -1,0 +1,20 @@
+[gate]
+mandatory_jobs = ["checks"]
+
+[[root.allow]]
+entry = "tsconfig.json"
+reason = "tsc and the editor find the TypeScript configuration at the root"
+
+[[root.allow]]
+entry = "vitest.config.ts"
+reason = "vitest finds its configuration at the root"
+
+[[layout.allow]]
+path = "src/bin.ts"
+rule = "script-name"
+reason = "npm links the figure command to this file, whose shebang makes it executable"
+
+[[layout.allow]]
+path = "src/bin.ts"
+rule = "script-header"
+reason = "the script header rule reads # and .mjs comments only, and this TypeScript entry is four lines of wiring"

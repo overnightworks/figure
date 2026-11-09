@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { checkFigure } from '../src/check.js';
-import { buildGlb } from './glb-builder.js';
+import { checkFigure } from './check.js';
+import { buildGlb } from '../tests/glbBuilder.js';
 
 describe('checkFigure', () => {
 	it('passes a synthetic GLB', () => {

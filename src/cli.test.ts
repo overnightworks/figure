@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { runCommand } from '../src/cli.js';
-import { buildGlb } from './glb-builder.js';
+import { runCommand } from './cli.js';
+import { buildGlb } from '../tests/glbBuilder.js';
 
 describe('runCommand', () => {
 	let directory: string;

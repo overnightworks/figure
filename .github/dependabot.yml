@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 7
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 7
+    # why: @vitest/coverage-v8 requires exactly the installed vitest as its
+    # peer, so both move in one update.
+    groups:
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
