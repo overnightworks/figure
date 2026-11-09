@@ -1,0 +1,8 @@
+claim_id = "21e7377e031744288299c7b4fbdbe1c5"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "62f46f7541db185a030584085c413c2f16d33d66"
+branch = "claude/issue-3-figure-check-runs-from-the-packed-packag"
+scope = [".aco/board.toml", ".github", ".gitignore", "AGENTS.md", "CLAUDE.md", "LICENSE", "README.md", "docs", "package.json", "pnpm-lock.yaml", "quality", "sonar-project.properties", "src", "tests", "tsconfig.json", "vitest.config.ts"]
+opened_commit = "0d681e332d3affd374f9993f6a8aa29a417ef8b5"
+whole_reason = "The scaffold lands as one piece: the gate judges manifest, workflows, configuration, code and the document set together, and none of them is green alone."
