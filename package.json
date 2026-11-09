@@ -1,0 +1,44 @@
+{
+  "name": "overnightworks-figure",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "figure": "dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.map"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./codes": {
+      "types": "./dist/codes.d.ts",
+      "default": "./dist/codes.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepack": "pnpm run build",
+    "check": "tsc --noEmit && tsc --noEmit -p tests",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24 || ^26"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "~5.0.5",
+    "typescript": "^6.0.0",
+    "vitest": "~5.0.5"
+  }
+}

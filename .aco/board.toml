@@ -1,0 +1,1 @@
+dependency_paths = [".github/workflows/", "package.json", "pnpm-lock.yaml"]
