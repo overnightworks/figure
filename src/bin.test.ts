@@ -33,6 +33,14 @@ describe('the figure command from the build output', () => {
 		expect(result.stdout).toMatch(/^not_glb\b/);
 	});
 
+	it('exits 1 with the code and the text it found on a file that names a URI', () => {
+		const path = join(directory, 'uri.glb');
+		writeFileSync(path, buildGlb({ json: { buffers: [{ uri: 'model.bin' }] } }));
+		const result = figure('check', path);
+		expect(result.status).toBe(1);
+		expect(result.stdout).toMatch(/^uri_not_allowed\b.*buffers\[0\]/);
+	});
+
 	it('exits 2 when it cannot read the file', () => {
 		const result = figure('check', join(directory, 'missing.glb'));
 		expect(result.status).toBe(2);

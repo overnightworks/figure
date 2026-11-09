@@ -35,8 +35,8 @@ export function runCommand(argv: readonly string[], output: Output): number {
 		output.stdout(`${file}: passes every rule`);
 		return EXIT_PASSED;
 	}
-	for (const { code } of refusals) {
-		output.stdout(`${code}: ${refusalDescriptions[code]}`);
+	for (const { code, detail } of refusals) {
+		output.stdout(`${code}: ${refusalDescriptions[code]}${detail === undefined ? '' : ` (${detail})`}`);
 	}
 	return EXIT_REFUSED;
 }
