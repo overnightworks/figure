@@ -1,0 +1,8 @@
+claim_id = "822e5ef247484afa98e9e7a7e4f8309e"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "e04db6cc66464768d9d9cfd41cd95d883a71d6df"
+branch = "claude/issue-5-figure-check-refuses-a-glb-that-is-malfo"
+scope = ["README.md", "docs/ARCHITECTURE.md", "package.json", "quality/baseline.toml", "src", "tests"]
+opened_commit = "727f0fd6472c43cc16072350b206136c775957e4"
+whole_reason = "The rules, their codes, the profile's values, the builder's counter-examples and the two documents that list the codes change together; a rule without its code row or its counter-example is unfinished."
