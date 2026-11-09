@@ -1,9 +1,8 @@
 # figure
 
-The fleet's VRM 1.0 profile, its check command and a browser library that draws and drives a figure.
+The fleet's VRM 1.0 profile as a check: the framework-free TypeScript ESM package `overnightworks-figure`.
 
-figure is the one package behind every agent's animated 3D head and shoulders. Today it ships the check:
-`figure check <file>` tells whether a figure file meets the profile. The library that draws is not built yet.
+Today figure ships the check: `figure check <file>` tells whether a figure file meets the profile.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick start

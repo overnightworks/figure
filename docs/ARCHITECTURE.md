@@ -70,9 +70,9 @@ whose `figure` command runs in Node and whose modules a bundler takes. The packa
 **Trust.** A figure file is untrusted input; no code comes from it. The check is about conformance and about
 protecting phones; it is not an app's security boundary.
 
-**Proof strategy.** Branch coverage is 100 % over the check's cases, the in-process command tests and the entry-module
-tests together, reported as `lcov.info`. A second layer drives `dist/bin.js` as a process for each exit code, and CI
-installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that
+**Proof strategy.** Branch coverage is 100 % over the check's cases and the in-process command tests together, reported
+as `lcov.info`; the entry module `bin.ts` is outside that report. A second layer drives `dist/bin.js` as a process for
+each exit code, and CI installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that
 shares no code with the check.
 
 ## 6. Constraints and reasons
