@@ -71,8 +71,9 @@ whose `figure` command runs in Node and whose modules a bundler takes. The packa
 protecting phones; it is not an app's security boundary.
 
 **Proof strategy.** Branch coverage is 100 % over the check's cases and the in-process command tests together, reported
-as `lcov.info`; the entry module `bin.ts` is outside that report. A second layer drives `dist/bin.js` as a process for
-each exit code, and CI installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that
+as `lcov.info`; the entry module `bin.ts` is reached only as a process, so its lines count as uncovered in that report
+(branches stay 100 % because it has none). A second layer drives `dist/bin.js` as a process for each exit code, and CI
+installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that
 shares no code with the check.
 
 ## 6. Constraints and reasons
