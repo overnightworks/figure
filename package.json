@@ -19,6 +19,10 @@
     "./codes": {
       "types": "./dist/codes.d.ts",
       "default": "./dist/codes.js"
+    },
+    "./profile": {
+      "types": "./dist/profile.d.ts",
+      "default": "./dist/profile.js"
     }
   },
   "scripts": {
