@@ -23,15 +23,20 @@
     "./profile": {
       "types": "./dist/profile.d.ts",
       "default": "./dist/profile.js"
+    },
+    "./draw": {
+      "types": "./dist/draw.d.ts",
+      "default": "./dist/draw.js"
     }
   },
   "scripts": {
     "build": "tsc",
     "prepack": "pnpm run build",
-    "check": "tsc --noEmit && tsc --noEmit -p tests",
-    "test": "vitest run",
+    "check": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.node.json && tsc --noEmit -p tests",
+    "test": "vitest run --project node",
     "test:coverage": "vitest run --coverage",
-    "test:consumer": "playwright test --config tests/e2e/playwright.config.ts"
+    "test:consumer": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:browser": "vitest run --project browser"
   },
   "packageManager": "pnpm@10.32.1",
   "devEngines": {
@@ -40,11 +45,18 @@
       "version": "^24 || ^26"
     }
   },
+  "dependencies": {
+    "@pixiv/three-vrm": "~3.5.5",
+    "three": "~0.187.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.65.0",
     "@types/node": "^24.0.0",
+    "@types/three": "~0.187.0",
+    "@vitest/browser-playwright": "~5.0.5",
     "@vitest/coverage-v8": "~5.0.5",
     "gltf-validator": "^2.0.0-dev.3.10",
+    "playwright": "^1.65.0",
     "typescript": "^6.0.0",
     "vite": "^8.3.7",
     "vitest": "~5.0.5"

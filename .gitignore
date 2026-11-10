@@ -3,3 +3,4 @@ dist/
 coverage/
 *.tgz
 test-results/
+.vitest/

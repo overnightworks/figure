@@ -129,12 +129,25 @@ describe('checkFigure', () => {
 		expect(refusals[0]?.detail).toMatch(/^(buffers|images)\[0\]/);
 	});
 
-	it('passes buffers that name no URI, and ignores entries that are not objects', () => {
+	it('passes a buffer that names no URI, and ignores a buffer entry that is not an object', () => {
 		const json = vrmJson((vrm) => {
-			vrm.buffers = [{ byteLength: 1 }, 5, null];
+			vrm.buffers = [5];
 			vrm.nodes.push({ uri: 'x' });
 		});
 		expect(checkFigure(buildVrmGlb({ json }))).toEqual([]);
+	});
+
+	it.each([
+		['a second buffer that names no URI', (json: Record<string, any>) => json.buffers.push({ byteLength: 1 })],
+		['a buffer view in buffer 1', (json: Record<string, any>) => (json.bufferViews.at(-1).buffer = 1)]
+	])('refuses %s as buffer_outside_glb', (_name, change) => {
+		const refusals = checkFigure(buildVrmGlb({ json: vrmJson(change) }));
+		expect(refusals.map(({ code }) => code)).toEqual(['buffer_outside_glb']);
+		expect(refusals[0]?.detail).toMatch(/^(buffers|bufferViews\[\d+\])/);
+	});
+
+	it('ignores bufferViews that are not a list', () => {
+		expect(codesOf(buildVrmGlb({ json: vrmJson((json) => (json.bufferViews = { buffer: 1 })) }))).not.toContain('buffer_outside_glb');
 	});
 
 	it('ignores buffers that are not a list', () => {

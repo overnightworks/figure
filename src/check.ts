@@ -48,6 +48,7 @@ export function checkFigure(bytes: Uint8Array): Refusal[] {
 		...refusals,
 		...extensionRefusals(json),
 		...uriRefusals(json),
+		...bufferRefusals(json),
 		...vrmRefusals(json),
 		...budgetRefusals(json),
 		...textureRefusals(json, binaryChunk)
@@ -101,6 +102,22 @@ function extensionRefusals(json: JsonObject): Refusal[] {
 				refusals.push({ code: 'extension_not_allowed', detail: `${key} names ${JSON.stringify(name)}` });
 			}
 		}
+	}
+	return refusals;
+}
+
+/** The GLB body is the only buffer a loader can read without a request, so a second buffer, or a view in one, is refused. */
+function bufferRefusals(json: JsonObject): Refusal[] {
+	const refusals: Refusal[] = [];
+	if (Array.isArray(json['buffers']) && json['buffers'].length > 1) {
+		refusals.push({ code: 'buffer_outside_glb', detail: `buffers holds ${json['buffers'].length} entries` });
+	}
+	if (Array.isArray(json['bufferViews'])) {
+		json['bufferViews'].forEach((entry: unknown, index) => {
+			if (isJsonObject(entry) && entry['buffer'] !== 0) {
+				refusals.push({ code: 'buffer_outside_glb', detail: `bufferViews[${index}] is not in buffer 0` });
+			}
+		});
 	}
 	return refusals;
 }

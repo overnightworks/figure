@@ -8,6 +8,7 @@ export const refusalDescriptions = {
 	glb_json: 'the JSON chunk is not a JSON object',
 	extension_not_allowed: 'the file names an extension the profile does not allow',
 	uri_not_allowed: 'a buffer or an image names a URI; every byte must sit in the GLB itself',
+	buffer_outside_glb: 'the file has a buffer besides the GLB’s own, or a buffer view in one; every byte must sit in the GLB’s binary chunk',
 	not_vrm: 'the file has no VRMC_vrm extension object of specification version 1.0',
 	preset_missing: 'a preset expression the profile requires is missing',
 	humanoid_bone_missing: 'a bone VRM 1.0 requires is missing from the humanoid, or its entry is not an object with a node',

@@ -33,7 +33,7 @@ pnpm add https://github.com/overnightworks/figure/releases/download/v0.1.0/overn
 ```
 
 pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it downloads the tarball. The value to compare stands
-at the top of the release's notes. The package has no dependencies, so the lockfile gains that one package. npm takes the same URL and records the same integrity.
+at the top of the release's notes. Release 0.1.0 has no dependencies, so the lockfile gains that one package. npm takes the same URL and records the same integrity.
 
 Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } from 'overnightworks-figure'` in code.
 
@@ -59,6 +59,7 @@ The codes and the exit codes are the contract; the wording of a line is not.
 | `glb_json` | the JSON chunk's content is not a JSON object |
 | `extension_not_allowed` | `extensionsUsed` or `extensionsRequired` names an extension outside the profile's allowed list |
 | `uri_not_allowed` | a buffer or an image names a `uri`, external or data; every byte sits in the GLB itself |
+| `buffer_outside_glb` | `buffers` holds more than one entry, or a buffer view's `buffer` is not 0; every byte sits in the GLB's binary chunk |
 | `not_vrm` | there is no `extensions.VRMC_vrm` object, or its `specVersion` is not `1.0`; the other VRM rules then stay silent |
 | `preset_missing` | `expressions.preset` lacks one of the profile's presets; one refusal per missing preset, naming it |
 | `humanoid_bone_missing` | `humanoid.humanBones` lacks a bone VRM 1.0 requires, or its entry is not an object with a `node`; one refusal per bone, naming it |

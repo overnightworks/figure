@@ -2,17 +2,19 @@
 
 ## 1. Context and Scope
 
-figure is a framework-free TypeScript ESM package. Today it holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's
-bytes to a list of refusals, and the command `figure check <file>` around it. Two callers use it: a person or a CI job
-(personas' release check) runs the command in Node, and an app calls `checkFigure` in a browser before three parses
-the file.
+figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's
+bytes to a list of refusals, and the command `figure check <file>` around it; and the drawing export `overnightworks-figure/draw`, whose `mount` draws one frame of a figure into
+an app's canvas. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` in a browser before three parses
+the file, and an app calls `mount` on a canvas.
 
 ```mermaid
 flowchart LR
     caller["person or CI job"] -->|"figure check file"| package
     app["an app in a browser"] -->|"checkFigure(bytes)"| package
+    app -->|"mount(canvas, bytes)"| package
     package["overnightworks-figure"] -->|"exit code, lines"| caller
     package -->|"list of refusals"| app
+    package -->|"one drawn frame, a signal"| app
     file[("figure file<br/>untrusted")] -.->|"bytes"| package
 ```
 
@@ -45,6 +47,13 @@ flowchart TD
     index["index.ts: package root"] --> check
     index --> profile
     index --> codes
+    draw["draw.ts: mount, the handle"] --> check
+    draw --> signals
+    draw --> figureLoader
+    draw --> figureFrame
+    figureLoader["figureLoader.ts: GLTF and VRM loading, the img texture loader"]
+    figureFrame["figureFrame.ts: lights, camera, one frame"]
+    signals["signals.ts: the closed set of signals"]
 ```
 
 *Module dependencies; derived from the imports in `src/`.*
@@ -53,7 +62,9 @@ flowchart TD
 - `profile.ts` owns the values the rules read: allowed extensions, file budget, VRM version, presets, licence values and the two mesh budgets.
 - `check.ts` owns the container rules and the order; it reads bytes. `vrmRules.ts` and `budgetRules.ts` judge the parsed JSON; none imports more than the codes, the profile and `json.ts`. `textureRules.ts` also reads the binary chunk through `imageSize.ts`.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
-- `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone.
+- `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone. No module they reach imports three or three-vrm.
+- `signals.ts` owns every signal (`drawn`, `unsupported`, `refused`, `lost`, `slow`); `lost` is given for a context already lost at the mount; a loss while a figure lives and `slow` have no producer yet.
+- `draw.ts` is the one module of `overnightworks-figure/draw`: `mount` and the handle (the last signal and an idempotent `dispose`); its declarations name no three type. `figureLoader.ts` parses the bytes with three's GLTF loader and three-vrm's plugin and gives the parser an `<img>`-based texture loader. `figureFrame.ts` owns the picture: the camera, lights and clear colour of hopin's agent-tile mockup, framed on the head and shoulders.
 
 ## 3. Runtime View
 
@@ -77,7 +88,37 @@ sequenceDiagram
 
 *The command's one flow; derived from `src/cli.ts`.*
 
-The rules run in a fixed order. A refusal that leaves the later rules unjudgeable ends the check; the others all
+```mermaid
+sequenceDiagram
+    participant A as app
+    participant M as draw.ts
+    participant K as check.ts
+    participant L as figureLoader.ts
+    participant F as figureFrame.ts
+    A->>M: mount(canvas, bytes, onSignal)
+    M->>K: checkFigure(bytes)
+    alt refusals
+        M-->>A: onSignal(refused), handle
+    else none
+        M->>M: canvas.getContext webgl2
+        alt no context
+            M-->>A: onSignal(unsupported), handle
+        else context already lost
+            M-->>A: onSignal(lost), handle
+        else context
+            M->>L: loadFigure(bytes)
+            L-->>M: VRM, or an error
+            M->>F: drawFigureFrame
+            M-->>A: onSignal(drawn), handle
+        end
+    end
+```
+
+*`mount`'s one flow; derived from `src/draw.ts`. An error anywhere in loading or drawing, or a texture that fails, gives `refused` and frees the renderer; `mount` never rejects.*
+
+The loader's texture loader reads each image through an `<img>`, because three's default fetches a `blob:` URL and the script policy refuses that; it also records a failed image, which three itself swallows. Its file loader always fails, so a buffer outside the GLB gives `refused` and no request, whatever the check said. The canvas is the host's: the renderer never writes its `style`, and no element is created.
+
+The check's rules run in a fixed order. A refusal that leaves the later rules unjudgeable ends the check; the others all
 report:
 
 1. `too_large` (judged on the file's length alone, and reported beside any later refusal);
@@ -85,7 +126,7 @@ report:
 3. `glb_version` and `glb_length`, both reported;
 4. `glb_chunk` (every chunk compared with the bytes that are there) ends the check;
 5. `glb_json` ends the check;
-6. `extension_not_allowed` and `uri_not_allowed`, both reported;
+6. `extension_not_allowed`, `uri_not_allowed` and `buffer_outside_glb`, all reported;
 7. the VRM rules: `not_vrm` alone when the VRM 1.0 extension is absent, else `preset_missing` (one per preset),
    `humanoid_bone_missing` (one per required bone, `gltf_invalid` for a bone whose node names no entry of `nodes`), `look_at_missing` and the three `licence_*` codes;
 8. the budgets, which read plain glTF and so judge a file that is `not_vrm` too: `too_many_triangles`,
@@ -108,7 +149,7 @@ budgets and never used to allocate or read.
 ## 4. Deployment View
 
 The build is `tsc` alone and emits ESM and declarations to `dist/`. `prepack` runs it, so `pnpm pack` yields a tarball
-whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm.
+whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm. The build resolves imports as a bundler does, because three-vrm's types need it; `tests/tsconfig.node.json` type-checks the modules `bin.ts` reaches under Node's own resolution, which demands each relative import's `.js`.
 
 A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the
 build packs `overnightworks-figure-<version>.tgz` into `release-files` and proves it with
@@ -119,10 +160,9 @@ repository's releases page (`https://github.com/overnightworks/figure/releases`)
 ## 5. Crosscutting Concepts
 
 **Trust.** A figure file is untrusted input; no code comes from it. The check is about conformance and about
-protecting phones; it is not an app's security boundary.
+protecting phones; it is not an app's security boundary. `mount` runs the check before three sees a byte.
 
-**Proof strategy.** Branch coverage is 100 % over the check's cases and the in-process command tests together, reported
-as `lcov.info`; the entry module `bin.ts` is reached only as a process, so its lines count as uncovered in that report
+**Proof strategy.** Branch coverage is 100 % over the check's cases, the in-process command tests and the browser project (`src/*.browser.test.ts`, headless Chromium through vitest's Playwright provider) together; one `vitest run --coverage` runs both projects and reports one `lcov.info`; the entry module `bin.ts` is reached only as a process, so its lines count as uncovered in that report
 (branches stay 100 % because it has none). A second layer drives `dist/bin.js` as a process for each exit code, and CI
 installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that
 shares no code with the check.
@@ -132,21 +172,22 @@ head box with vertex data skinned to spine, chest and head, a blink morph target
 material with a base colour texture, and a PNG with image data and checksums. Every test, the script the workflows run
 and the tarball proof start from this file. Today it is proven by the check (no refusal), by tests that read its
 structure back from the glTF 2.0 and VRM 1.0 schemas, by the Khronos glTF validator (no error; it also decodes the PNG),
-and by the browser layer, where an `<img>` loads the texture at the builder's size. That a renderer draws it is not yet
-proven.
+and by the browser layer, where `mount` draws it and shows the texture's colour.
 
 A browser layer (`tests/e2e`, Playwright) packs the tarball, installs it into a temporary consumer, bundles that with Vite
 and serves it in headless Chromium under the script policy `default-src 'none'; script-src 'self'; connect-src 'self';
 img-src 'self' blob:; worker-src 'self'`, which every response of the page carries. It proves that the check runs in a
-browser on raw bytes and that loading code and files breaks no part of the policy. Its coverage is not measured: it runs
-the check, which the Node tests cover to 100 % of branches. It records, without asserting, whether the canvas gives WebGL 2.
+browser on raw bytes, that `mount` gives `drawn` with the texture's colour on the canvas, and that loading code, files and
+textures breaks no part of the policy. Its coverage is not measured: the browser project covers the same code. A missing
+WebGL 2 makes it red. The browser project drives `mount`'s other signals, the handle and the canvas contract.
 
 ## 6. Constraints and reasons
 
 - The check reads raw bytes and imports no module: a browser runs it before three parses a file, and personas' CI runs it in Node.
 - Every refusal is one value of one closed set: callers branch on codes, never on wording.
 - Exit codes are quality's (0 yes, 1 no, 2 could not answer), so a failure to judge is never read as a verdict.
-- There is no runtime dependency; the tree holds no third-party model bytes.
+- The runtime dependencies are `three` and `@pixiv/three-vrm`, which draw and load the figure; only the `draw` export imports them, so a consumer that only checks loads neither. Both are on patch ranges and update together with `@types/three`.
+- The tree holds no third-party model bytes.
 
 ## 7. Not chosen
 
@@ -156,4 +197,5 @@ the check, which the Node tests cover to 100 % of branches. It records, without 
 
 - Of the humanoid only the required bones are judged, not optional bones, a bone used twice or the hierarchy; spring bones, constraints and materials are not judged.
 - Extension objects a file uses without declaring them in `extensionsUsed` are not scanned.
+- The package does not validate image data: a corrupt image that the browser decodes without an error is drawn as decoded.
 - The command reads the whole file before the check judges its size.
