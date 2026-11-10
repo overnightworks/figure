@@ -23,3 +23,18 @@ reason = "the script header rule reads # and .mjs comments only, and this TypeSc
 path = "tests/e2e/check.spec.ts"
 rule = "test-layout"
 reason = "the browser layer sits beside the Node test builders in tests/, and a root e2e/ would need its own root entry"
+
+[[layout.allow]]
+path = "src/conformantFigure.test.ts"
+rule = "test-layout"
+reason = "it tests the test builder in tests/, and vitest runs only src/**/*.test.ts"
+
+[[layout.allow]]
+path = "src/figurePng.test.ts"
+rule = "test-layout"
+reason = "it tests the test builder in tests/, and vitest runs only src/**/*.test.ts"
+
+[[layout.allow]]
+path = "src/figureValidator.test.ts"
+rule = "test-layout"
+reason = "it tests the test builder in tests/, and vitest runs only src/**/*.test.ts"
