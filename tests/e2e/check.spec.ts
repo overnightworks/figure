@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { buildConsumer, type BuiltConsumer } from './build-consumer.js';
-import { origin, serveConsumer } from './serve-consumer.js';
+import { origin, scriptPolicy, serveConsumer } from './serve-consumer.js';
 
 declare global {
 	interface Window {
@@ -30,7 +30,8 @@ test.describe('the packed package in a browser under the script policy', () => {
 			'/not-glb.txt': new TextEncoder().encode('plain text')
 		});
 
-		await page.goto(`${origin}/`);
+		const response = await page.goto(`${origin}/`);
+		expect(response?.headers()['content-security-policy']).toBe(scriptPolicy);
 		await expect(page.locator('#refusals[data-done]')).toBeAttached();
 
 		const refusalsByFile = JSON.parse((await page.locator('#refusals').textContent()) ?? '');
