@@ -126,6 +126,14 @@ as `lcov.info`; the entry module `bin.ts` is reached only as a process, so its l
 installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that
 shares no code with the check.
 
+The builder's one conformant VRM is a small figure: the required bones plus chest and neck on a hierarchy, a torso and a
+head box with vertex data skinned to spine, chest and head, a blink morph target bound by the `blink` preset, a core
+material with a base colour texture, and a PNG with image data and checksums. Every test, the script the workflows run
+and the tarball proof start from this file. Today it is proven by the check (no refusal), by tests that read its
+structure back from the glTF 2.0 and VRM 1.0 schemas, by the Khronos glTF validator (no error; it also decodes the PNG),
+and by the browser layer, where an `<img>` loads the texture at the builder's size. That a renderer draws it is not yet
+proven.
+
 A browser layer (`tests/e2e`, Playwright) packs the tarball, installs it into a temporary consumer, bundles that with Vite
 and serves it in headless Chromium under the script policy `default-src 'none'; script-src 'self'; connect-src 'self';
 img-src 'self' blob:; worker-src 'self'`, which every response of the page carries. It proves that the check runs in a
