@@ -1,4 +1,4 @@
-import { TextureLoader, type LoadingManager } from 'three';
+import { FileLoader, TextureLoader, type LoadingManager } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
 
@@ -34,6 +34,22 @@ class ImageElementTexturesPlugin implements GLTFLoaderPlugin {
 	}
 }
 
+/** A file loader that always fails; three reads a buffer outside the GLB with a request, which nothing in a figure file may cause. */
+class RefusingFileLoader extends FileLoader {
+	override load(_url: string, _onLoad: unknown, _onProgress: unknown, onError: (error: unknown) => void): void {
+		onError(new Error('a figure file may not read a file'));
+	}
+}
+
+/** Gives the parser the refusing file loader, so a buffer outside the GLB fails the load whatever the check said. */
+class NoFileReadsPlugin implements GLTFLoaderPlugin {
+	readonly name = 'figure_no_file_reads';
+
+	constructor(parser: GLTFParser) {
+		parser.fileLoader = new RefusingFileLoader(parser.options.manager);
+	}
+}
+
 /** The check holds the licence to the profile, so the loader accepts the licence URL the file names instead of three-vrm's one default. */
 function loaderPluginFor(parser: GLTFParser): VRMLoaderPlugin {
 	const acceptLicenseUrls = [parser.json.extensions.VRMC_vrm.meta.licenseUrl];
@@ -45,6 +61,7 @@ export async function loadFigure(bytes: Uint8Array): Promise<VRM> {
 	let textureFailed = false;
 	const loader = new GLTFLoader();
 	loader.register((parser) => new ImageElementTexturesPlugin(parser, () => (textureFailed = true)));
+	loader.register((parser) => new NoFileReadsPlugin(parser));
 	loader.register(loaderPluginFor);
 	const gltf = await loader.parseAsync(bytes.slice().buffer, '');
 	const vrm = gltf.userData.vrm as VRM;
