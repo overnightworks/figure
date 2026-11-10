@@ -54,7 +54,10 @@ describe('mount in a browser', () => {
 
 	it('draws a file whose texture data the browser decodes without an error, though the data is corrupt', async () => {
 		const png = buildFigureTexturePng().slice();
-		const firstZlibByte = 8 + 25 + 8;
+		const pngSignatureLength = 8;
+		const ihdrChunkLength = 25;
+		const idatLengthAndTypeLength = 8;
+		const firstZlibByte = pngSignatureLength + ihdrChunkLength + idatLengthAndTypeLength;
 		png[firstZlibByte] ^= 0xff;
 
 		const { handle, signals } = await mountOn(newCanvas(), buildVrmGlbWithImages([png]));
