@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { checkFigure } from './check.js';
 import { figureProfile } from './profile.js';
-import { vrmJson } from '../tests/figureFixtures.js';
-import { buildGlb } from '../tests/glbBuilder.js';
+import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 
 type Json = Record<string, any>;
 
 function codesOf(change: (json: Json) => void): string[] {
-	return checkFigure(buildGlb({ json: vrmJson(change) })).map(({ code }) => code);
+	return checkFigure(buildVrmGlb({ json: vrmJson(change) })).map(({ code }) => code);
 }
 
 /** Replaces the conformant mesh with primitives whose vertex counts sit in accessor fields only. */
@@ -113,12 +112,8 @@ describe('gltf_invalid', () => {
 		['a mesh without primitives', (json: Json) => (json.meshes = [{}])],
 		['primitives that are not a list', (json: Json) => (json.meshes = [{ primitives: 'x' }])],
 		['a primitive that is not an object', (json: Json) => (json.meshes = [{ primitives: [null] }])],
-		['accessors that are not a list', (json: Json) => (json.accessors = {})],
-		['an accessor that is not an object', (json: Json) => (json.accessors = [7])],
-		['an accessor without a count', (json: Json) => (json.accessors = [{}])],
 		['a negative count', withPrimitives([valid], [-3])],
 		['a fractional count', withPrimitives([valid], [1.5])],
-		['a count that is a string', (json: Json) => (json.accessors = [{ count: '3' }])],
 		['a mode that is a string', withPrimitives([{ ...valid, mode: '4' }], [3])],
 		['a mode that is null', withPrimitives([{ ...valid, mode: null }], [3])],
 		['an indices that is null', withPrimitives([{ ...valid, indices: null }], [3])],
@@ -138,8 +133,18 @@ describe('gltf_invalid', () => {
 		expect(codesOf(change)).toEqual(['gltf_invalid']);
 	});
 
+	it.each([
+		['accessors that are not a list', (json: Json) => (json.accessors = {})],
+		['an accessor that is not an object', (json: Json) => (json.accessors = [7])],
+		['an accessor without a count', (json: Json) => (json.accessors = [{}])],
+		['a count that is a string', (json: Json) => (json.accessors = [{ count: '3' }])]
+	])('refuses %s as gltf_invalid once for each primitive of the figure', (_name, change) => {
+		const primitives = vrmJson().meshes.flatMap((mesh: Json) => mesh.primitives);
+		expect(codesOf(change)).toEqual(primitives.map(() => 'gltf_invalid'));
+	});
+
 	it('names the place that cannot be read', () => {
-		const refusals = checkFigure(buildGlb({ json: vrmJson(withPrimitives([valid, { ...valid, mode: 9 }], [3])) }));
+		const refusals = checkFigure(buildVrmGlb({ json: vrmJson(withPrimitives([valid, { ...valid, mode: 9 }], [3])) }));
 		expect(refusals[0]?.detail).toContain('meshes[0].primitives[1]');
 	});
 
