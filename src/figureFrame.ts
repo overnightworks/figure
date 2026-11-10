@@ -5,6 +5,13 @@ import type { VRM } from '@pixiv/three-vrm';
 const camera = { fieldOfView: 22, near: 0.05, far: 20 };
 /** The distances, in metres from the eyes, the picture shows above the head, below it and to either side. */
 const framing = { above: 0.25, below: 0.4, halfWidth: 0.31 };
+/** The most drawing-buffer pixels per CSS pixel: a denser screen gets this ratio, not its own. */
+const maximumPixelRatio = 2;
+
+/** The drawing buffer's pixels per CSS pixel: the window's device pixel ratio, capped. */
+export function drawingPixelRatio(): number {
+	return Math.min(window.devicePixelRatio, maximumPixelRatio);
+}
 
 function lightedScene(vrm: VRM): Scene {
 	const key = new DirectionalLight(0xffffff, Math.PI);
@@ -27,11 +34,12 @@ function headAndShouldersCamera(vrm: VRM, aspect: number): PerspectiveCamera {
 	return view;
 }
 
-/** Draws the figure once into the renderer's canvas at the canvas's client size. */
+/** Draws the figure into the renderer's canvas: the drawing buffer is the canvas's client size at the drawing pixel ratio. */
 export function drawFigureFrame(renderer: WebGLRenderer, canvas: HTMLCanvasElement, vrm: VRM): void {
 	const width = Math.max(2, canvas.clientWidth);
 	const height = Math.max(2, canvas.clientHeight);
 	renderer.setClearColor(0, 0);
+	renderer.setPixelRatio(drawingPixelRatio());
 	renderer.setSize(width, height, false);
 	vrm.scene.traverse((node) => {
 		node.frustumCulled = false;

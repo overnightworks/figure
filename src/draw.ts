@@ -2,6 +2,7 @@ import { WebGLRenderer } from 'three';
 import { VRMUtils, type VRM } from '@pixiv/three-vrm';
 import { checkFigure } from './check.js';
 import { drawFigureFrame } from './figureFrame.js';
+import { followCanvas } from './followCanvas.js';
 import { loadFigure } from './figureLoader.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 
@@ -47,14 +48,18 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array): Promise<Outc
 	if (typeof opened === 'string') return ended(opened);
 	const renderer = opened;
 	let vrm: VRM | undefined;
+	let stopFollowing = () => {};
 	const release = () => {
+		stopFollowing();
 		if (vrm !== undefined) VRMUtils.deepDispose(vrm.scene);
 		renderer.dispose();
 		renderer.forceContextLoss();
 	};
 	try {
 		vrm = await loadFigure(bytes);
-		drawFigureFrame(renderer, canvas, vrm);
+		const figure = vrm;
+		drawFigureFrame(renderer, canvas, figure);
+		stopFollowing = followCanvas(canvas, () => drawFigureFrame(renderer, canvas, figure));
 		return { signal: figureSignal.drawn, release };
 	} catch {
 		release();
