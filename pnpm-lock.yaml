@@ -17,6 +17,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ~5.0.5
         version: 5.0.5(vitest@5.0.5)
+      gltf-validator:
+        specifier: ^2.0.0-dev.3.10
+        version: 2.0.0-dev.3.10
       typescript:
         specifier: ^6.0.0
         version: 6.0.3
@@ -248,6 +251,9 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  gltf-validator@2.0.0-dev.3.10:
+    resolution: {integrity: sha512-odJ4k0tRkGXiDGn78yDBg+fBbAIvBnXxh3RwAta0emSxGtyagFE8B4xELB1oYe3S5RD8Ci3uZAsZaascH2LAEQ==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -634,6 +640,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  gltf-validator@2.0.0-dev.3.10: {}
 
   js-tokens@10.0.0: {}
 
