@@ -1,4 +1,5 @@
 import { budgetRefusals } from './budgetRules.js';
+import { textureRefusals } from './textureRules.js';
 import type { Refusal } from './codes.js';
 import { type JsonObject, isJsonObject } from './json.js';
 import { figureProfile } from './profile.js';
@@ -9,6 +10,7 @@ const CHUNK_HEADER_BYTES = 8;
 const GLB_MAGIC = [0x67, 0x6c, 0x54, 0x46];
 const GLB_VERSION = 2;
 const JSON_CHUNK_TYPE = 0x4e4f534a;
+const BINARY_CHUNK_TYPE = 0x004e4942;
 
 interface Chunk {
 	readonly type: number;
@@ -41,7 +43,15 @@ export function checkFigure(bytes: Uint8Array): Refusal[] {
 	if (json === undefined) {
 		return [...refusals, { code: 'glb_json' }];
 	}
-	return [...refusals, ...extensionRefusals(json), ...uriRefusals(json), ...vrmRefusals(json), ...budgetRefusals(json)];
+	const binaryChunk = chunks[1]?.type === BINARY_CHUNK_TYPE ? chunks[1].content : undefined;
+	return [
+		...refusals,
+		...extensionRefusals(json),
+		...uriRefusals(json),
+		...vrmRefusals(json),
+		...budgetRefusals(json),
+		...textureRefusals(json, binaryChunk)
+	];
 }
 
 /** Walks the chunks against the bytes that are there; undefined when one reaches past the end. */

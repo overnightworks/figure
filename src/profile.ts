@@ -19,5 +19,7 @@ export const figureProfile = {
 		creditNotation: 'unnecessary'
 	},
 	maxTriangles: 60_000,
-	maxMorphTargetsPerPrimitive: 64
+	maxMorphTargetsPerPrimitive: 64,
+	maxTextureSidePixels: 2048,
+	maxTexels: 8_000_000
 } as const;
