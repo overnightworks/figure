@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkFigure } from './check.js';
 import { figureProfile } from './profile.js';
 import { buildVrmGlb, buildVrmGlbWithImages, vrmJson } from '../tests/figureFixtures.js';
-import { buildGlb, buildPng, embedImages } from '../tests/glbBuilder.js';
+import { buildGlb, buildJpeg, buildPng, buildWebp, embedImages } from '../tests/glbBuilder.js';
 
 type Json = Record<string, any>;
 
@@ -12,6 +12,14 @@ const texels = figureProfile.maxTexels;
 function codesOf(bytes: Uint8Array): string[] {
 	return checkFigure(bytes).map(({ code }) => code);
 }
+
+const formats: [string, (width: number, height: number) => Uint8Array][] = [
+	['PNG', buildPng],
+	['JPEG', buildJpeg],
+	['lossy WebP', (width, height) => buildWebp('lossy', width, height)],
+	['lossless WebP', (width, height) => buildWebp('lossless', width, height)],
+	['extended WebP', (width, height) => buildWebp('extended', width, height)]
+];
 
 function pngCodes(...sizes: [number, number][]): string[] {
 	return codesOf(buildVrmGlbWithImages(sizes.map(([width, height]) => buildPng(width, height))));
@@ -42,7 +50,29 @@ describe('the texture side budget', () => {
 	});
 });
 
+describe.each(formats)('the texture budgets for a %s', (_name, build) => {
+	it('passes a side of exactly the budget and refuses one pixel more as texture_too_large', () => {
+		expect(codesOf(buildVrmGlbWithImages([build(side, 1), build(1, side)]))).toEqual([]);
+		const refusals = checkFigure(buildVrmGlbWithImages([build(1, 1), build(side + 1, 1)]));
+		expect(refusals.map(({ code }) => code)).toEqual(['texture_too_large']);
+		expect(refusals[0]?.detail).toMatch(/^images\[1\]/);
+	});
+
+	it('is sized by its bytes whatever its mimeType says', () => {
+		expect(codesOf(buildVrmGlbWithImages([build(side + 1, 1)], (json) => (json.images[0].mimeType = 'image/other')))).toEqual([
+			'texture_too_large'
+		]);
+	});
+});
+
 describe('the texel budget', () => {
+	it('adds up images of mixed formats', () => {
+		const [first, second, third] = sizesAddingUpToBudget();
+		const images = [buildPng(...first!), buildJpeg(...second!), buildWebp('lossless', ...third!)];
+		expect(codesOf(buildVrmGlbWithImages(images))).toEqual([]);
+		expect(codesOf(buildVrmGlbWithImages([...images, buildWebp('extended', 1, 1)]))).toEqual(['too_many_texels']);
+	});
+
 	it('passes images that add up to exactly the budget', () => {
 		expect(pngCodes(...sizesAddingUpToBudget())).toEqual([]);
 	});
@@ -76,8 +106,6 @@ describe('an image the check cannot find or size', () => {
 		['a header chunk of another length', () => withBytes((bytes) => bytes.map((byte, index) => (index === 11 ? 14 : byte)))],
 		['a width of zero', () => buildVrmGlbWithImages([buildPng(0, 1)])],
 		['a height of zero', () => buildVrmGlbWithImages([buildPng(1, 0)])],
-		['bytes that start like a JPEG', () => buildVrmGlbWithImages([Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, ...new Array(40).fill(0)])])],
-		['bytes that start like a WebP', () => buildVrmGlbWithImages([new TextEncoder().encode('RIFF\u0000\u0000\u0000\u0000WEBPVP8 ' + 'x'.repeat(30))])],
 		['no binary chunk', () => buildGlb({ json: vrmJson((json) => embedImages(json, [png])) })],
 		[
 			'a range that ends past the end of the chunk',
@@ -93,6 +121,16 @@ describe('an image the check cannot find or size', () => {
 		]
 	])('refuses %s as image_invalid alone', (_name, build) => {
 		expect(codesOf(build())).toEqual(['image_invalid']);
+	});
+
+	it.each([
+		['a JPEG without a frame header', () => buildVrmGlbWithImages([buildJpeg(1, 1).subarray(0, 8)])],
+		['a WebP of another container type', () => buildVrmGlbWithImages([buildWebp('lossy', 1, 1, { riffType: 'AVI ' })])],
+		['an image of another type', () => buildVrmGlbWithImages([new TextEncoder().encode('GIF89a' + 'x'.repeat(30))])]
+	])('refuses %s as image_invalid alone', (_name, build) => {
+		const refusals = checkFigure(build());
+		expect(refusals.map(({ code }) => code)).toEqual(['image_invalid']);
+		expect(refusals[0]?.detail).toMatch(/^images\[0\] .*PNG, JPEG or WebP/);
 	});
 
 	it('names the image', () => {
