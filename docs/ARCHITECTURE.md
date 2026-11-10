@@ -126,7 +126,6 @@ shares no code with the check.
 
 ## 8. Risks and Technical Debt
 
-- The texture budgets are not built; a file the rules pass can still hold oversized textures.
 - The humanoid, spring bones, constraints and materials are not judged.
 - Extension objects a file uses without declaring them in `extensionsUsed` are not scanned.
 - The command reads the whole file before the check judges its size.
