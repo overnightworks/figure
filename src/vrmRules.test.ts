@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { checkFigure } from './check.js';
 import { figureProfile } from './profile.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
-import { buildGlb } from '../tests/glbBuilder.js';
 
 function refusalsOf(change: Parameters<typeof vrmJson>[0]) {
-	return checkFigure(buildGlb({ json: vrmJson(change) }));
+	return checkFigure(buildVrmGlb({ json: vrmJson(change) }));
 }
 
 function codesOf(change: Parameters<typeof vrmJson>[0]): string[] {
@@ -129,13 +128,13 @@ describe('the VRM rules', () => {
 		});
 
 		it.each([
-			['negative', -1],
-			['a float', 1.5],
-			['a string', '0'],
-			['null', null],
-			['past the node list', bones.length]
+			['negative', () => -1],
+			['a float', () => 1.5],
+			['a string', () => '0'],
+			['null', () => null],
+			['past the node list', (json: Record<string, any>) => json.nodes.length]
 		])('refuses a bone whose node is %s as gltf_invalid', (_name, node) => {
-			const codes = codesOf((json) => (humanBonesOf(json)[bones[0] as string].node = node));
+			const codes = codesOf((json) => (humanBonesOf(json)[bones[0] as string].node = node(json)));
 			expect(codes).toEqual(['gltf_invalid']);
 		});
 

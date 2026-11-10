@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { checkFigure } from './check.js';
 import { figureProfile } from './profile.js';
-import { buildVrmGlb, buildVrmGlbWithImages, vrmJson } from '../tests/figureFixtures.js';
-import { buildGlb, buildJpeg, buildPng, buildWebp, embedImages } from '../tests/glbBuilder.js';
+import { buildVrmGlb, buildVrmGlbWithImages, vrmJson, vrmParts } from '../tests/figureFixtures.js';
+import { buildGlb, buildJpeg, buildPng, buildWebp } from '../tests/glbBuilder.js';
 
 type Json = Record<string, any>;
 
@@ -106,14 +106,14 @@ describe('an image the check cannot find or size', () => {
 		['a header chunk of another length', () => withBytes((bytes) => bytes.map((byte, index) => (index === 11 ? 14 : byte)))],
 		['a width of zero', () => buildVrmGlbWithImages([buildPng(0, 1)])],
 		['a height of zero', () => buildVrmGlbWithImages([buildPng(1, 0)])],
-		['no binary chunk', () => buildGlb({ json: vrmJson((json) => embedImages(json, [png])) })],
+		['no binary chunk', () => buildGlb({ json: vrmJson() })],
 		[
 			'a range that ends past the end of the chunk',
-			() => buildVrmGlbWithImages([png], (json) => (json.bufferViews[0].byteLength = png.length + 1))
+			() => buildVrmGlbWithImages([png], (json) => (json.bufferViews[0].byteLength = json.buffers[0].byteLength + 1))
 		],
 		[
 			'a range that starts past the end of the chunk',
-			() => buildVrmGlbWithImages([png], (json) => (json.bufferViews[0].byteOffset = png.length))
+			() => buildVrmGlbWithImages([png], (json) => (json.bufferViews[0].byteOffset = json.buffers[0].byteLength))
 		],
 		[
 			'an offset and a length too large to add up',
@@ -139,9 +139,7 @@ describe('an image the check cannot find or size', () => {
 	});
 
 	it('does not read past the chunk even when the file goes on', () => {
-		const json = vrmJson();
-		const binary = embedImages(json, [png]);
-		json.bufferViews[0].byteLength = png.length + 4;
+		const { json, binary } = vrmParts([png], (json) => (json.bufferViews[0].byteLength = json.buffers[0].byteLength + 4));
 		expect(codesOf(buildGlb({ json, binary, trailing: new Uint8Array(8) }))).toEqual(['image_invalid']);
 	});
 });
@@ -157,7 +155,7 @@ describe('a part of the JSON the texture rules cannot read', () => {
 		['an image with a null buffer view', (json) => (json.images[0].bufferView = null)],
 		['a buffer view index that is not an integer', (json) => (json.images[0].bufferView = 0.5)],
 		['a negative buffer view index', (json) => (json.images[0].bufferView = -1)],
-		['a buffer view that names nothing', (json) => (json.images[0].bufferView = 1)],
+		['a buffer view that names nothing', (json) => (json.images[0].bufferView = json.bufferViews.length)],
 		['buffer views that are not a list', (json) => (json.bufferViews = {})],
 		['no buffer views', (json) => delete json.bufferViews],
 		['a buffer view that is not an object', (json) => (json.bufferViews = [7])],

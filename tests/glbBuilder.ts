@@ -1,3 +1,19 @@
+// The `.ts` extension lets Node run this file without a build, as scripts/write_conformant_figure.mjs does.
+import {
+	BUFFER_TARGET,
+	BinaryPacker,
+	COMPONENT_TYPE,
+	figureSkeleton,
+	inverseBindMatrix,
+	morphDeltas,
+	skinnedBox,
+	worldPositions,
+	type AccessorSpec,
+	type Bone,
+	type MeshData,
+	type Vector3
+} from './figureModel.ts';
+
 const JSON_CHUNK_TYPE = 0x4e4f534a;
 const BINARY_CHUNK_TYPE = 0x004e4942;
 const HEADER_BYTES = 12;
@@ -76,27 +92,135 @@ export interface ConformantVrmValues {
 	};
 }
 
-/** The JSON of a conformant synthetic VRM: its extension, one triangle in one indexed primitive, no binary data. */
-export function buildConformantVrmJson(values: ConformantVrmValues): Record<string, any> {
-	return {
-		asset: { version: '2.0' },
-		extensionsUsed: ['VRMC_vrm'],
-		extensions: {
-			VRMC_vrm: {
-				specVersion: values.vrmSpecVersion,
-				meta: { name: 'synthetic', authors: ['synthetic'], licenseUrl: 'https://example.invalid/licence', ...values.licence },
-				humanoid: { humanBones: Object.fromEntries(values.requiredHumanBones.map((bone, index) => [bone, { node: index }])) },
-				expressions: { preset: Object.fromEntries(values.presets.map((name) => [name, {}])) },
-				lookAt: { type: 'bone' }
-			}
-		},
-		nodes: values.requiredHumanBones.map((bone) => ({ name: bone })),
-		meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
-		accessors: [
-			{ componentType: 5126, count: 3, type: 'VEC3' },
-			{ componentType: 5123, count: 3, type: 'SCALAR' }
-		]
+const TORSO_HALF_SIZE: Vector3 = [0.18, 0.2, 0.1];
+const TORSO_CENTRE: Vector3 = [0, 1.2, 0];
+const HEAD_HALF_SIZE: Vector3 = [0.12, 0.12, 0.12];
+const HEAD_CENTRE: Vector3 = [0, 1.65, 0];
+const BLINK_OFFSET: Vector3 = [0, -0.03, 0];
+const FRONT_FACE_NORMAL_Z = 1;
+
+interface SkinnedMesh {
+	readonly name: string;
+	readonly data: MeshData;
+	/** What a morph target moves: the vertices it names move by the offset. */
+	readonly morph?: readonly number[];
+}
+
+/** The joints of the skin, in the order of its `joints`; the torso is skinned to the first two, the head to the third. */
+const SKIN_JOINT_NAMES = ['spine', 'chest', 'head'] as const;
+
+function skinnedMeshes(chestHeight: number): SkinnedMesh[] {
+	const torso = skinnedBox(TORSO_CENTRE, TORSO_HALF_SIZE, (position) => (position[1]! < chestHeight ? 0 : 1));
+	const head = skinnedBox(HEAD_CENTRE, HEAD_HALF_SIZE, () => 2);
+	const upperFront = (vertex: number) =>
+		head.normals[3 * vertex + 2] === FRONT_FACE_NORMAL_Z && head.positions[3 * vertex + 1]! > HEAD_CENTRE[1];
+	return [
+		{ name: 'torso', data: torso },
+		{ name: 'head', data: head, morph: morphDeltas(head.positions.length / 3, upperFront, BLINK_OFFSET) }
+	];
+}
+
+function addPrimitive(packer: BinaryPacker, { data, morph }: SkinnedMesh): Record<string, unknown> {
+	const { float, unsignedByte, unsignedShort } = COMPONENT_TYPE;
+	const attributes: Record<string, AccessorSpec> = {
+		POSITION: { values: data.positions, componentType: float, type: 'VEC3', bounded: true },
+		NORMAL: { values: data.normals, componentType: float, type: 'VEC3' },
+		TEXCOORD_0: { values: data.textureCoordinates, componentType: float, type: 'VEC2' },
+		JOINTS_0: { values: data.joints, componentType: unsignedByte, type: 'VEC4' },
+		WEIGHTS_0: { values: data.weights, componentType: float, type: 'VEC4' }
 	};
+	const addAttributes = (specs: Record<string, AccessorSpec>) =>
+		Object.fromEntries(Object.entries(specs).map(([name, spec]) => [name, packer.addAccessor({ ...spec, target: BUFFER_TARGET.vertexAttributes })]));
+	const morphTarget: Record<string, AccessorSpec> = { POSITION: { values: morph ?? [], componentType: float, type: 'VEC3', bounded: true } };
+	return {
+		attributes: addAttributes(attributes),
+		indices: packer.addAccessor({ values: data.indices, componentType: unsignedShort, type: 'SCALAR', target: BUFFER_TARGET.indices }),
+		material: 0,
+		...(morph === undefined ? {} : { targets: [addAttributes(morphTarget)] })
+	};
+}
+
+function requireBones(skeleton: readonly Bone[], required: readonly string[]): void {
+	const names = new Set(skeleton.map(({ name }) => name));
+	const missing = required.filter((name) => !names.has(name));
+	if (missing.length > 0) {
+		throw new Error(`the test skeleton lacks the required bones ${missing.join(', ')}`);
+	}
+}
+
+/** The images come first in the binary chunk and in the buffer views, so `images[i]` reads `bufferViews[i]`; the geometry follows. */
+function addImages(packer: BinaryPacker, images: readonly Uint8Array[]) {
+	return images.map((image) => ({ bufferView: packer.addView(image), mimeType: 'image/png' }));
+}
+
+function skeletonNodes(skeleton: readonly Bone[]) {
+	return skeleton.map(({ name, translation }, index) => {
+		const children = skeleton.flatMap((child, childIndex) => (child.parent === index ? [childIndex] : []));
+		return { name, translation, ...(children.length === 0 ? {} : { children }) };
+	});
+}
+
+/**
+ * The conformant synthetic VRM's JSON and binary chunk: a skeleton with chest and neck, two skinned boxes, a blink morph target
+ * bound by the `blink` preset, a core material with a base colour texture, and `images` (by default the figure's PNG) as the texture sources.
+ */
+export function buildConformantVrmParts(
+	values: ConformantVrmValues,
+	images: readonly Uint8Array[] = [buildFigureTexturePng()]
+): { json: Record<string, any>; binary: Uint8Array } {
+	const skeleton = figureSkeleton();
+	requireBones(skeleton, values.requiredHumanBones);
+	const boneIndex = (name: string) => skeleton.findIndex((bone) => bone.name === name);
+	const positions = worldPositions(skeleton);
+	const packer = new BinaryPacker();
+	const imageEntries = addImages(packer, images);
+	const meshes = skinnedMeshes(positions[boneIndex('chest')]![1]);
+	const meshEntries = meshes.map((mesh) => ({ name: mesh.name, primitives: [addPrimitive(packer, mesh)] }));
+	const jointNodes = SKIN_JOINT_NAMES.map(boneIndex);
+	const inverseBindMatrices = packer.addAccessor({
+		values: jointNodes.flatMap((node) => inverseBindMatrix(positions[node]!)),
+		componentType: COMPONENT_TYPE.float,
+		type: 'MAT4'
+	});
+	const meshNodes = meshes.map((mesh, meshIndex) => ({ name: `${mesh.name}Mesh`, mesh: meshIndex, skin: 0 }));
+	const nodes = [...skeletonNodes(skeleton), ...meshNodes];
+	const headMeshNode = skeleton.length + meshes.findIndex(({ name }) => name === 'head');
+	return {
+		json: {
+			asset: { version: '2.0' },
+			extensionsUsed: ['VRMC_vrm'],
+			extensions: {
+				VRMC_vrm: {
+					specVersion: values.vrmSpecVersion,
+					meta: { name: 'synthetic', authors: ['synthetic'], licenseUrl: 'https://example.invalid/licence', ...values.licence },
+					humanoid: { humanBones: Object.fromEntries(skeleton.map(({ name }, node) => [name, { node }])) },
+					expressions: {
+						preset: Object.fromEntries(
+							values.presets.map((name) => [name, name === 'blink' ? { morphTargetBinds: [{ node: headMeshNode, index: 0, weight: 1 }] } : {}])
+						)
+					},
+					lookAt: { type: 'bone' }
+				}
+			},
+			scene: 0,
+			scenes: [{ nodes: [0, ...meshNodes.map((_, index) => skeleton.length + index)] }],
+			nodes,
+			skins: [{ inverseBindMatrices, skeleton: 0, joints: jointNodes }],
+			meshes: meshEntries,
+			materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+			textures: [{ source: 0 }],
+			images: imageEntries,
+			buffers: [{ byteLength: packer.byteLength }],
+			bufferViews: packer.bufferViews,
+			accessors: packer.accessors
+		},
+		binary: packer.toBytes()
+	};
+}
+
+/** The JSON of the conformant synthetic VRM; see `buildConformantVrmParts`. */
+export function buildConformantVrmJson(values: ConformantVrmValues): Record<string, any> {
+	return buildConformantVrmParts(values).json;
 }
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -325,25 +449,7 @@ export function buildWebp(form: WebpForm, width: number, height: number, options
 	return bytes;
 }
 
-/** Adds one buffer view and one image to `json` for each image, back to back in the binary chunk the call returns. */
-export function embedImages(json: Record<string, any>, images: readonly Uint8Array[]): Uint8Array {
-	const binary = new Uint8Array(images.reduce((sum, image) => sum + image.length, 0));
-	json.buffers = [{ byteLength: binary.length }];
-	json.bufferViews = [];
-	json.images = [];
-	let offset = 0;
-	for (const image of images) {
-		binary.set(image, offset);
-		json.images.push({ bufferView: json.bufferViews.length, mimeType: 'image/png' });
-		json.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: image.length });
-		offset += image.length;
-	}
-	return binary;
-}
-
-/** The conformant synthetic VRM as a GLB: its JSON and one small PNG in the binary chunk. */
+/** The conformant synthetic VRM as a GLB: its JSON and binary chunk. */
 export function buildConformantVrmGlb(values: ConformantVrmValues): Uint8Array {
-	const json = buildConformantVrmJson(values);
-	const binary = embedImages(json, [buildPng(1, 1)]);
-	return buildGlb({ json, binary });
+	return buildGlb(buildConformantVrmParts(values));
 }

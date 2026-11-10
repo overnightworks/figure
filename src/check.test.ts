@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkFigure } from './check.js';
 import { figureProfile } from './profile.js';
-import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
+import { buildVrmGlb, vrmJson, vrmParts } from '../tests/figureFixtures.js';
 import { buildGlb, buildHeaderOnlyGlb } from '../tests/glbBuilder.js';
 
 function codesOf(bytes: Uint8Array): string[] {
@@ -10,11 +10,7 @@ function codesOf(bytes: Uint8Array): string[] {
 
 describe('checkFigure', () => {
 	it('passes a synthetic GLB with a JSON chunk, a binary chunk and an allowed extension in use', () => {
-		const bytes = buildVrmGlb({
-			json: vrmJson((json) => (json.buffers = [{ byteLength: 4 }])),
-			binary: new Uint8Array(4)
-		});
-		expect(checkFigure(bytes)).toEqual([]);
+		expect(checkFigure(buildVrmGlb())).toEqual([]);
 	});
 
 	it.each(figureProfile.allowedExtensions)('passes the allowed extension %s used and required', (extension) => {
@@ -22,7 +18,7 @@ describe('checkFigure', () => {
 			vrm.extensionsUsed.push(extension);
 			vrm.extensionsRequired = [extension];
 		});
-		expect(checkFigure(buildGlb({ json }))).toEqual([]);
+		expect(checkFigure(buildVrmGlb({ json }))).toEqual([]);
 	});
 
 	it.each([
@@ -81,7 +77,7 @@ describe('checkFigure', () => {
 		['null', null],
 		['a string', 'asset']
 	])('refuses a JSON chunk that is %s as glb_json', (_name, json) => {
-		expect(codesOf(buildGlb({ json }))).toEqual(['glb_json']);
+		expect(codesOf(buildVrmGlb({ json }))).toEqual(['glb_json']);
 	});
 
 	it('does not judge extensions or URIs of a file whose JSON is unreadable', () => {
@@ -94,13 +90,13 @@ describe('checkFigure', () => {
 		'KHR_texture_basisu',
 		'KHR_techniques_webgl'
 	])('refuses the profile-refused extension %s in extensionsUsed', (extension) => {
-		const refusals = checkFigure(buildGlb({ json: vrmJson((vrm) => (vrm.extensionsUsed = [extension])) }));
+		const refusals = checkFigure(buildVrmGlb({ json: vrmJson((vrm) => (vrm.extensionsUsed = [extension])) }));
 		expect(refusals.map(({ code }) => code)).toEqual(['extension_not_allowed']);
 		expect(refusals[0]?.detail).toContain(extension);
 	});
 
 	it('refuses an extension named only in extensionsRequired', () => {
-		expect(codesOf(buildGlb({ json: vrmJson((vrm) => (vrm.extensionsRequired = ['KHR_materials_clearcoat'])) }))).toEqual([
+		expect(codesOf(buildVrmGlb({ json: vrmJson((vrm) => (vrm.extensionsRequired = ['KHR_materials_clearcoat'])) }))).toEqual([
 			'extension_not_allowed'
 		]);
 	});
@@ -110,7 +106,7 @@ describe('checkFigure', () => {
 			vrm.extensionsUsed.push('A_one', 'B_two');
 			vrm.extensionsRequired = ['A_one'];
 		});
-		const details = checkFigure(buildGlb({ json })).map(({ detail }) => detail ?? '');
+		const details = checkFigure(buildVrmGlb({ json })).map(({ detail }) => detail ?? '');
 		expect(details).toHaveLength(3);
 		expect(details.join(' ')).not.toContain('VRMC_vrm');
 	});
@@ -119,7 +115,7 @@ describe('checkFigure', () => {
 		['a string instead of a list', 'A_one'],
 		['a list with a number', [7]]
 	])('refuses extensionsUsed as %s', (_name, extensionsUsed) => {
-		expect(codesOf(buildGlb({ json: vrmJson((vrm) => (vrm.extensionsUsed = extensionsUsed)) }))).toEqual(['extension_not_allowed']);
+		expect(codesOf(buildVrmGlb({ json: vrmJson((vrm) => (vrm.extensionsUsed = extensionsUsed)) }))).toEqual(['extension_not_allowed']);
 	});
 
 	it.each([
@@ -128,7 +124,7 @@ describe('checkFigure', () => {
 		['an image with an external URI', { images: [{ uri: 'face.png' }] }],
 		['an image with a data URI', { images: [{ uri: 'data:image/png;base64,AA==' }] }]
 	])('refuses %s as uri_not_allowed and names its place', (_name, json) => {
-		const refusals = checkFigure(buildGlb({ json: { ...vrmJson(), ...json } }));
+		const refusals = checkFigure(buildVrmGlb({ json: { ...vrmJson(), ...json } }));
 		expect(refusals.map(({ code }) => code)).toEqual(['uri_not_allowed']);
 		expect(refusals[0]?.detail).toMatch(/^(buffers|images)\[0\]/);
 	});
@@ -138,24 +134,29 @@ describe('checkFigure', () => {
 			vrm.buffers = [{ byteLength: 1 }, 5, null];
 			vrm.nodes.push({ uri: 'x' });
 		});
-		expect(checkFigure(buildGlb({ json }))).toEqual([]);
+		expect(checkFigure(buildVrmGlb({ json }))).toEqual([]);
 	});
 
 	it('ignores buffers that are not a list', () => {
-		expect(checkFigure(buildGlb({ json: { ...vrmJson(), buffers: { uri: 'a' } } }))).toEqual([]);
+		expect(checkFigure(buildVrmGlb({ json: { ...vrmJson(), buffers: { uri: 'a' } } }))).toEqual([]);
 	});
 
 	it('reports an extension and a URI together', () => {
 		const json = { extensionsUsed: ['A_one'], images: [{ uri: 'face.png' }] };
-		expect(codesOf(buildGlb({ json: { ...vrmJson(), ...json } }))).toEqual(['extension_not_allowed', 'uri_not_allowed']);
+		expect(codesOf(buildVrmGlb({ json: { ...vrmJson(), ...json } }))).toEqual(['extension_not_allowed', 'uri_not_allowed']);
 	});
 
 	it('refuses a file one byte over the budget as too_large alone, and passes one at the budget', () => {
-		const overhead = buildVrmGlb({ binary: new Uint8Array(4) }).length - 4;
-		const atBudget = buildVrmGlb({ binary: new Uint8Array(figureProfile.fileBudgetBytes - overhead) });
+		const { json, binary } = vrmParts();
+		const withFileSize = (size: number) => {
+			const padded = new Uint8Array(size - buildGlb({ json, binary }).length + binary.length);
+			padded.set(binary);
+			return buildGlb({ json, binary: padded });
+		};
+		const atBudget = withFileSize(figureProfile.fileBudgetBytes);
 		expect(atBudget).toHaveLength(figureProfile.fileBudgetBytes);
 		expect(checkFigure(atBudget)).toEqual([]);
-		const overBudget = buildVrmGlb({ binary: new Uint8Array(figureProfile.fileBudgetBytes - overhead + 1) });
+		const overBudget = withFileSize(figureProfile.fileBudgetBytes + 1);
 		expect(codesOf(overBudget)).toEqual(['too_large']);
 	});
 
