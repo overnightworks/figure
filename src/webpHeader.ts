@@ -25,7 +25,7 @@ const EXTENDED_WIDTH_OFFSET = 4;
 const EXTENDED_HEIGHT_OFFSET = 7;
 
 function fourCharacters(bytes: Uint8Array, offset: number): string {
-	return String.fromCharCode(...bytes.subarray(offset, offset + 4));
+	return String.fromCodePoint(...bytes.subarray(offset, offset + 4));
 }
 
 function sized(width: number, height: number): ImageSize | undefined {
