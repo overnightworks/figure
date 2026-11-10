@@ -91,14 +91,17 @@ function accessorCount(json: JsonObject, accessorIndex: unknown): number {
 }
 
 function triangleCount(json: JsonObject, primitive: JsonObject): number {
-	const mode = primitive['mode'] ?? MODE_TRIANGLES;
+	const mode = primitive['mode'] === undefined ? MODE_TRIANGLES : primitive['mode'];
 	if (!Number.isInteger(mode) || (mode as number) < 0 || (mode as number) > LAST_MODE) {
 		throw new Unreadable('has a mode that is not an integer from 0 to 6');
 	}
 	if ((mode as number) < MODE_TRIANGLES) {
 		return 0;
 	}
-	const vertices = accessorCount(json, primitive['indices'] ?? objectOf(primitive['attributes'])['POSITION']);
+	const vertices = accessorCount(
+		json,
+		primitive['indices'] === undefined ? objectOf(primitive['attributes'])['POSITION'] : primitive['indices']
+	);
 	return mode === MODE_TRIANGLES
 		? Math.floor(vertices / VERTICES_PER_TRIANGLE)
 		: Math.max(0, vertices - VERTICES_BEFORE_FIRST_STRIP_OR_FAN_TRIANGLE);

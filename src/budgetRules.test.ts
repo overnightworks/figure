@@ -120,6 +120,8 @@ describe('gltf_invalid', () => {
 		['a fractional count', withPrimitives([valid], [1.5])],
 		['a count that is a string', (json: Json) => (json.accessors = [{ count: '3' }])],
 		['a mode that is a string', withPrimitives([{ ...valid, mode: '4' }], [3])],
+		['a mode that is null', withPrimitives([{ ...valid, mode: null }], [3])],
+		['an indices that is null', withPrimitives([{ ...valid, indices: null }], [3])],
 		['a mode of 7', withPrimitives([{ ...valid, mode: 7 }], [3])],
 		['a negative mode', withPrimitives([{ ...valid, mode: -1 }], [3])],
 		['a fractional mode', withPrimitives([{ ...valid, mode: 4.5 }], [3])],
