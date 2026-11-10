@@ -143,7 +143,7 @@ describe('checkFigure', () => {
 	it('refuses a file one byte over the budget as too_large alone, and passes one at the budget', () => {
 		const overhead = buildGlb({ binary: new Uint8Array(4) }).length - 4;
 		const atBudget = buildGlb({ binary: new Uint8Array(figureProfile.fileBudgetBytes - overhead) });
-		expect(atBudget.length).toBe(figureProfile.fileBudgetBytes);
+		expect(atBudget).toHaveLength(figureProfile.fileBudgetBytes);
 		expect(checkFigure(atBudget)).toEqual([]);
 		const overBudget = buildGlb({ binary: new Uint8Array(figureProfile.fileBudgetBytes - overhead + 1) });
 		expect(codesOf(overBudget)).toEqual(['too_large']);
