@@ -24,6 +24,14 @@ function isFrameHeader(marker: number): boolean {
 	return marker >= FIRST_FRAME && marker <= LAST_FRAME && !NOT_FRAME_HEADERS.has(marker);
 }
 
+function segmentLengthAt(view: DataView, position: number): number | undefined {
+	if (position + MARKER_BYTES + LENGTH_FIELD_BYTES > view.byteLength) {
+		return undefined;
+	}
+	const segmentLength = view.getUint16(position + MARKER_BYTES);
+	return segmentLength >= LENGTH_FIELD_BYTES && position + MARKER_BYTES + segmentLength <= view.byteLength ? segmentLength : undefined;
+}
+
 /**
  * Reads a JPEG's stated size from the first frame header among its segments (ITU-T T.81, Annex B.1 and B.2.2): every
  * start-of-frame marker but the three table and extension markers is one. The walk takes at least two bytes per step
@@ -55,11 +63,8 @@ export function jpegSize(bytes: Uint8Array): ImageSize | undefined {
 			position += MARKER_BYTES;
 			continue;
 		}
-		if (position + MARKER_BYTES + LENGTH_FIELD_BYTES > bytes.length) {
-			return undefined;
-		}
-		const segmentLength = view.getUint16(position + MARKER_BYTES);
-		if (segmentLength < LENGTH_FIELD_BYTES || position + MARKER_BYTES + segmentLength > bytes.length) {
+		const segmentLength = segmentLengthAt(view, position);
+		if (segmentLength === undefined) {
 			return undefined;
 		}
 		if (isFrameHeader(marker)) {
