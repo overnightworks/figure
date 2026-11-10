@@ -19,6 +19,24 @@ node dist/bin.js check path/to/figure.vrm
 In an app or a release check, `checkFigure(bytes)` from the package root returns the list of refusals for a file's
 bytes; it runs in a browser and in Node.
 
+## Install
+
+A consumer pins a release's tarball by URL. Every release is on the repository's
+[releases page](https://github.com/overnightworks/figure/releases), immutable, and holds one tarball:
+
+```
+https://github.com/overnightworks/figure/releases/download/v<version>/overnightworks-figure-<version>.tgz
+```
+
+```sh
+pnpm add https://github.com/overnightworks/figure/releases/download/v0.1.0/overnightworks-figure-0.1.0.tgz
+```
+
+pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it downloads the tarball. The value to compare stands
+at the top of the release's notes. The package has no dependencies, so the lockfile gains that one package. npm takes the same URL and records the same integrity.
+
+Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } from 'overnightworks-figure'` in code.
+
 ## Exit codes
 
 | Exit | Meaning | Output |
