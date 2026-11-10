@@ -37,6 +37,19 @@ describe('runCommand', () => {
 		expect(stdout[0]).toMatch(/^not_glb\b/);
 	});
 
+	it('prints the text a refusal carries after its code', () => {
+		const path = writeFigure('uri.glb', buildGlb({ json: { images: [{ uri: 'face.png' }] } }));
+		expect(runCommand(['check', path], output)).toBe(1);
+		expect(stdout).toHaveLength(1);
+		expect(stdout[0]).toMatch(/^uri_not_allowed\b.*images\[0\]/);
+	});
+
+	it('prints one line per refusal', () => {
+		const path = writeFigure('two.glb', buildGlb({ version: 1, declaredLength: 0 }));
+		expect(runCommand(['check', path], output)).toBe(1);
+		expect(stdout.map((line) => line.split(':')[0])).toEqual(['glb_version', 'glb_length']);
+	});
+
 	it('exits 2 with the reason on stderr when the file cannot be read', () => {
 		expect(runCommand(['check', join(directory, 'missing.glb')], output)).toBe(2);
 		expect(stdout).toEqual([]);

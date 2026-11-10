@@ -26,17 +26,21 @@ flowchart TD
     cli["cli.ts: arguments, file read, output, exit codes"] --> check
     cli --> codes
     check["check.ts: bytes to refusals, pure"] --> codes
+    check --> profile
+    profile["profile.ts: allowed extensions, file budget"]
     codes["codes.ts: the closed set of refusal codes"]
     index["index.ts: package root"] --> check
+    index --> profile
     index --> codes
 ```
 
 *Module dependencies; derived from the imports in `src/`.*
 
 - `codes.ts` owns every refusal code and its description.
-- `check.ts` owns the rules; it reads bytes and imports nothing.
+- `profile.ts` owns the values the rules read: the allowed extensions and the file budget.
+- `check.ts` owns the rules; it reads bytes and imports no module but the codes and the profile.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
-- `index.ts` exports `checkFigure` and the codes; `overnightworks-figure/codes` exports the codes alone.
+- `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone.
 
 ## 3. Runtime View
 
@@ -59,6 +63,16 @@ sequenceDiagram
 ```
 
 *The command's one flow; derived from `src/cli.ts`.*
+
+The rules run in a fixed order. A refusal that leaves the later rules unjudgeable ends the check; the others all
+report:
+
+1. `too_large` (judged on the file's length alone, and reported beside any later refusal);
+2. `not_glb` ends the check;
+3. `glb_version` and `glb_length`, both reported;
+4. `glb_chunk` (every chunk compared with the bytes that are there) ends the check;
+5. `glb_json` ends the check;
+6. `extension_not_allowed` and `uri_not_allowed`, both reported.
 
 ## 4. Deployment View
 
@@ -89,4 +103,6 @@ shares no code with the check.
 
 ## 8. Risks and Technical Debt
 
-- Only one rule exists; a file with a GLB header can still be malformed.
+- The profile rules (presets, look-at, licence, further budgets) are not built; a file the container rules pass can still be outside the profile.
+- Extension objects a file uses without declaring them in `extensionsUsed` are not scanned.
+- The command reads the whole file before the check judges its size.

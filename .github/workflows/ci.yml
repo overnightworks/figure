@@ -72,8 +72,8 @@ jobs:
           cd "${install_directory}"
           printf '{"private":true,"dependencies":{"overnightworks-figure":"file:%s"}}' "${tarball_directory}"/overnightworks-figure-*.tgz > package.json
           npm install
-          # glTF magic, version 2, total length 12: a GLB header and nothing else.
-          printf 'glTF\002\000\000\000\014\000\000\000' > synthetic.glb
+          # glTF magic, version 2, total length 48, then one 28-byte JSON chunk.
+          printf 'glTF\002\000\000\000\060\000\000\000\034\000\000\000JSON{"asset":{"version":"2.0"}} ' > synthetic.glb
           printf 'plain text' > not-glb.txt
           npx figure check synthetic.glb
           status=0; npx figure check not-glb.txt || status=$?

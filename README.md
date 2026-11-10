@@ -33,6 +33,17 @@ The codes and the exit codes are the contract; the wording of a line is not.
 | Code | Refused when |
 |---|---|
 | `not_glb` | the file is shorter than GLB's 12-byte header, or does not start with GLB's magic |
+| `too_large` | the file is over the profile's file budget |
+| `glb_version` | the GLB header's version field is not 2 |
+| `glb_length` | the GLB header's length field differs from the file's length |
+| `glb_chunk` | a chunk's header or content reaches past the end of the file, or the first chunk is not the JSON chunk |
+| `glb_json` | the JSON chunk's content is not a JSON object |
+| `extension_not_allowed` | `extensionsUsed` or `extensionsRequired` names an extension outside the profile's allowed list |
+| `uri_not_allowed` | a buffer or an image names a `uri`, external or data; every byte sits in the GLB itself |
+
+A refusal may also carry a text naming what it found (the extension, the place of the URI); the command prints it
+after the code. The profile's values (allowed extensions, file budget) live in `src/profile.ts` and are exported as
+`overnightworks-figure/profile`.
 
 The closed set lives in `src/codes.ts` and is exported as `overnightworks-figure/codes`.
 
