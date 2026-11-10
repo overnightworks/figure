@@ -1,8 +1,0 @@
-claim_id = "e4529745788d4df7bb3812601677ac85"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "03885a53b6b35325b2d367cbbc3e58a1679c4b9e"
-branch = "claude/issue-16-figure-check-refuses-a-vrm-without-the-h"
-scope = ["README.md", "docs/ARCHITECTURE.md", "quality/baseline.toml", "src", "tests"]
-opened_commit = "1fe72c129e1e2dab29c8099e928da65ab5d1fa2b"
-whole_reason = "The rule, its code, the list it reads, the builder's conformant file and the two documents that list the rules change together; a rule without its counter-examples is unfinished."
