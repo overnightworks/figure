@@ -3,7 +3,7 @@
 The fleet's VRM 1.0 profile as a check: the framework-free TypeScript ESM package `overnightworks-figure`.
 
 Today figure ships the check: `figure check <file>` tells whether a figure file meets the profile's container, VRM and
-budget rules (the texture budgets are not judged yet).
+budget rules.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick start
