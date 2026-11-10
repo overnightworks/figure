@@ -49,10 +49,13 @@ The codes and the exit codes are the contract; the wording of a line is not.
 | `licence_credit` | `meta.creditNotation` is not `unnecessary` |
 | `too_many_triangles` | the meshes hold more triangles together than the profile's budget (each mesh counted once) |
 | `too_many_morph_targets` | a primitive has more morph targets than the profile's budget |
-| `gltf_invalid` | a mesh, primitive, accessor or index a budget must read does not have glTF's shape, so it cannot judge |
+| `texture_too_large` | an embedded image is wider or taller than the profile's side budget; one refusal per image, naming it |
+| `too_many_texels` | the embedded images' widths times heights, added up (each image once), are over the profile's texel budget |
+| `image_invalid` | an embedded image's bytes reach past the binary chunk, or are not a PNG whose header the check can size (zero sides included; JPEG and WebP count as not sizeable) |
+| `gltf_invalid` | a mesh, primitive, accessor, index, image or buffer view a rule must read does not have glTF's shape, so it cannot judge |
 
 A refusal may also carry a text naming what it found (the extension, the place of the URI); the command prints it
-after the code. The profile's values (allowed extensions, file budget, presets, licence values, triangle and morph-target budgets) live in `src/profile.ts` and are exported as
+after the code. The profile's values (allowed extensions, file budget, presets, licence values, triangle, morph-target, texture-side and texel budgets) live in `src/profile.ts` and are exported as
 `overnightworks-figure/profile`.
 
 The closed set lives in `src/codes.ts` and is exported as `overnightworks-figure/codes`.
