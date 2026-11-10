@@ -7,7 +7,16 @@ export const refusalDescriptions = {
 	glb_chunk: 'a chunk reaches past the end of the file, or the first chunk is not the JSON chunk',
 	glb_json: 'the JSON chunk is not a JSON object',
 	extension_not_allowed: 'the file names an extension the profile does not allow',
-	uri_not_allowed: 'a buffer or an image names a URI; every byte must sit in the GLB itself'
+	uri_not_allowed: 'a buffer or an image names a URI; every byte must sit in the GLB itself',
+	not_vrm: 'the file has no VRMC_vrm extension object of specification version 1.0',
+	preset_missing: 'a preset expression the profile requires is missing',
+	look_at_missing: 'the VRM has no look-at',
+	licence_redistribution: 'the licence does not allow redistribution',
+	licence_avatar_permission: 'the licence does not let everyone use the model as an avatar',
+	licence_credit: 'the licence requires a credit notation',
+	too_many_triangles: 'the meshes hold more triangles together than the profile’s budget',
+	too_many_morph_targets: 'a primitive has more morph targets than the profile’s budget',
+	gltf_invalid: 'a part of the JSON that a rule must read does not have the shape glTF gives it'
 } as const;
 
 export type RefusalCode = keyof typeof refusalDescriptions;

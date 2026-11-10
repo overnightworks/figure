@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCommand } from './cli.js';
-import { buildGlb } from '../tests/glbBuilder.js';
+import { figureProfile } from './profile.js';
+import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 
 describe('runCommand', () => {
 	let directory: string;
@@ -24,8 +25,8 @@ describe('runCommand', () => {
 		return path;
 	}
 
-	it('exits 0 and says so on stdout for a GLB', () => {
-		expect(runCommand(['check', writeFigure('ok.glb', buildGlb())], output)).toBe(0);
+	it('exits 0 and says so on stdout for a conformant VRM', () => {
+		expect(runCommand(['check', writeFigure('ok.vrm', buildVrmGlb())], output)).toBe(0);
 		expect(stdout).toHaveLength(1);
 		expect(stderr).toEqual([]);
 	});
@@ -37,15 +38,22 @@ describe('runCommand', () => {
 		expect(stdout[0]).toMatch(/^not_glb\b/);
 	});
 
+	it('exits 1 with the code and the preset it names for a VRM that lacks a preset', () => {
+		const [preset] = figureProfile.presets;
+		const bytes = buildVrmGlb({ json: vrmJson((json) => delete json.extensions.VRMC_vrm.expressions.preset[preset as string]) });
+		expect(runCommand(['check', writeFigure('no-preset.vrm', bytes)], output)).toBe(1);
+		expect(stdout).toEqual([expect.stringMatching(new RegExp(`^preset_missing\\b.*${preset}`))]);
+	});
+
 	it('prints the text a refusal carries after its code', () => {
-		const path = writeFigure('uri.glb', buildGlb({ json: { images: [{ uri: 'face.png' }] } }));
+		const path = writeFigure('uri.glb', buildVrmGlb({ json: vrmJson((json) => (json.images = [{ uri: 'face.png' }])) }));
 		expect(runCommand(['check', path], output)).toBe(1);
 		expect(stdout).toHaveLength(1);
 		expect(stdout[0]).toMatch(/^uri_not_allowed\b.*images\[0\]/);
 	});
 
 	it('prints one line per refusal', () => {
-		const path = writeFigure('two.glb', buildGlb({ version: 1, declaredLength: 0 }));
+		const path = writeFigure('two.glb', buildVrmGlb({ version: 1, declaredLength: 0 }));
 		expect(runCommand(['check', path], output)).toBe(1);
 		expect(stdout.map((line) => line.split(':')[0])).toEqual(['glb_version', 'glb_length']);
 	});

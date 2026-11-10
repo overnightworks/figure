@@ -2,7 +2,7 @@
 
 ## 1. Context and Scope
 
-figure is a framework-free TypeScript ESM package. Today it holds the check: a pure function from a figure file's
+figure is a framework-free TypeScript ESM package. Today it holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's
 bytes to a list of refusals, and the command `figure check <file>` around it. Two callers use it: a person or a CI job
 (personas' release check) runs the command in Node, and an app calls `checkFigure` in a browser before three parses
 the file.
@@ -25,9 +25,17 @@ flowchart TD
     bin["bin.ts: wires process streams and exit code"] --> cli
     cli["cli.ts: arguments, file read, output, exit codes"] --> check
     cli --> codes
-    check["check.ts: bytes to refusals, pure"] --> codes
+    check["check.ts: container rules, bytes to refusals, pure"] --> codes
     check --> profile
-    profile["profile.ts: allowed extensions, file budget"]
+    check --> vrmRules
+    check --> budgetRules
+    vrmRules["vrmRules.ts: extension, presets, look-at, licence"] --> profile
+    budgetRules["budgetRules.ts: triangle and morph-target budgets"] --> profile
+    vrmRules --> json
+    budgetRules --> json
+    check --> json
+    json["json.ts: the JSON object type"]
+    profile["profile.ts: the values the rules read"]
     codes["codes.ts: the closed set of refusal codes"]
     index["index.ts: package root"] --> check
     index --> profile
@@ -37,8 +45,8 @@ flowchart TD
 *Module dependencies; derived from the imports in `src/`.*
 
 - `codes.ts` owns every refusal code and its description.
-- `profile.ts` owns the values the rules read: the allowed extensions and the file budget.
-- `check.ts` owns the rules; it reads bytes and imports no module but the codes and the profile.
+- `profile.ts` owns the values the rules read: allowed extensions, file budget, VRM version, presets, licence values and the two mesh budgets.
+- `check.ts` owns the container rules and the order; it reads bytes. `vrmRules.ts` and `budgetRules.ts` judge the parsed JSON; none imports more than the codes, the profile and `json.ts`.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
 - `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone.
 
@@ -72,7 +80,15 @@ report:
 3. `glb_version` and `glb_length`, both reported;
 4. `glb_chunk` (every chunk compared with the bytes that are there) ends the check;
 5. `glb_json` ends the check;
-6. `extension_not_allowed` and `uri_not_allowed`, both reported.
+6. `extension_not_allowed` and `uri_not_allowed`, both reported;
+7. the VRM rules: `not_vrm` alone when the VRM 1.0 extension is absent, else `preset_missing` (one per preset),
+   `look_at_missing` and the three `licence_*` codes;
+8. the budgets, which read plain glTF and so judge a file that is `not_vrm` too: `too_many_triangles`,
+   `too_many_morph_targets`, and `gltf_invalid` for a mesh, accessor or index they cannot read.
+
+Triangles are counted from accessor fields, never from geometry: per primitive of each mesh once, the `count` of the
+`indices` accessor (else `POSITION`) divided by three for mode 4, less two for modes 5 and 6, none for modes 0 to 3.
+Only the presence of a preset or the look-at is judged. The texture budgets are not judged yet.
 
 ## 4. Deployment View
 
@@ -103,6 +119,7 @@ shares no code with the check.
 
 ## 8. Risks and Technical Debt
 
-- The profile rules (presets, look-at, licence, further budgets) are not built; a file the container rules pass can still be outside the profile.
+- The texture budgets are not built; a file the rules pass can still hold oversized textures.
+- The humanoid, spring bones, constraints and materials are not judged.
 - Extension objects a file uses without declaring them in `extensionsUsed` are not scanned.
 - The command reads the whole file before the check judges its size.

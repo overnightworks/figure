@@ -69,13 +69,12 @@ jobs:
           tarball_directory="$(mktemp -d)"
           install_directory="$(mktemp -d)"
           pnpm pack --pack-destination "${tarball_directory}"
+          node scripts/write_conformant_figure.mjs "${install_directory}/synthetic.vrm"
           cd "${install_directory}"
           printf '{"private":true,"dependencies":{"overnightworks-figure":"file:%s"}}' "${tarball_directory}"/overnightworks-figure-*.tgz > package.json
           npm install
-          # glTF magic, version 2, total length 48, then one 28-byte JSON chunk.
-          printf 'glTF\002\000\000\000\060\000\000\000\034\000\000\000JSON{"asset":{"version":"2.0"}} ' > synthetic.glb
           printf 'plain text' > not-glb.txt
-          npx figure check synthetic.glb
+          npx figure check synthetic.vrm
           status=0; npx figure check not-glb.txt || status=$?
           test "${status}" -eq 1
           status=0; npx figure check missing.glb || status=$?
