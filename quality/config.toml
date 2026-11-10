@@ -18,3 +18,8 @@ reason = "npm links the figure command to this file, whose shebang makes it exec
 path = "src/bin.ts"
 rule = "script-header"
 reason = "the script header rule reads # and .mjs comments only, and this TypeScript entry is four lines of wiring"
+
+[[layout.allow]]
+path = "tests/e2e/check.spec.ts"
+rule = "test-layout"
+reason = "the browser layer sits beside the Node test builders in tests/, and a root e2e/ would need its own root entry"

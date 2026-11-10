@@ -69,6 +69,10 @@ jobs:
           tarball_directory="$(mktemp -d -p .)"
           pnpm pack --pack-destination "${tarball_directory}"
           scripts/check_packed_tarball.sh "${tarball_directory}"/overnightworks-figure-*.tgz
+      - name: Run the browser layer under the script policy
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm run test:consumer
 
   quality:
     name: quality
