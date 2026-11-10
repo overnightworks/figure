@@ -1,8 +1,0 @@
-claim_id = "ddd6d111ae7d48a481d8e6b09c612125"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "80000d63ae6ceafdc1972fbba7f7cda65d80ed67"
-branch = "claude/issue-7-figure-check-refuses-a-file-that-is-not"
-scope = [".github/workflows/ci.yml", "README.md", "docs/ARCHITECTURE.md", "package.json", "quality/baseline.toml", "quality/config.toml", "scripts", "src", "tests"]
-opened_commit = "461a614aca925838a7e7ccee46af3cdab32e2b55"
-whole_reason = "The rules, their codes, the profile's values, the builder's conformant VRM, the workflow step that uses it and the documents that list the codes change together; a rule without its code row or its counter-example is unfinished."
