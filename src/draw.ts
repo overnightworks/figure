@@ -66,11 +66,11 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array): Promise<Outc
  * Draws one frame of the VRM in `bytes` into `canvas`, whose CSS size the host owns, and resolves to a handle holding the
  * first signal, which `onSignal` has had by then. It never rejects: an error `onSignal` throws is reported to the window's error handlers.
  */
-export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, { onSignal }: MountOptions): Promise<FigureHandle> {
-	const { signal, release } = await start(canvas, bytes);
+export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
+	const { signal, release } = await start(canvas, bytes).catch(() => ended(figureSignal.refused));
 	let disposed = false;
 	try {
-		onSignal(signal);
+		options?.onSignal?.(signal);
 	} catch (error) {
 		reportError(error);
 	}

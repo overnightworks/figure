@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
-import { buildPng } from '../tests/glbBuilder.js';
+import { buildFigureTexturePng, buildPng } from '../tests/glbBuilder.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 
@@ -50,6 +50,31 @@ describe('mount in a browser', () => {
 
 		expect(handle.signal).toBe(figureSignal.refused);
 		expect(signals).toEqual([figureSignal.refused]);
+	});
+
+	it('refuses a file whose texture has an intact header but undecodable image data', async () => {
+		const png = buildFigureTexturePng().slice();
+		const firstZlibByte = 8 + 25 + 8;
+		png[firstZlibByte] = 0x87;
+
+		const { handle, signals } = await mountOn(newCanvas(), buildVrmGlbWithImages([png]));
+
+		expect(signals).toEqual([figureSignal.refused]);
+		expect(handle.signal).toBe(figureSignal.refused);
+	});
+
+	it('resolves with refused instead of rejecting when the bytes are null', async () => {
+		const { handle, signals } = await mountOn(newCanvas(), null as unknown as Uint8Array);
+
+		expect(signals).toEqual([figureSignal.refused]);
+		expect(handle.signal).toBe(figureSignal.refused);
+	});
+
+	it('resolves with a signal when called without options', async () => {
+		const handle = await mount(newCanvas(), buildConformantVrm());
+		handles.push(handle);
+
+		expect(handle.signal).toBe(figureSignal.drawn);
 	});
 
 	it('is unsupported on a canvas that gives no WebGL 2 context', async () => {

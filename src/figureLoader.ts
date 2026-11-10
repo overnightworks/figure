@@ -2,6 +2,22 @@ import { FileLoader, Texture, TextureLoader, type LoadingManager } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
 
+/**
+ * Resolves once the image has decoded to at least one visible pixel. The browser fires `load` after the header and decodes
+ * lazily, and an image with an intact header and unreadable data then loads as a fully transparent frame, which a figure draws black.
+ */
+async function decodedToPixels(image: HTMLImageElement): Promise<void> {
+	await image.decode();
+	const canvas = document.createElement('canvas');
+	canvas.width = image.naturalWidth;
+	canvas.height = image.naturalHeight;
+	const context = canvas.getContext('2d', { willReadFrequently: true })!;
+	context.drawImage(image, 0, 0);
+	const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+	for (let alpha = 3; alpha < data.length; alpha += 4) if (data[alpha] > 0) return;
+	throw new Error('a texture decoded to no visible pixel');
+}
+
 /** A texture loader that reads an image through an `<img>` element, which the script policy allows, and tells when an image fails. */
 class ImageElementTextureLoader extends TextureLoader {
 	constructor(
@@ -23,10 +39,16 @@ class ImageElementTextureLoader extends TextureLoader {
 			onError(new Error('a figure file may only read an image from its own bytes'));
 			return new Texture<HTMLImageElement>();
 		}
-		return super.load(url, onLoad, onProgress, (error) => {
+		const failed = (error: unknown) => {
 			this.onFailure();
 			onError(error);
-		});
+		};
+		return super.load(
+			url,
+			(texture) => decodedToPixels(texture.image as HTMLImageElement).then(() => onLoad(texture), failed),
+			onProgress,
+			failed
+		);
 	}
 }
 
