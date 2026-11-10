@@ -1,0 +1,8 @@
+claim_id = "73f9968ca1894e0fb0ba14c16b262cad"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "b92289e356432d43e7720fb07da153e61e0064c7"
+branch = "claude/issue-13-a-release-run-gates-builds-the-tarball-a"
+scope = [".github/workflows/ci.yml", ".github/workflows/release.yml", "AGENTS.md", "docs/ARCHITECTURE.md", "package.json", "quality/baseline.toml", "quality/config.toml", "scripts"]
+opened_commit = "c81b83761b076a1bf0bfa55d3215a33b03ac4775"
+whole_reason = "The workflow, the version it refuses without, the one script that proves a packed tarball for CI and for a release, and the two documents that name the release path are one change; the workflow alone would refuse every dispatch."
