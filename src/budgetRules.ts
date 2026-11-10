@@ -18,9 +18,9 @@ export function budgetRefusals(json: JsonObject): Refusal[] {
 	const attempt = (place: string, read: () => void) => {
 		try {
 			read();
-		} catch (unreadable) {
+		} catch (error_) {
 			// The readers below throw nothing but Unreadable.
-			invalid.push({ code: 'gltf_invalid', detail: `${place}: ${(unreadable as Unreadable).message}` });
+			invalid.push({ code: 'gltf_invalid', detail: `${place}: ${(error_ as Unreadable).message}` });
 		}
 	};
 	attempt('meshes', () => {
