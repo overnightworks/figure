@@ -17,3 +17,7 @@ updates:
     groups:
       vitest:
         patterns: ["vitest", "@vitest/*"]
+      # why: three-vrm takes three as a peer and @types/three follows three's
+      # version, so the three move in one update.
+      three:
+        patterns: ["three", "@pixiv/three-vrm", "@types/three"]

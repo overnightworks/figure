@@ -50,14 +50,15 @@ jobs:
           node-version-file: package.json
           # Without check-latest a range resolves from the runner's tool cache, which can lag the newest major.
           check-latest: true
-      # The command tests run the build output, so the build comes before the tests.
+      # The command tests run the build output, so the build comes before the tests; the browser project needs Chromium.
       - name: Install, type-check, build and test
         run: |
           pnpm install --frozen-lockfile
           pnpm run check
           pnpm run build
+          pnpm exec playwright install --with-deps chromium
           pnpm run test:coverage
-      - name: Upload the unit-test coverage report
+      - name: Upload the merged coverage report of the Node and the browser project
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: unit-coverage
@@ -71,7 +72,6 @@ jobs:
           scripts/check_packed_tarball.sh "${tarball_directory}"/overnightworks-figure-*.tgz
       - name: Run the browser layer under the script policy
         run: |
-          pnpm exec playwright install --with-deps chromium
           pnpm run test:consumer
 
   quality:
