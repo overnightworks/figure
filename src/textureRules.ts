@@ -1,11 +1,12 @@
 import type { Refusal } from './codes.js';
 import { attemptRead, indexOf, listOf, objectOf, requiredListOf, unreadable, type JsonObject } from './json.js';
-import { pngSize, type ImageSize } from './pngHeader.js';
+import { imageSize } from './imageSize.js';
+import type { ImageSize } from './pngHeader.js';
 import { figureProfile } from './profile.js';
 
 /**
  * Judges the texture budgets from each embedded image's header alone (glTF 2.0, sections 3.8 and 3.6.1.2): the images
- * sit in the binary chunk, and only a PNG header can be sized. An image with a `uri` is left to `uri_not_allowed`.
+ * sit in the binary chunk, and a PNG, JPEG or WebP header can be sized. An image with a `uri` is left to `uri_not_allowed`.
  */
 export function textureRefusals(json: JsonObject, binaryChunk: Uint8Array | undefined): Refusal[] {
 	const tooLarge: Refusal[] = [];
@@ -22,7 +23,7 @@ export function textureRefusals(json: JsonObject, binaryChunk: Uint8Array | unde
 				}
 				const size = rangeSize(binaryChunk, range);
 				if (size === undefined) {
-					invalidImages.push({ code: 'image_invalid', detail: `${place} is not a PNG within the binary chunk` });
+					invalidImages.push({ code: 'image_invalid', detail: `${place} is not a PNG, JPEG or WebP image whose header states a size within the binary chunk` });
 					return;
 				}
 				texels += size.width * size.height;
@@ -62,10 +63,10 @@ function imageRange(json: JsonObject, image: JsonObject): ByteRange | undefined 
 	};
 }
 
-/** The size of the PNG in the range; undefined when the range reaches past the chunk or holds no PNG header. */
+/** The size of the image in the range; undefined when the range reaches past the chunk or holds no header that can be sized. */
 function rangeSize(binaryChunk: Uint8Array | undefined, range: ByteRange): ImageSize | undefined {
 	if (binaryChunk === undefined || range.offset > binaryChunk.length || range.length > binaryChunk.length - range.offset) {
 		return undefined;
 	}
-	return pngSize(binaryChunk.subarray(range.offset, range.offset + range.length));
+	return imageSize(binaryChunk.subarray(range.offset, range.offset + range.length));
 }

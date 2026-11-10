@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { figureProfile } from './profile.js';
-import { buildPng } from '../tests/glbBuilder.js';
+import { buildJpeg, buildPng } from '../tests/glbBuilder.js';
 import { buildConformantVrm, buildVrmGlb, buildVrmGlbWithImages, vrmJson } from '../tests/figureFixtures.js';
 
 const binPath = join(import.meta.dirname, '..', 'dist', 'bin.js');
@@ -24,6 +24,12 @@ describe('the figure command from the build output', () => {
 	it('exits 0 on the conformant synthetic VRM', () => {
 		const path = join(directory, 'ok.glb');
 		writeFileSync(path, buildConformantVrm());
+		expect(figure('check', path).status).toBe(0);
+	});
+
+	it('exits 0 on a synthetic VRM whose embedded texture is a JPEG', () => {
+		const path = join(directory, 'jpeg.glb');
+		writeFileSync(path, buildVrmGlbWithImages([buildJpeg(figureProfile.maxTextureSidePixels, 1)]));
 		expect(figure('check', path).status).toBe(0);
 	});
 
