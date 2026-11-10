@@ -29,6 +29,11 @@ flowchart TD
     check --> profile
     check --> vrmRules
     check --> budgetRules
+    check --> textureRules
+    textureRules["textureRules.ts: texture side and texel budgets"] --> profile
+    textureRules --> json
+    textureRules --> imageSize
+    imageSize["imageSize.ts: PNG, JPEG and WebP header readers"]
     vrmRules["vrmRules.ts: extension, presets, look-at, licence"] --> profile
     budgetRules["budgetRules.ts: triangle and morph-target budgets"] --> profile
     vrmRules --> json
@@ -46,7 +51,7 @@ flowchart TD
 
 - `codes.ts` owns every refusal code and its description.
 - `profile.ts` owns the values the rules read: allowed extensions, file budget, VRM version, presets, licence values and the two mesh budgets.
-- `check.ts` owns the container rules and the order; it reads bytes. `vrmRules.ts` and `budgetRules.ts` judge the parsed JSON; none imports more than the codes, the profile and `json.ts`.
+- `check.ts` owns the container rules and the order; it reads bytes. `vrmRules.ts` and `budgetRules.ts` judge the parsed JSON; none imports more than the codes, the profile and `json.ts`. `textureRules.ts` also reads the binary chunk through `imageSize.ts`.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
 - `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone.
 
@@ -94,8 +99,11 @@ Only the presence of a preset or the look-at is judged.
 
 Textures are judged from headers only. Each entry of `images` counts once, however many textures use it; an image with
 a `uri` is left to `uri_not_allowed`. Its bytes are the range its buffer view names in the binary chunk, compared with
-the chunk's length before any read. Today only a PNG is sized, from its signature and header chunk (`src/pngHeader.ts`);
-any other image type is `image_invalid`. The stated size is compared with the budgets and never used to allocate or read.
+the chunk's length before any read. `imageSize` (`src/imageSize.ts`) sizes a PNG, a JPEG or a WebP by the image's first
+bytes, never by its `mimeType`, each in its own reader (`pngHeader.ts`, `jpegHeader.ts`, `webpHeader.ts`); any other
+image type is `image_invalid`. A JPEG's size is its first frame header, found by a forward walk over the segments; a
+WebP's is the first chunk's own header (lossy, lossless or the extended canvas). The stated size is compared with the
+budgets and never used to allocate or read.
 
 ## 4. Deployment View
 

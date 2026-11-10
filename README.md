@@ -51,7 +51,7 @@ The codes and the exit codes are the contract; the wording of a line is not.
 | `too_many_morph_targets` | a primitive has more morph targets than the profile's budget |
 | `texture_too_large` | an embedded image is wider or taller than the profile's side budget; one refusal per image, naming it |
 | `too_many_texels` | the embedded images' widths times heights, added up (each image once), are over the profile's texel budget |
-| `image_invalid` | an embedded image's bytes reach past the binary chunk, or are not a PNG whose header the check can size (zero sides included; JPEG and WebP count as not sizeable) |
+| `image_invalid` | an embedded image's bytes reach past the binary chunk, or are not a PNG, JPEG or WebP (lossy, lossless or extended) whose header the check can size (zero sides included) |
 | `gltf_invalid` | a mesh, primitive, accessor, index, image or buffer view a rule must read does not have glTF's shape, so it cannot judge |
 
 A refusal may also carry a text naming what it found (the extension, the place of the URI); the command prints it
