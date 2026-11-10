@@ -1,4 +1,4 @@
-/** The values the rules read; the profile rules of later slices add theirs here. */
+/** The values the rules read; the rules of later slices add theirs here. */
 export const figureProfile = {
 	allowedExtensions: [
 		'VRMC_vrm',
@@ -10,5 +10,14 @@ export const figureProfile = {
 		'KHR_materials_emissive_strength',
 		'EXT_texture_webp'
 	],
-	fileBudgetBytes: 12 * 1024 * 1024
+	fileBudgetBytes: 12 * 1024 * 1024,
+	vrmSpecVersion: '1.0',
+	presets: ['aa', 'ih', 'ou', 'ee', 'oh', 'blink', 'happy', 'angry', 'sad', 'relaxed', 'surprised'],
+	licence: {
+		allowRedistribution: true,
+		avatarPermission: 'everyone',
+		creditNotation: 'unnecessary'
+	},
+	maxTriangles: 60_000,
+	maxMorphTargetsPerPrimitive: 64
 } as const;

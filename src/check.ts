@@ -1,5 +1,8 @@
+import { budgetRefusals } from './budgetRules.js';
 import type { Refusal } from './codes.js';
+import { type JsonObject, isJsonObject } from './json.js';
 import { figureProfile } from './profile.js';
+import { vrmRefusals } from './vrmRules.js';
 
 const GLB_HEADER_BYTES = 12;
 const CHUNK_HEADER_BYTES = 8;
@@ -38,7 +41,7 @@ export function checkFigure(bytes: Uint8Array): Refusal[] {
 	if (json === undefined) {
 		return [...refusals, { code: 'glb_json' }];
 	}
-	return [...refusals, ...extensionRefusals(json), ...uriRefusals(json)];
+	return [...refusals, ...extensionRefusals(json), ...uriRefusals(json), ...vrmRefusals(json), ...budgetRefusals(json)];
 }
 
 /** Walks the chunks against the bytes that are there; undefined when one reaches past the end. */
@@ -64,13 +67,10 @@ function readChunks(bytes: Uint8Array): Chunk[] | undefined {
 	return chunks;
 }
 
-type JsonObject = Record<string, unknown>;
-
 function parseJsonObject(content: Uint8Array): JsonObject | undefined {
 	try {
 		const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(content));
-		const isObject = typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
-		return isObject ? (parsed as JsonObject) : undefined;
+		return isJsonObject(parsed) ? parsed : undefined;
 	} catch {
 		return undefined;
 	}

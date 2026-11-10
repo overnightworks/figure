@@ -63,3 +63,36 @@ export function buildGlb(options: GlbOptions = {}): Uint8Array {
 export function buildHeaderOnlyGlb(): Uint8Array {
 	return buildGlb().subarray(0, HEADER_BYTES).map((byte, index) => (index === 8 ? HEADER_BYTES : byte));
 }
+
+/** The values a conformant VRM carries; the caller reads them from the profile so the builder restates none. */
+export interface ConformantVrmValues {
+	readonly vrmSpecVersion: string;
+	readonly presets: readonly string[];
+	readonly licence: {
+		readonly allowRedistribution: boolean;
+		readonly avatarPermission: string;
+		readonly creditNotation: string;
+	};
+}
+
+/** The JSON of a conformant synthetic VRM: its extension, one triangle in one indexed primitive, no binary data. */
+export function buildConformantVrmJson(values: ConformantVrmValues): Record<string, any> {
+	return {
+		asset: { version: '2.0' },
+		extensionsUsed: ['VRMC_vrm'],
+		extensions: {
+			VRMC_vrm: {
+				specVersion: values.vrmSpecVersion,
+				meta: { name: 'synthetic', authors: ['synthetic'], licenseUrl: 'https://example.invalid/licence', ...values.licence },
+				humanoid: { humanBones: {} },
+				expressions: { preset: Object.fromEntries(values.presets.map((name) => [name, {}])) },
+				lookAt: { type: 'bone' }
+			}
+		},
+		meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
+		accessors: [
+			{ componentType: 5126, count: 3, type: 'VEC3' },
+			{ componentType: 5123, count: 3, type: 'SCALAR' }
+		]
+	};
+}

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buildGlb } from '../tests/glbBuilder.js';
+import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 
 const binPath = join(import.meta.dirname, '..', 'dist', 'bin.js');
 
@@ -19,10 +19,18 @@ describe('the figure command from the build output', () => {
 		return spawnSync(process.execPath, [binPath, ...args], { encoding: 'utf8' });
 	}
 
-	it('exits 0 on a synthetic GLB', () => {
+	it('exits 0 on the conformant synthetic VRM', () => {
 		const path = join(directory, 'ok.glb');
-		writeFileSync(path, buildGlb());
+		writeFileSync(path, buildVrmGlb());
 		expect(figure('check', path).status).toBe(0);
+	});
+
+	it('exits 1 with the code of the rule a synthetic VRM breaks', () => {
+		const path = join(directory, 'no-look-at.vrm');
+		writeFileSync(path, buildVrmGlb({ json: vrmJson((json) => delete json.extensions.VRMC_vrm.lookAt) }));
+		const result = figure('check', path);
+		expect(result.status).toBe(1);
+		expect(result.stdout).toMatch(/^look_at_missing\b/);
 	});
 
 	it('exits 1 with the code not_glb on a file that is not GLB', () => {
@@ -35,7 +43,7 @@ describe('the figure command from the build output', () => {
 
 	it('exits 1 with the code and the text it found on a file that names a URI', () => {
 		const path = join(directory, 'uri.glb');
-		writeFileSync(path, buildGlb({ json: { buffers: [{ uri: 'model.bin' }] } }));
+		writeFileSync(path, buildVrmGlb({ json: vrmJson((json) => (json.buffers = [{ uri: 'model.bin' }])) }));
 		const result = figure('check', path);
 		expect(result.status).toBe(1);
 		expect(result.stdout).toMatch(/^uri_not_allowed\b.*buffers\[0\]/);
