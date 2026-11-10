@@ -1,4 +1,4 @@
-import { FileLoader, TextureLoader, type LoadingManager } from 'three';
+import { FileLoader, Texture, TextureLoader, type LoadingManager } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
 
@@ -18,6 +18,11 @@ class ImageElementTextureLoader extends TextureLoader {
 		onProgress: undefined,
 		onError: (error: unknown) => void
 	) {
+		if (!url.startsWith('blob:')) {
+			this.onFailure();
+			onError(new Error('a figure file may only read an image from its own bytes'));
+			return new Texture<HTMLImageElement>();
+		}
 		return super.load(url, onLoad, onProgress, (error) => {
 			this.onFailure();
 			onError(error);
