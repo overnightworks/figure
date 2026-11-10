@@ -1,0 +1,8 @@
+claim_id = "787ce239171f4848bc35f5fe2c99fb5b"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "b95e6e3e89328945781476da520fdc309c5b3ed0"
+branch = "claude/issue-11-figure-check-sizes-embedded-jpeg-and-web"
+scope = ["README.md", "docs/ARCHITECTURE.md", "quality/baseline.toml", "src", "tests"]
+opened_commit = "82fc9bed9bfbe4985237ed90e5e97f74cfe9f19a"
+whole_reason = "The two header readers, the one size function the texture rules call, the builder's synthetic images and the two sentences that name the sized types change together; a reader without its counter-examples is unfinished."
