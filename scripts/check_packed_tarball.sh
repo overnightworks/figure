@@ -2,7 +2,7 @@
 # Proves a packed figure tarball runs: installs it into a temporary directory and expects `figure check` to exit 0 on the
 # test builder's conformant file, 1 on a file that is not GLB and 2 on a missing file.
 # Usage: scripts/check_packed_tarball.sh <tarball>; run it from the repository after `pnpm run build`.
-# Exit codes: 2 for a missing or unreadable tarball argument, 1 for any failed expectation or command.
+# Exit codes: 2 for a missing tarball argument, non-zero for any failed expectation or command.
 set -euo pipefail
 
 if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
