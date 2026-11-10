@@ -24,6 +24,10 @@ function isFrameHeader(marker: number): boolean {
 	return marker >= FIRST_FRAME && marker <= LAST_FRAME && !NOT_FRAME_HEADERS.has(marker);
 }
 
+function endsHeaderWalk(marker: number): boolean {
+	return marker === 0 || marker === END_OF_IMAGE || marker === START_OF_SCAN;
+}
+
 function segmentLengthAt(view: DataView, position: number): number | undefined {
 	if (position + MARKER_BYTES + LENGTH_FIELD_BYTES > view.byteLength) {
 		return undefined;
@@ -56,7 +60,7 @@ export function jpegSize(bytes: Uint8Array): ImageSize | undefined {
 			position += 1;
 			continue;
 		}
-		if (marker === 0 || marker === END_OF_IMAGE || marker === START_OF_SCAN) {
+		if (endsHeaderWalk(marker)) {
 			return undefined;
 		}
 		if (!carriesLength(marker)) {
