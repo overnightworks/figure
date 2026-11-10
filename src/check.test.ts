@@ -133,13 +133,13 @@ describe('checkFigure', () => {
 		expect(refusals[0]?.detail).toMatch(/^(buffers|images)\[0\]/);
 	});
 
-	it('passes buffers and images that name no URI, and ignores entries that are not objects', () => {
-		const json = { buffers: [{ byteLength: 1 }, 5, null], images: [{ bufferView: 0 }], nodes: [{ uri: 'x' }] };
+	it('passes buffers that name no URI, and ignores entries that are not objects', () => {
+		const json = { buffers: [{ byteLength: 1 }, 5, null], nodes: [{ uri: 'x' }] };
 		expect(checkFigure(buildGlb({ json: { ...vrmJson(), ...json } }))).toEqual([]);
 	});
 
-	it('ignores buffers and images that are not lists', () => {
-		expect(checkFigure(buildGlb({ json: { ...vrmJson(), buffers: { uri: 'a' }, images: 3 } }))).toEqual([]);
+	it('ignores buffers that are not a list', () => {
+		expect(checkFigure(buildGlb({ json: { ...vrmJson(), buffers: { uri: 'a' } } }))).toEqual([]);
 	});
 
 	it('reports an extension and a URI together', () => {

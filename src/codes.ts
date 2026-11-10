@@ -16,6 +16,9 @@ export const refusalDescriptions = {
 	licence_credit: 'the licence requires a credit notation',
 	too_many_triangles: 'the meshes hold more triangles together than the profile’s budget',
 	too_many_morph_targets: 'a primitive has more morph targets than the profile’s budget',
+	texture_too_large: 'an embedded image is wider or taller than the profile’s side budget',
+	too_many_texels: 'the embedded images hold more texels together than the profile’s budget',
+	image_invalid: 'an image’s bytes reach past the binary chunk, or are not an image whose header the check can size',
 	gltf_invalid: 'a part of the JSON that a rule must read does not have the shape glTF gives it'
 } as const;
 
