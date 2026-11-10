@@ -126,6 +126,12 @@ as `lcov.info`; the entry module `bin.ts` is reached only as a process, so its l
 installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that
 shares no code with the check.
 
+A browser layer (`tests/e2e`, Playwright) packs the tarball, installs it into a temporary consumer, bundles that with Vite
+and serves it in headless Chromium under the script policy `default-src 'none'; script-src 'self'; connect-src 'self';
+img-src 'self' blob:; worker-src 'self'`, which every response of the page carries. It proves that the check runs in a
+browser on raw bytes and that loading code and files breaks no part of the policy. Its coverage is not measured: it runs
+the check, which the Node tests cover to 100 % of branches. It records, without asserting, whether the canvas gives WebGL 2.
+
 ## 6. Constraints and reasons
 
 - The check reads raw bytes and imports no module: a browser runs it before three parses a file, and personas' CI runs it in Node.

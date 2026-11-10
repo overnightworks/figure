@@ -8,6 +8,7 @@
 - `pnpm run build`: emits `dist/`; the process-driven tests in `src/bin.test.ts` run it, so build first.
 - `pnpm exec vitest run <file>`: one test file. Add `--coverage` for the lcov report.
 - `scripts/check_packed_tarball.sh <tarball>`: installs a packed tarball into a temporary directory and runs `figure check` from it; CI and the release build both call it.
+- `scripts/run_consumer_check.sh`: the browser layer (`pnpm run test:consumer`) under the fleet's probe-stack lock, for local use; needs `pnpm exec playwright install chromium` once. CI calls `pnpm run test:consumer` directly. Never run it in watch or UI mode or beside another browser proof.
 - Release: the operator dispatches `.github/workflows/release.yml` with the version, which must equal `package.json`'s. An agent dispatches it only on his yes for that one version (quality's `docs/release.md`).
 - `quality check`: the shared static check. Run it at the release `.github/workflows/ci.yml` pins, after `git add` (it reads the index).
 
