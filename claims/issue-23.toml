@@ -1,0 +1,8 @@
+claim_id = "cfe15ba274784ec3971b45da11327eb7"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "7b89755082e211166c6e5f495cc799bd23a26877"
+branch = "claude/issue-23-mount-draws-one-frame-of-a-figure-and-te"
+scope = [".github/dependabot.yml", ".github/workflows/ci.yml", ".gitignore", "AGENTS.md", "docs/ARCHITECTURE.md", "package.json", "pnpm-lock.yaml", "quality/baseline.toml", "quality/config.toml", "scripts", "sonar-project.properties", "src", "tests", "tsconfig.json", "vitest.config.ts"]
+opened_commit = "21fe4f874b94b236af25dd14f393bdd33fd2dda5"
+whole_reason = "The drawing export, its two dependencies, the two browser layers that prove it and the coverage they join are one path from a file's bytes to a drawn frame; none of them is reachable or provable alone."
