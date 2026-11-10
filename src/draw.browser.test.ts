@@ -61,6 +61,28 @@ describe('mount in a browser', () => {
 		expect(signals).toEqual([figureSignal.unsupported]);
 	});
 
+	it('resolves with lost, once, on a canvas whose figure was disposed', async () => {
+		const canvas = newCanvas();
+		const first = await mountOn(canvas, buildConformantVrm());
+		first.handle.dispose();
+
+		const { handle, signals } = await mountOn(canvas, buildConformantVrm());
+
+		expect(handle.signal).toBe(figureSignal.lost);
+		expect(signals).toEqual([figureSignal.lost]);
+	});
+
+	it('resolves with lost, once, on a canvas an earlier mount refused after loading', async () => {
+		const canvas = newCanvas();
+		const first = await mountOn(canvas, buildVrmGlbWithImages([buildPng(4, 2)]));
+		expect(first.handle.signal).toBe(figureSignal.refused);
+
+		const { handle, signals } = await mountOn(canvas, buildConformantVrm());
+
+		expect(handle.signal).toBe(figureSignal.lost);
+		expect(signals).toEqual([figureSignal.lost]);
+	});
+
 	it('gives its first signal before the promise resolves and the handle carries it', async () => {
 		let resolved = false;
 		const signalsBeforeResolve: FigureSignal[] = [];

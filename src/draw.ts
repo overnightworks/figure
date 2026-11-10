@@ -33,6 +33,7 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array): Promise<Outc
 	if (checkFigure(bytes).length > 0) return ended(figureSignal.refused);
 	const context = canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: 'low-power' });
 	if (context === null) return ended(figureSignal.unsupported);
+	if (context.isContextLost()) return ended(figureSignal.lost);
 	const renderer = new WebGLRenderer({ canvas, context, alpha: true });
 	let vrm: VRM | undefined;
 	const release = () => {
