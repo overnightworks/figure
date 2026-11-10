@@ -1,0 +1,7 @@
+claim_id = "56f11284d7d548fb9ae432faa98ea414"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "50bbf0192856f6645dc6a5d3cce4c318648ac624"
+branch = "claude/issue-15-the-first-immutable-release-installs-by"
+scope = ["README.md", "docs/ARCHITECTURE.md"]
+opened_commit = "0c81cae4f75f6ddb75f07c58e6b31ff5952b1246"
