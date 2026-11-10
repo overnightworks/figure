@@ -40,6 +40,7 @@ jobs:
       notes: ${{ steps.notes.outputs.notes }}
     env:
       VERSION: ${{ inputs.version }}
+      TARBALL: overnightworks-figure-${{ inputs.version }}.tgz
     steps:
       # The checkout takes github.sha, the dispatch's commit; the gate refuses unless main's head is still that commit.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -80,31 +81,29 @@ jobs:
           pnpm pack --pack-destination release-files
 
       - name: Run figure check from the packed tarball
-        run: scripts/check_packed_tarball.sh "release-files/overnightworks-figure-$VERSION.tgz"
+        run: scripts/check_packed_tarball.sh "release-files/$TARBALL"
 
       - name: Refuse unless release-files holds exactly the tarball
         run: |
-          expected="overnightworks-figure-$VERSION.tgz"
           found=$(LC_ALL=C ls -A release-files)
-          if [ "$found" != "$expected" ]; then
+          if [ "$found" != "$TARBALL" ]; then
             echo "Refused: release-files holds" >&2
             echo "$found" >&2
-            echo "but only $expected belongs in it." >&2
+            echo "but only $TARBALL belongs in it." >&2
             exit 1
           fi
 
       - name: Write the notes that pin the uploaded tarball by its integrity
         id: notes
         run: |
-          tarball="overnightworks-figure-$VERSION.tgz"
-          integrity=sha512-$(openssl dgst -sha512 -binary "release-files/$tarball" | base64 -w0)
+          integrity=sha512-$(openssl dgst -sha512 -binary "release-files/$TARBALL" | base64 -w0)
           download="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/v$VERSION"
           {
             echo 'notes<<NOTES'
             echo "The tarball's URL and the integrity pnpm writes into the lockfile:"
             echo
             echo '```'
-            echo "$download/$tarball"
+            echo "$download/$TARBALL"
             echo "$integrity"
             echo '```'
             echo 'NOTES'
