@@ -22,8 +22,8 @@ function headAndShouldersCamera(vrm: VRM, aspect: number): PerspectiveCamera {
 	const centreHeight = eyes.y + (framing.above - framing.below) / 2;
 	const distance = Math.max((framing.above + framing.below) / 2 / tangent, framing.halfWidth / (tangent * aspect));
 	const view = new PerspectiveCamera(camera.fieldOfView, aspect, camera.near, camera.far);
-	view.position.set(0, centreHeight, eyes.z + distance);
-	view.lookAt(0, centreHeight, eyes.z);
+	view.position.set(eyes.x, centreHeight, eyes.z + distance);
+	view.lookAt(eyes.x, centreHeight, eyes.z);
 	return view;
 }
 

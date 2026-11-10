@@ -24,6 +24,8 @@ class ImageElementTextureLoader extends TextureLoader {
 			return new Texture<HTMLImageElement>();
 		}
 		return super.load(url, onLoad, onProgress, (error) => {
+			// three revokes the object URL it made only when the image loads.
+			URL.revokeObjectURL(url);
 			this.onFailure();
 			onError(error);
 		});
