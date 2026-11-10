@@ -43,6 +43,7 @@ The codes and the exit codes are the contract; the wording of a line is not.
 | `uri_not_allowed` | a buffer or an image names a `uri`, external or data; every byte sits in the GLB itself |
 | `not_vrm` | there is no `extensions.VRMC_vrm` object, or its `specVersion` is not `1.0`; the other VRM rules then stay silent |
 | `preset_missing` | `expressions.preset` lacks one of the profile's presets; one refusal per missing preset, naming it |
+| `humanoid_bone_missing` | `humanoid.humanBones` lacks a bone VRM 1.0 requires, or its entry is not an object with a `node`; one refusal per bone, naming it |
 | `look_at_missing` | `VRMC_vrm.lookAt` is not an object |
 | `licence_redistribution` | `meta.allowRedistribution` is not `true` |
 | `licence_avatar_permission` | `meta.avatarPermission` is not `everyone` |

@@ -13,6 +13,24 @@ export const figureProfile = {
 	fileBudgetBytes: 12 * 1024 * 1024,
 	vrmSpecVersion: '1.0',
 	presets: ['aa', 'ih', 'ou', 'ee', 'oh', 'blink', 'happy', 'angry', 'sad', 'relaxed', 'surprised'],
+	/** The bones VRM 1.0 requires in `humanoid.humanBones`; each entry names a node. */
+	requiredHumanBones: [
+		'hips',
+		'spine',
+		'head',
+		'leftUpperLeg',
+		'leftLowerLeg',
+		'leftFoot',
+		'rightUpperLeg',
+		'rightLowerLeg',
+		'rightFoot',
+		'leftUpperArm',
+		'leftLowerArm',
+		'leftHand',
+		'rightUpperArm',
+		'rightLowerArm',
+		'rightHand'
+	],
 	licence: {
 		allowRedistribution: true,
 		avatarPermission: 'everyone',

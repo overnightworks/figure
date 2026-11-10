@@ -134,8 +134,11 @@ describe('checkFigure', () => {
 	});
 
 	it('passes buffers that name no URI, and ignores entries that are not objects', () => {
-		const json = { buffers: [{ byteLength: 1 }, 5, null], nodes: [{ uri: 'x' }] };
-		expect(checkFigure(buildGlb({ json: { ...vrmJson(), ...json } }))).toEqual([]);
+		const json = vrmJson((vrm) => {
+			vrm.buffers = [{ byteLength: 1 }, 5, null];
+			vrm.nodes.push({ uri: 'x' });
+		});
+		expect(checkFigure(buildGlb({ json }))).toEqual([]);
 	});
 
 	it('ignores buffers that are not a list', () => {

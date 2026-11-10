@@ -69,7 +69,7 @@ describe('the triangle budget', () => {
 	it('counts a mesh once however many nodes use it', () => {
 		const change = (json: Json) => {
 			withPrimitives([{ attributes: { POSITION: 0 } }], [3 * budget])(json);
-			json.nodes = [{ mesh: 0 }, { mesh: 0 }, { mesh: 0 }];
+			json.nodes.push({ mesh: 0 }, { mesh: 0 }, { mesh: 0 });
 		};
 		expect(codesOf(change)).toEqual([]);
 	});
