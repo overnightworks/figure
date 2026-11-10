@@ -113,7 +113,8 @@ whose `figure` command runs in Node and whose modules a bundler takes. The packa
 A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the
 build packs `overnightworks-figure-<version>.tgz` into `release-files` and proves it with
 `scripts/check_packed_tarball.sh`, and quality's tag job publishes the tarball on an immutable release, whose notes carry
-the tarball's `sha512-` integrity for a consumer that pins it by URL. quality's `docs/release.md` owns the path.
+the tarball's `sha512-` integrity for a consumer that pins it by URL. Releases exist; a consumer finds them on the
+repository's releases page (`https://github.com/overnightworks/figure/releases`). quality's `docs/release.md` owns the path.
 
 ## 5. Crosscutting Concepts
 
