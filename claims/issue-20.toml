@@ -1,8 +1,0 @@
-claim_id = "ae6154966bf64e72ac90324dd2410915"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "19687ef555e46e53634a18c54dcf2b1ae8b97b7d"
-branch = "claude/issue-20-the-conformant-synthetic-vrm-is-one-a-re"
-scope = [".github/dependabot.yml", "docs/ARCHITECTURE.md", "package.json", "pnpm-lock.yaml", "quality/baseline.toml", "quality/config.toml", "scripts", "src", "tests"]
-opened_commit = "296e49270cba86cd1686afdd23f01176c5eddb7b"
-whole_reason = "The one conformant file, every test that starts from it, the script that writes it and the two proofs of it change together; a file half made drawable would break the tests that count on its shape."
