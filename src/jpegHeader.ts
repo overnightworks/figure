@@ -49,11 +49,8 @@ export function jpegSize(bytes: Uint8Array): ImageSize | undefined {
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
 	let position = MARKER_BYTES;
 	while (position < bytes.length) {
-		if (bytes[position] !== MARKER_PREFIX) {
-			return undefined;
-		}
 		const marker = bytes[position + 1];
-		if (marker === undefined) {
+		if (bytes[position] !== MARKER_PREFIX || marker === undefined) {
 			return undefined;
 		}
 		if (marker === MARKER_PREFIX) {
