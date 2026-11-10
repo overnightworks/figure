@@ -87,7 +87,7 @@ report:
 5. `glb_json` ends the check;
 6. `extension_not_allowed` and `uri_not_allowed`, both reported;
 7. the VRM rules: `not_vrm` alone when the VRM 1.0 extension is absent, else `preset_missing` (one per preset),
-   `look_at_missing` and the three `licence_*` codes;
+   `humanoid_bone_missing` (one per required bone, `gltf_invalid` for a bone whose node names no entry of `nodes`), `look_at_missing` and the three `licence_*` codes;
 8. the budgets, which read plain glTF and so judge a file that is `not_vrm` too: `too_many_triangles`,
    `too_many_morph_targets`, and `gltf_invalid` for a mesh, accessor or index they cannot read;
 9. the texture budgets (`src/textureRules.ts`), which also read the binary chunk: `texture_too_large`,
@@ -139,6 +139,6 @@ shares no code with the check.
 
 ## 8. Risks and Technical Debt
 
-- The humanoid, spring bones, constraints and materials are not judged.
+- Of the humanoid only the required bones are judged, not optional bones, a bone used twice or the hierarchy; spring bones, constraints and materials are not judged.
 - Extension objects a file uses without declaring them in `extensionsUsed` are not scanned.
 - The command reads the whole file before the check judges its size.
