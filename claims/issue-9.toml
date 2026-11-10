@@ -1,8 +1,0 @@
-claim_id = "8446b069802b48418d19781ec1aeb66f"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "fdd8da08377b2911abc02f8e1008fb20bc179cea"
-branch = "claude/issue-9-figure-check-sizes-each-embedded-image-a"
-scope = [".github/workflows/ci.yml", "README.md", "docs/ARCHITECTURE.md", "quality/baseline.toml", "scripts", "src", "tests"]
-opened_commit = "026100b1d131e49b357b556b09d38d8642278b9c"
-whole_reason = "The image lookup, the PNG header, the two budgets, their codes and values, the builder's embedded image and the documents that list the codes are one path from the file to a verdict; none is reachable alone."
