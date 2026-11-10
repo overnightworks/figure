@@ -52,15 +52,15 @@ describe('mount in a browser', () => {
 		expect(signals).toEqual([figureSignal.refused]);
 	});
 
-	it('refuses a file whose texture has an intact header but undecodable image data', async () => {
+	it('draws a file whose texture data the browser decodes without an error, though the data is corrupt', async () => {
 		const png = buildFigureTexturePng().slice();
 		const firstZlibByte = 8 + 25 + 8;
-		png[firstZlibByte] = 0x87;
+		png[firstZlibByte] ^= 0xff;
 
 		const { handle, signals } = await mountOn(newCanvas(), buildVrmGlbWithImages([png]));
 
-		expect(signals).toEqual([figureSignal.refused]);
-		expect(handle.signal).toBe(figureSignal.refused);
+		expect(signals).toEqual([figureSignal.drawn]);
+		expect(handle.signal).toBe(figureSignal.drawn);
 	});
 
 	it('resolves with refused instead of rejecting when the bytes are null', async () => {

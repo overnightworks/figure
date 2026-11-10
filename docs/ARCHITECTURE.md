@@ -197,4 +197,5 @@ WebGL 2 makes it red. The browser project drives `mount`'s other signals, the ha
 
 - Of the humanoid only the required bones are judged, not optional bones, a bone used twice or the hierarchy; spring bones, constraints and materials are not judged.
 - Extension objects a file uses without declaring them in `extensionsUsed` are not scanned.
+- The package does not validate image data: a corrupt image that the browser decodes without an error is drawn as decoded.
 - The command reads the whole file before the check judges its size.
