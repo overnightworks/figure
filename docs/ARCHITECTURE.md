@@ -110,6 +110,11 @@ budgets and never used to allocate or read.
 The build is `tsc` alone and emits ESM and declarations to `dist/`. `prepack` runs it, so `pnpm pack` yields a tarball
 whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm.
 
+A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the
+build packs `overnightworks-figure-<version>.tgz` into `release-files` and proves it with
+`scripts/check_packed_tarball.sh`, and quality's tag job publishes the tarball on an immutable release, whose notes carry
+the tarball's `sha512-` integrity for a consumer that pins it by URL. quality's `docs/release.md` owns the path.
+
 ## 5. Crosscutting Concepts
 
 **Trust.** A figure file is untrusted input; no code comes from it. The check is about conformance and about
