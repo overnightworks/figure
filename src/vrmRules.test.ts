@@ -140,6 +140,17 @@ describe('the VRM rules', () => {
 		});
 
 		it.each([
+			['null', null],
+			['a number', 3],
+			['a list', []]
+		])('refuses every bone as gltf_invalid when the node entries are %s', (_name, entry) => {
+			const codes = codesOf((json) => {
+				json.nodes = json.nodes.map(() => entry);
+			});
+			expect(codes).toEqual(bones.map(() => 'gltf_invalid'));
+		});
+
+		it.each([
 			['absent', (json: Record<string, any>) => delete json.nodes],
 			['a string', (json: Record<string, any>) => (json.nodes = 'nodes')]
 		])('refuses every bone as gltf_invalid when the node list is %s', (_name, change) => {

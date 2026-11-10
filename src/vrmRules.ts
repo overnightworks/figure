@@ -37,7 +37,7 @@ function humanoidRefusals(vrm: JsonObject, json: JsonObject): Refusal[] {
 			continue;
 		}
 		attemptRead(refusals, `humanoid bone ${bone}`, () => {
-			if (indexOf(entry['node']) >= listOf(json['nodes']).length) {
+			if (!isJsonObject(listOf(json['nodes'])[indexOf(entry['node'])])) {
 				unreadable('a node index names no entry of nodes');
 			}
 		});
