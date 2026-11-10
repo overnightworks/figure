@@ -1,0 +1,8 @@
+claim_id = "7c77c0373e67476e8c48ab83c4b86810"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "b288e56f1a220a3f842b545fda39e57203d8292f"
+branch = "claude/issue-18-the-check-runs-in-headless-chromium-unde"
+scope = [".github/dependabot.yml", ".github/workflows/ci.yml", ".gitignore", "AGENTS.md", "docs/ARCHITECTURE.md", "package.json", "pnpm-lock.yaml", "quality/baseline.toml", "quality/config.toml", "scripts", "tests"]
+opened_commit = "3c4f490268fa233bf5ca4f7c3fb766b9fff1e9d3"
+whole_reason = "The browser layer is one path from the packed tarball to a verdict in CI: its spec, its dependencies, its script, the CI steps and the documents that name its command; none of them runs alone."
