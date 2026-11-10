@@ -1,5 +1,5 @@
 import type { Refusal } from './codes.js';
-import { isJsonObject, type JsonObject } from './json.js';
+import { attemptRead, indexOf, isJsonObject, listOf, unreadable, type JsonObject } from './json.js';
 import { figureProfile } from './profile.js';
 
 const licenceCodes = {
@@ -15,7 +15,7 @@ export function vrmRefusals(json: JsonObject): Refusal[] {
 	if (!isJsonObject(vrm) || vrm['specVersion'] !== figureProfile.vrmSpecVersion) {
 		return [{ code: 'not_vrm' }];
 	}
-	return [...presetRefusals(vrm), ...lookAtRefusals(vrm), ...licenceRefusals(vrm)];
+	return [...presetRefusals(vrm), ...humanoidRefusals(vrm, json), ...lookAtRefusals(vrm), ...licenceRefusals(vrm)];
 }
 
 function presetRefusals(vrm: JsonObject): Refusal[] {
@@ -24,6 +24,25 @@ function presetRefusals(vrm: JsonObject): Refusal[] {
 	return figureProfile.presets
 		.filter((name) => !isJsonObject(presets) || !isJsonObject(presets[name]))
 		.map((name) => ({ code: 'preset_missing', detail: `the preset ${name} is missing` }));
+}
+
+function humanoidRefusals(vrm: JsonObject, json: JsonObject): Refusal[] {
+	const humanoid = vrm['humanoid'];
+	const humanBones = isJsonObject(humanoid) ? humanoid['humanBones'] : undefined;
+	const refusals: Refusal[] = [];
+	for (const bone of figureProfile.requiredHumanBones) {
+		const entry = isJsonObject(humanBones) ? humanBones[bone] : undefined;
+		if (!isJsonObject(entry) || !('node' in entry)) {
+			refusals.push({ code: 'humanoid_bone_missing', detail: `the bone ${bone} is missing` });
+			continue;
+		}
+		attemptRead(refusals, `humanoid bone ${bone}`, () => {
+			if (indexOf(entry['node']) >= listOf(json['nodes']).length) {
+				unreadable('a node index names no entry of nodes');
+			}
+		});
+	}
+	return refusals;
 }
 
 function lookAtRefusals(vrm: JsonObject): Refusal[] {

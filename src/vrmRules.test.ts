@@ -94,4 +94,70 @@ describe('the VRM rules', () => {
 	])('refuses all three licence fields of a meta that is %s', (_name, change) => {
 		expect(codesOf(change)).toEqual(['licence_redistribution', 'licence_avatar_permission', 'licence_credit']);
 	});
+
+	describe('humanoid bones', () => {
+		const bones = figureProfile.requiredHumanBones;
+		const humanBonesOf = (json: Record<string, any>) => json.extensions.VRMC_vrm.humanoid.humanBones;
+
+		it.each(bones)('refuses the bone %s removed alone as humanoid_bone_missing naming it', (bone) => {
+			const refusals = refusalsOf((json) => delete humanBonesOf(json)[bone]);
+			expect(refusals.map(({ code }) => code)).toEqual(['humanoid_bone_missing']);
+			expect(refusals[0]?.detail).toContain(bone);
+		});
+
+		it('refuses one humanoid_bone_missing per missing bone', () => {
+			const [first, second] = bones;
+			const refusals = refusalsOf((json) => {
+				delete humanBonesOf(json)[first as string];
+				delete humanBonesOf(json)[second as string];
+			});
+			expect(refusals.map(({ detail }) => detail)).toEqual([expect.stringContaining(first as string), expect.stringContaining(second as string)]);
+		});
+
+		it.each([
+			['without node', (entry: Record<string, any>) => delete entry.node, undefined],
+			['null', undefined, null],
+			['a string', undefined, 'hips'],
+			['a list', undefined, []]
+		])('refuses a bone entry that is %s as humanoid_bone_missing', (_name, removeNode, replacement) => {
+			const bone = bones[0] as string;
+			const codes = codesOf((json) => {
+				if (removeNode) removeNode(humanBonesOf(json)[bone]);
+				else humanBonesOf(json)[bone] = replacement;
+			});
+			expect(codes).toEqual(['humanoid_bone_missing']);
+		});
+
+		it.each([
+			['negative', -1],
+			['a float', 1.5],
+			['a string', '0'],
+			['null', null],
+			['past the node list', bones.length]
+		])('refuses a bone whose node is %s as gltf_invalid', (_name, node) => {
+			const codes = codesOf((json) => (humanBonesOf(json)[bones[0] as string].node = node));
+			expect(codes).toEqual(['gltf_invalid']);
+		});
+
+		it.each([
+			['absent', (json: Record<string, any>) => delete json.nodes],
+			['a string', (json: Record<string, any>) => (json.nodes = 'nodes')]
+		])('refuses every bone as gltf_invalid when the node list is %s', (_name, change) => {
+			expect(codesOf(change)).toEqual(bones.map(() => 'gltf_invalid'));
+		});
+
+		it.each([
+			['absent', (json: Record<string, any>) => delete json.extensions.VRMC_vrm.humanoid],
+			['null', (json: Record<string, any>) => (json.extensions.VRMC_vrm.humanoid = null)],
+			['a number', (json: Record<string, any>) => (json.extensions.VRMC_vrm.humanoid = 7)],
+			['without humanBones', (json: Record<string, any>) => (json.extensions.VRMC_vrm.humanoid = {})],
+			['with humanBones as a list', (json: Record<string, any>) => (json.extensions.VRMC_vrm.humanoid.humanBones = [])]
+		])('refuses every bone of a humanoid that is %s', (_name, change) => {
+			expect(codesOf(change)).toEqual(bones.map(() => 'humanoid_bone_missing'));
+		});
+
+		it('reports no bone refusal for a file that is not a VRM', () => {
+			expect(codesOf((json) => delete json.extensions)).toEqual(['not_vrm']);
+		});
+	});
 });

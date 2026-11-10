@@ -49,6 +49,15 @@ describe('the figure command from the build output', () => {
 		expect(result.stdout).toMatch(/^look_at_missing\b/);
 	});
 
+	it('exits 1 with the code of a required humanoid bone a synthetic VRM lacks', () => {
+		const path = join(directory, 'no-bone.vrm');
+		const [bone] = figureProfile.requiredHumanBones;
+		writeFileSync(path, buildVrmGlb({ json: vrmJson((json) => delete json.extensions.VRMC_vrm.humanoid.humanBones[bone as string]) }));
+		const result = figure('check', path);
+		expect(result.status).toBe(1);
+		expect(result.stdout).toMatch(/^humanoid_bone_missing\b/);
+	});
+
 	it('exits 1 with the code not_glb on a file that is not GLB', () => {
 		const path = join(directory, 'bad.glb');
 		writeFileSync(path, 'plain text');

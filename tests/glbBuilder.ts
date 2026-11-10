@@ -68,6 +68,7 @@ export function buildHeaderOnlyGlb(): Uint8Array {
 export interface ConformantVrmValues {
 	readonly vrmSpecVersion: string;
 	readonly presets: readonly string[];
+	readonly requiredHumanBones: readonly string[];
 	readonly licence: {
 		readonly allowRedistribution: boolean;
 		readonly avatarPermission: string;
@@ -84,11 +85,12 @@ export function buildConformantVrmJson(values: ConformantVrmValues): Record<stri
 			VRMC_vrm: {
 				specVersion: values.vrmSpecVersion,
 				meta: { name: 'synthetic', authors: ['synthetic'], licenseUrl: 'https://example.invalid/licence', ...values.licence },
-				humanoid: { humanBones: {} },
+				humanoid: { humanBones: Object.fromEntries(values.requiredHumanBones.map((bone, index) => [bone, { node: index }])) },
 				expressions: { preset: Object.fromEntries(values.presets.map((name) => [name, {}])) },
 				lookAt: { type: 'bone' }
 			}
 		},
+		nodes: values.requiredHumanBones.map((bone) => ({ name: bone })),
 		meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
 		accessors: [
 			{ componentType: 5126, count: 3, type: 'VEC3' },
