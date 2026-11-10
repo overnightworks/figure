@@ -7,6 +7,8 @@
 - `pnpm run check`: the type check of the sources and the tests.
 - `pnpm run build`: emits `dist/`; the process-driven tests in `src/bin.test.ts` run it, so build first.
 - `pnpm exec vitest run <file>`: one test file. Add `--coverage` for the lcov report.
+- `scripts/check_packed_tarball.sh <tarball>`: installs a packed tarball into a temporary directory and runs `figure check` from it; CI and the release build both call it.
+- Release: the operator dispatches `.github/workflows/release.yml` with the version, which must equal `package.json`'s. An agent dispatches it only on his yes for that one version (quality's `docs/release.md`).
 - `quality check`: the shared static check. Run it at the release `.github/workflows/ci.yml` pins, after `git add` (it reads the index).
 
 ## Rules

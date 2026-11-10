@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, X.Y.Z
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions: {}
+
+# bash runs with pipefail, so a hash pipeline whose first command fails fails its step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  gate:
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: read
+    uses: overnightworks/quality/.github/workflows/release-gate.yml@2d2b68bf3916b34f6f2c72a540c1e3d8a947b750 # v0.10.0
+    with:
+      version: ${{ inputs.version }}
+
+  build:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      notes: ${{ steps.notes.outputs.notes }}
+    env:
+      VERSION: ${{ inputs.version }}
+      TARBALL: overnightworks-figure-${{ inputs.version }}.tgz
+    steps:
+      # The checkout takes github.sha, the dispatch's commit; the gate refuses unless main's head is still that commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Refuse unless the checkout is the commit the gate judged
+        env:
+          COMMIT: ${{ needs.gate.outputs.commit }}
+        run: |
+          head=$(git rev-parse HEAD)
+          if [ "$head" != "$COMMIT" ]; then
+            echo "Refused: the checkout is $head, not the gated commit $COMMIT." >&2
+            exit 1
+          fi
+
+      - name: Refuse unless package.json carries the version
+        run: |
+          package_version=$(jq -r .version package.json)
+          if [ "$package_version" != "$VERSION" ]; then
+            echo "Refused: package.json carries $package_version, not $VERSION." >&2
+            exit 1
+          fi
+
+      # pnpm takes its version from package.json's packageManager.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
+      # A release build reads no cache, so no earlier run can change what it ships.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version-file: package.json
+          check-latest: true
+          package-manager-cache: false
+
+      # dist is tsc's output and the package's files, so the tarball goes to its own directory; pnpm pack runs prepack, which builds.
+      - name: Install and pack the tarball
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm pack --pack-destination release-files
+
+      - name: Run figure check from the packed tarball
+        run: scripts/check_packed_tarball.sh "release-files/$TARBALL"
+
+      - name: Refuse unless release-files holds exactly the tarball
+        run: |
+          found=$(LC_ALL=C ls -A release-files)
+          if [ "$found" != "$TARBALL" ]; then
+            echo "Refused: release-files holds" >&2
+            echo "$found" >&2
+            echo "but only $TARBALL belongs in it." >&2
+            exit 1
+          fi
+
+      - name: Write the notes that pin the uploaded tarball by its integrity
+        id: notes
+        run: |
+          integrity=sha512-$(openssl dgst -sha512 -binary "release-files/$TARBALL" | base64 -w0)
+          download="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/v$VERSION"
+          {
+            echo 'notes<<NOTES'
+            echo "The tarball's URL and the integrity pnpm writes into the lockfile:"
+            echo
+            echo '```'
+            echo "$download/$TARBALL"
+            echo "$integrity"
+            echo '```'
+            echo 'NOTES'
+          } >>"$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release-files
+          path: release-files/
+          if-no-files-found: error
+
+  tag:
+    needs: [gate, build]
+    permissions:
+      contents: write
+    uses: overnightworks/quality/.github/workflows/release-tag.yml@2d2b68bf3916b34f6f2c72a540c1e3d8a947b750 # v0.10.0
+    with:
+      version: ${{ inputs.version }}
+      commit: ${{ needs.gate.outputs.commit }}
+      artifact: release-files
+      notes: ${{ needs.build.outputs.notes }}
