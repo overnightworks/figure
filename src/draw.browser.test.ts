@@ -70,8 +70,11 @@ describe('mount in a browser', () => {
 		expect(handle.signal).toBe(figureSignal.refused);
 	});
 
-	it('resolves with a signal when called without options', async () => {
-		const handle = await mount(newCanvas(), buildConformantVrm());
+	it.each([
+		['no options object', undefined],
+		['an empty options object', {}],
+	])('resolves with a signal when called with %s', async (_name, options) => {
+		const handle = await mount(newCanvas(), buildConformantVrm(), options);
 		handles.push(handle);
 
 		expect(handle.signal).toBe(figureSignal.drawn);

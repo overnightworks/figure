@@ -9,7 +9,7 @@ export { figureSignal, type FigureSignal } from './signals.js';
 
 export interface MountOptions {
 	/** Called with every signal the figure gives, the first one before `mount` resolves. */
-	readonly onSignal: (signal: FigureSignal) => void;
+	readonly onSignal?: (signal: FigureSignal) => void;
 }
 
 export interface FigureHandle {
