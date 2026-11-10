@@ -124,7 +124,7 @@ report:
 3. `glb_version` and `glb_length`, both reported;
 4. `glb_chunk` (every chunk compared with the bytes that are there) ends the check;
 5. `glb_json` ends the check;
-6. `extension_not_allowed` and `uri_not_allowed`, both reported;
+6. `extension_not_allowed`, `uri_not_allowed` and `buffer_outside_glb`, all reported;
 7. the VRM rules: `not_vrm` alone when the VRM 1.0 extension is absent, else `preset_missing` (one per preset),
    `humanoid_bone_missing` (one per required bone, `gltf_invalid` for a bone whose node names no entry of `nodes`), `look_at_missing` and the three `licence_*` codes;
 8. the budgets, which read plain glTF and so judge a file that is `not_vrm` too: `too_many_triangles`,

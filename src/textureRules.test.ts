@@ -159,8 +159,6 @@ describe('a part of the JSON the texture rules cannot read', () => {
 		['buffer views that are not a list', (json) => (json.bufferViews = {})],
 		['no buffer views', (json) => delete json.bufferViews],
 		['a buffer view that is not an object', (json) => (json.bufferViews = [7])],
-		['a buffer other than 0', (json) => (json.bufferViews[0].buffer = 1)],
-		['a buffer view without a buffer', (json) => delete json.bufferViews[0].buffer],
 		['an offset that is not a number', (json) => (json.bufferViews[0].byteOffset = '0')],
 		['a null offset', (json) => (json.bufferViews[0].byteOffset = null)],
 		['a negative offset', (json) => (json.bufferViews[0].byteOffset = -1)],
@@ -168,6 +166,13 @@ describe('a part of the JSON the texture rules cannot read', () => {
 		['a missing length', (json) => delete json.bufferViews[0].byteLength]
 	])('gives gltf_invalid for %s', (_name, change) => {
 		expect(broken(change)).toEqual(['gltf_invalid']);
+	});
+
+	it.each<[string, (json: Json) => void]>([
+		['a buffer other than 0', (json) => (json.bufferViews[0].buffer = 1)],
+		['a buffer view without a buffer', (json) => delete json.bufferViews[0].buffer]
+	])('gives gltf_invalid beside buffer_outside_glb for %s', (_name, change) => {
+		expect(broken(change)).toEqual(['buffer_outside_glb', 'gltf_invalid']);
 	});
 
 	it('reads an absent offset as 0', () => {
