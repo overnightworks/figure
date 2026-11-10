@@ -36,7 +36,8 @@ export function runCommand(argv: readonly string[], output: Output): number {
 		return EXIT_PASSED;
 	}
 	for (const { code, detail } of refusals) {
-		output.stdout(`${code}: ${refusalDescriptions[code]}${detail === undefined ? '' : ` (${detail})`}`);
+		const suffix = detail === undefined ? '' : ` (${detail})`;
+		output.stdout(`${code}: ${refusalDescriptions[code]}${suffix}`);
 	}
 	return EXIT_REFUSED;
 }
