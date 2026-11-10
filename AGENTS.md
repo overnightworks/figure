@@ -4,7 +4,7 @@
 
 - `pnpm run` lists the package scripts. figure has no other task runner.
 - `pnpm install --frozen-lockfile`: installs the dependencies; every command below needs it.
-- `pnpm run check`: the type check of the sources and the tests.
+- `pnpm run check`: the type check of the sources, of the modules `src/bin.ts` reaches under Node's resolution, and of the tests.
 - `pnpm run build`: emits `dist/`; the process-driven tests in `src/bin.test.ts` run it, so build first.
 - `pnpm exec vitest run <file>`: one test file. Add `--coverage` for the lcov report.
 - `scripts/check_packed_tarball.sh <tarball>`: installs a packed tarball into a temporary directory and runs `figure check` from it; CI and the release build both call it.

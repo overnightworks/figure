@@ -32,7 +32,7 @@
   "scripts": {
     "build": "tsc",
     "prepack": "pnpm run build",
-    "check": "tsc --noEmit && tsc --noEmit -p tests",
+    "check": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.node.json && tsc --noEmit -p tests",
     "test": "vitest run --project node",
     "test:coverage": "vitest run --coverage",
     "test:consumer": "playwright test --config tests/e2e/playwright.config.ts",

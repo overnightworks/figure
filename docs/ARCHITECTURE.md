@@ -147,7 +147,7 @@ budgets and never used to allocate or read.
 ## 4. Deployment View
 
 The build is `tsc` alone and emits ESM and declarations to `dist/`. `prepack` runs it, so `pnpm pack` yields a tarball
-whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm.
+whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm. The build resolves imports as a bundler does, because three-vrm's types need it; `tests/tsconfig.node.json` type-checks the modules `bin.ts` reaches under Node's own resolution, which demands each relative import's `.js`.
 
 A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the
 build packs `overnightworks-figure-<version>.tgz` into `release-files` and proves it with
