@@ -29,12 +29,23 @@ function ended(signal: FigureSignal): Outcome {
 	return { signal, release: () => {} };
 }
 
+/** The renderer on the canvas's WebGL 2 context, or the signal for why there is none; a canvas that cannot give a context throws. */
+function openRenderer(canvas: HTMLCanvasElement): WebGLRenderer | FigureSignal {
+	try {
+		const context = canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: 'low-power' });
+		if (context === null) return figureSignal.unsupported;
+		if (context.isContextLost()) return figureSignal.lost;
+		return new WebGLRenderer({ canvas, context, alpha: true });
+	} catch {
+		return figureSignal.unsupported;
+	}
+}
+
 async function start(canvas: HTMLCanvasElement, bytes: Uint8Array): Promise<Outcome> {
 	if (checkFigure(bytes).length > 0) return ended(figureSignal.refused);
-	const context = canvas.getContext('webgl2', { antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: 'low-power' });
-	if (context === null) return ended(figureSignal.unsupported);
-	if (context.isContextLost()) return ended(figureSignal.lost);
-	const renderer = new WebGLRenderer({ canvas, context, alpha: true });
+	const opened = openRenderer(canvas);
+	if (typeof opened === 'string') return ended(opened);
+	const renderer = opened;
 	let vrm: VRM | undefined;
 	const release = () => {
 		if (vrm !== undefined) VRMUtils.deepDispose(vrm.scene);

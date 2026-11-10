@@ -61,6 +61,16 @@ describe('mount in a browser', () => {
 		expect(signals).toEqual([figureSignal.unsupported]);
 	});
 
+	it('is unsupported, once, on a canvas whose control went to an offscreen canvas', async () => {
+		const canvas = newCanvas();
+		canvas.transferControlToOffscreen();
+
+		const { handle, signals } = await mountOn(canvas, buildConformantVrm());
+
+		expect(handle.signal).toBe(figureSignal.unsupported);
+		expect(signals).toEqual([figureSignal.unsupported]);
+	});
+
 	it('resolves with lost, once, on a canvas whose figure was disposed', async () => {
 		const canvas = newCanvas();
 		const first = await mountOn(canvas, buildConformantVrm());
