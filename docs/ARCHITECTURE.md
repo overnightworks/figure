@@ -63,7 +63,7 @@ flowchart TD
 - `check.ts` owns the container rules and the order; it reads bytes. `vrmRules.ts` and `budgetRules.ts` judge the parsed JSON; none imports more than the codes, the profile and `json.ts`. `textureRules.ts` also reads the binary chunk through `imageSize.ts`.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
 - `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone. No module they reach imports three or three-vrm.
-- `signals.ts` owns every signal (`drawn`, `unsupported`, `refused`, `lost`, `slow`); `lost` and `slow` have no producer yet.
+- `signals.ts` owns every signal (`drawn`, `unsupported`, `refused`, `lost`, `slow`); `lost` is given for a context already lost at the mount; a loss while a figure lives and `slow` have no producer yet.
 - `draw.ts` is the one module of `overnightworks-figure/draw`: `mount` and the handle (the last signal and an idempotent `dispose`); its declarations name no three type. `figureLoader.ts` parses the bytes with three's GLTF loader and three-vrm's plugin and gives the parser an `<img>`-based texture loader. `figureFrame.ts` owns the picture: the camera, lights and clear colour of hopin's agent-tile mockup, framed on the head and shoulders.
 
 ## 3. Runtime View
@@ -103,6 +103,8 @@ sequenceDiagram
         M->>M: canvas.getContext webgl2
         alt no context
             M-->>A: onSignal(unsupported), handle
+        else context already lost
+            M-->>A: onSignal(lost), handle
         else context
             M->>L: loadFigure(bytes)
             L-->>M: VRM, or an error
