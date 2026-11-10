@@ -124,6 +124,6 @@ describe('mount in a browser', () => {
 		await mountOn(canvas, buildConformantVrm());
 
 		expect(canvas.hasAttribute('style')).toBe(false);
-		expect(document.querySelectorAll('*').length).toBe(elementsBefore);
+		expect(document.querySelectorAll('*')).toHaveLength(elementsBefore);
 	});
 });
