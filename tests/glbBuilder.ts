@@ -105,23 +105,48 @@ const PNG_CHUNK_OVERHEAD_BYTES = 12;
 const PNG_BITS_PER_CHANNEL = 8;
 const PNG_COLOUR_TYPE_RGBA = 6;
 
+const CRC_POLYNOMIAL = 0xedb88320;
+const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
+	let remainder = value;
+	for (let bit = 0; bit < 8; bit++) {
+		remainder = remainder & 1 ? CRC_POLYNOMIAL ^ (remainder >>> 1) : remainder >>> 1;
+	}
+	return remainder >>> 0;
+});
+
+/** The CRC-32 of PNG specification section 5.5, over a chunk's type and content. */
+function crc32(bytes: Uint8Array): number {
+	let crc = 0xffffffff;
+	for (const byte of bytes) {
+		crc = CRC_TABLE[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
+	}
+	return (crc ^ 0xffffffff) >>> 0;
+}
+
+const ADLER_MODULUS = 65521;
+
+/** The Adler-32 that ends a zlib stream (RFC 1950, section 8.2). */
+function adler32(bytes: Uint8Array): number {
+	let low = 1;
+	let high = 0;
+	for (const byte of bytes) {
+		low = (low + byte) % ADLER_MODULUS;
+		high = (high + low) % ADLER_MODULUS;
+	}
+	return ((high << 16) | low) >>> 0;
+}
+
 function pngChunk(type: string, content: Uint8Array): Uint8Array {
 	const bytes = new Uint8Array(PNG_CHUNK_OVERHEAD_BYTES + content.length);
-	new DataView(bytes.buffer).setUint32(0, content.length);
+	const view = new DataView(bytes.buffer);
+	view.setUint32(0, content.length);
 	bytes.set(new TextEncoder().encode(type), 4);
 	bytes.set(content, 8);
+	view.setUint32(8 + content.length, crc32(bytes.subarray(4, 8 + content.length)));
 	return bytes;
 }
 
-/** Writes a synthetic PNG: the signature, a header chunk stating the size, an end chunk; it holds no pixel data, whatever the size. */
-export function buildPng(width: number, height: number): Uint8Array {
-	const header = new Uint8Array(PNG_HEADER_CHUNK_BYTES);
-	const view = new DataView(header.buffer);
-	view.setUint32(0, width);
-	view.setUint32(4, height);
-	header[8] = PNG_BITS_PER_CHANNEL;
-	header[9] = PNG_COLOUR_TYPE_RGBA;
-	const parts = [Uint8Array.from(PNG_SIGNATURE), pngChunk('IHDR', header), pngChunk('IEND', new Uint8Array())];
+function concatenate(parts: readonly Uint8Array[]): Uint8Array {
 	const bytes = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
 	let offset = 0;
 	for (const part of parts) {
@@ -129,6 +154,72 @@ export function buildPng(width: number, height: number): Uint8Array {
 		offset += part.length;
 	}
 	return bytes;
+}
+
+const STORED_BLOCK_MAX_BYTES = 0xffff;
+const ZLIB_HEADER = [0x78, 0x01];
+const FINAL_STORED_BLOCK = 0x01;
+
+/** A zlib stream (RFC 1950) holding `data` in one stored deflate block (RFC 1951, section 3.2.4), so no compressor is needed. */
+function storedZlibStream(data: Uint8Array): Uint8Array {
+	if (data.length > STORED_BLOCK_MAX_BYTES) {
+		throw new RangeError(`a stored block holds at most ${STORED_BLOCK_MAX_BYTES} bytes, not ${data.length}`);
+	}
+	const bytes = new Uint8Array(ZLIB_HEADER.length + 5 + data.length + 4);
+	const view = new DataView(bytes.buffer);
+	bytes.set(ZLIB_HEADER, 0);
+	bytes[2] = FINAL_STORED_BLOCK;
+	view.setUint16(3, data.length, true);
+	view.setUint16(5, ~data.length & 0xffff, true);
+	bytes.set(data, 7);
+	view.setUint32(7 + data.length, adler32(data));
+	return bytes;
+}
+
+function pngHeaderContent(width: number, height: number): Uint8Array {
+	const header = new Uint8Array(PNG_HEADER_CHUNK_BYTES);
+	const view = new DataView(header.buffer);
+	view.setUint32(0, width);
+	view.setUint32(4, height);
+	header[8] = PNG_BITS_PER_CHANNEL;
+	header[9] = PNG_COLOUR_TYPE_RGBA;
+	return header;
+}
+
+/** One colour, red, green, blue and alpha, each 0 to 255. */
+export type Rgba = readonly [number, number, number, number];
+
+/** The pixels of the figure's texture: its size and its one colour, which the browser layer and the decoding tests read back. */
+export const figureTexture: { readonly width: number; readonly height: number; readonly colour: Rgba } = {
+	width: 4,
+	height: 2,
+	colour: [200, 120, 80, 255]
+};
+
+/** The scanlines of an image of one colour: each row is a filter type byte of 0, then the row's pixels. */
+export function plainScanlines(width: number, height: number, colour: Rgba): Uint8Array {
+	const row = Uint8Array.from([0, ...Array.from({ length: width }, () => colour).flat()]);
+	return concatenate(Array.from({ length: height }, () => row));
+}
+
+/** Writes a PNG that a decoder reads: every pixel is `colour`, the image data is one stored deflate block, every chunk has its CRC. */
+export function buildImagePng(width: number, height: number, colour: Rgba): Uint8Array {
+	return concatenate([
+		Uint8Array.from(PNG_SIGNATURE),
+		pngChunk('IHDR', pngHeaderContent(width, height)),
+		pngChunk('IDAT', storedZlibStream(plainScanlines(width, height, colour))),
+		pngChunk('IEND', new Uint8Array())
+	]);
+}
+
+/** The figure's texture as a PNG. */
+export function buildFigureTexturePng(): Uint8Array {
+	return buildImagePng(figureTexture.width, figureTexture.height, figureTexture.colour);
+}
+
+/** Writes a synthetic PNG: the signature, a header chunk stating the size, an end chunk; it holds no pixel data, whatever the size. */
+export function buildPng(width: number, height: number): Uint8Array {
+	return concatenate([Uint8Array.from(PNG_SIGNATURE), pngChunk('IHDR', pngHeaderContent(width, height)), pngChunk('IEND', new Uint8Array())]);
 }
 
 const JPEG_MARKER_PREFIX = 0xff;
