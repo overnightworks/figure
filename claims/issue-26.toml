@@ -1,0 +1,8 @@
+claim_id = "b3fd52ee69554d0b9bbc06898beeef97"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "29de10c18de5726e48f1d2b6c28c329e537e1ad0"
+branch = "claude/issue-26-a-figure-follows-its-canvas-s-size-at-a"
+scope = ["docs/ARCHITECTURE.md", "src"]
+opened_commit = "72742d17dfe934cde3dd6d18f12e1ec2eac75b38"
+whole_reason = "The size logic, the mount that owns its observer, their browser tests and the one architecture sentence are one behaviour; src is named as a directory because the builder may give the logic its own module."
