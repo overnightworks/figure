@@ -32,9 +32,8 @@ https://github.com/overnightworks/figure/releases/download/v<version>/overnightw
 pnpm add https://github.com/overnightworks/figure/releases/download/v0.1.0/overnightworks-figure-0.1.0.tgz
 ```
 
-pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it downloads the tarball, and a frozen install
-enforces it. The value to compare stands at the top of the release's notes. The package has no dependencies, so the lockfile
-gains that one package. npm takes the same URL and records the same integrity.
+pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it downloads the tarball. The value to compare stands
+at the top of the release's notes. The package has no dependencies, so the lockfile gains that one package. npm takes the same URL and records the same integrity.
 
 Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } from 'overnightworks-figure'` in code.
 
