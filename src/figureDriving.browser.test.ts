@@ -2,17 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng } from '../tests/glbBuilder.js';
+import { centreOf, coversSomething, emulateReducedMotion, readPixels, spotsOf, type Spot } from '../tests/browserCanvas.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 
 /** The page's own frame request, which the tests wait on without the watcher counting it. */
 const requestFrameOwn = window.requestAnimationFrame;
-
-/** Where the nose is on a canvas, in pixels from its top left corner. */
-interface Position {
-	readonly x: number;
-	readonly y: number;
-}
 
 /** How far the nose has to move to the side or up, in pixels at a canvas 200 wide, for a test to call it turned, and how near its resting place it has to be to call it back. */
 const turnedPixels = { side: 10, up: 4 };
@@ -64,14 +59,16 @@ describe('a figure driven by the host', () => {
 	}
 
 	/** The nose as the latest frame of `canvas` shows it, once the figure has drawn after `afterFrame`. */
-	async function noseAfter(canvas: HTMLCanvasElement, afterFrame: number): Promise<Position> {
+	async function noseAfter(canvas: HTMLCanvasElement, afterFrame: number): Promise<Spot> {
 		await vi.waitFor(() => expect(frames).toBeGreaterThan(afterFrame), { timeout: 5000 });
 		await vi.waitFor(() => expect(shown.get(canvas)).toBeDefined());
 		const { pixels, width, height } = shown.get(canvas)!;
-		return noseOf(pixels, width, height);
+		const nose = centreOf(spotsOf(pixels, width, height).nose);
+		if (nose.count === 0) throw new Error('the nose is not on the canvas');
+		return nose;
 	}
 
-	async function noseNow(canvas: HTMLCanvasElement): Promise<Position> {
+	async function noseNow(canvas: HTMLCanvasElement): Promise<Spot> {
 		return noseAfter(canvas, frames + 2);
 	}
 
@@ -196,43 +193,4 @@ function seededRandom(seed: number): () => number {
 
 function nextFrame(): Promise<void> {
 	return new Promise((resolve) => requestFrameOwn.call(window, () => resolve()));
-}
-
-/** The canvas's drawing buffer as RGBA bytes; read in the task that drew it, a buffer holds nothing afterwards. */
-function readPixels(canvas: HTMLCanvasElement): Uint8Array {
-	const context = canvas.getContext('webgl2');
-	if (context === null) throw new Error('the canvas has no WebGL 2 context');
-	const pixels = new Uint8Array(canvas.width * canvas.height * 4);
-	context.readPixels(0, 0, canvas.width, canvas.height, context.RGBA, context.UNSIGNED_BYTE, pixels);
-	return pixels;
-}
-
-/** Whether the pixels hold any the figure covers: a buffer nothing was drawn into is transparent everywhere. */
-function coversSomething(pixels: Uint8Array): boolean {
-	return pixels.some((value, index) => index % 4 === 3 && value > 0);
-}
-
-/** The mean position of the nose's pixels, which the synthetic face paints yellow, in a buffer read from the bottom row up, measured from the top left. */
-function noseOf(pixels: Uint8Array, width: number, height: number): Position {
-	let count = 0;
-	let sumX = 0;
-	let sumY = 0;
-	for (let row = 0; row < height; row++) {
-		for (let column = 0; column < width; column++) {
-			const offset = 4 * (row * width + column);
-			const [red, green, blue, alpha] = [pixels[offset]!, pixels[offset + 1]!, pixels[offset + 2]!, pixels[offset + 3]!];
-			if (alpha >= 200 && red > 200 && green > 190 && blue < 150) {
-				count++;
-				sumX += column;
-				sumY += height - 1 - row;
-			}
-		}
-	}
-	if (count === 0) throw new Error('the nose is not on the canvas');
-	return { x: sumX / count, y: sumY / count };
-}
-
-/** Sets the page's `prefers-reduced-motion` to `reduce` through the browser's own media emulation, which is what a person's setting reaches the package as. */
-async function emulateReducedMotion(): Promise<void> {
-	await cdp().send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
 }
