@@ -12,7 +12,7 @@
 // the lock); it fetches nothing, serves the page by request routing, and writes the page's bundle only to a temporary
 // directory that it removes (the figure stays in memory).
 // Exit codes: 0 when the measurement ran (`slow` is a result, not a failure), 1 when the figure fails the check, no `drawn`
-// came or the browser failed, 2 when dist/ is not built.
+// came, fewer than 300 frames came or the browser failed, 2 when dist/ is not built.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -224,6 +224,10 @@ async function main() {
 		const failed = measured.mounts.find(({ signals, clientWidth }) => !signals.includes('drawn') || clientWidth !== canvasCssWidth);
 		if (failed !== undefined) {
 			console.error(`a mount was not drawn on a ${canvasCssWidth} px canvas: signals ${failed.signals.join(' ')}, canvas ${failed.clientWidth} px`);
+			return 1;
+		}
+		if (measured.intervals.length < frameCount) {
+			console.error(`only ${measured.intervals.length} of ${frameCount} frame intervals came in ${measured.mounts.length} mounts`);
 			return 1;
 		}
 		report(figure, figureProfile.fileBudgetBytes, measured, gpuMemoryParts(readGlb(figure.glb), measured.maxTextureSize));
