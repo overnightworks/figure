@@ -3,6 +3,6 @@ agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
 role = "builder"
 base = "90ad21c1a0aa0ce03431f15be2dd0ea239b68514"
 branch = "claude/issue-34-the-second-release-ships-the-idle-figure"
-scope = [".github/workflows/release.yml", "AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "package.json", "scripts", "tests"]
+scope = [".github/workflows/release.yml", "AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "package.json", "scripts", "src/conformantFigure.test.ts", "src/figurePng.test.ts", "tests"]
 opened_commit = "486e2d65797629b94b845e417ce2bb264afa9910"
 whole_reason = "The version, the documents that describe what it ships, the measurements it is released with and the notes that carry them are one release; none is true without the others."
