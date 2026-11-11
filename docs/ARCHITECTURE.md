@@ -52,11 +52,13 @@ flowchart TD
     draw --> figureLoader
     draw --> idleMotion
     draw --> figureFrame
+    draw --> frameTimeGuard
     figureLoader["figureLoader.ts: GLTF and VRM loading, the img texture loader"]
     idleMotion["idleMotion.ts: the idle pose from elapsed time and chance, pure"]
     figureFrame["figureFrame.ts: lights, camera, one frame"]
     figureFrame --> idleMotion
     signals["signals.ts: the closed set of signals"]
+    frameTimeGuard["frameTimeGuard.ts: the slow test over frame intervals, pure"]
 ```
 
 *Module dependencies; derived from the imports in `src/`.*
@@ -66,8 +68,8 @@ flowchart TD
 - `check.ts` owns the container rules and the order; it reads bytes. `vrmRules.ts` and `budgetRules.ts` judge the parsed JSON; none imports more than the codes, the profile and `json.ts`. `textureRules.ts` also reads the binary chunk through `imageSize.ts`.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
 - `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone. No module they reach imports three or three-vrm.
-- `signals.ts` owns every signal (`drawn`, `unsupported`, `refused`, `lost`, `slow`); `lost` is given for a context already lost at the mount, or lost while the figure lives; `slow` has no producer yet.
-- `draw.ts` is the one module of `overnightworks-figure/draw`: `mount` and the handle (the last signal and an idempotent `dispose`); its declarations name no three type. `figureLoader.ts` parses the bytes with three's GLTF loader and three-vrm's plugin and gives the parser an `<img>`-based texture loader. `figureFrame.ts` owns the picture: the camera, lights and clear colour of hopin's agent-tile mockup, framed on the head and shoulders, and the drawing buffer's size, the canvas's client size times the device pixel ratio capped at 2. `idleMotion.ts` owns the figure's idle life, a pure function of the seconds since the last frame and a source of chance that imports neither three nor the DOM: breathing and swaying, a blink 2 to 6 seconds after the last one, a glance 3 to 8 seconds after the last one began, with the values of the same mockup; while the page asks for reduced motion the blink stays, slower, and the rest rests. `draw.ts` owns the loop: one animation frame request at a time, the one place that draws. It runs only while the page is visible (`visibilitychange`) and an `IntersectionObserver` reports the canvas in the viewport; a frame it has requested is cancelled when either stops, and a resumed loop counts no time for the pause. The loop gives the motion the frame's time and `Math.random` and reads the page's `prefers-reduced-motion` each frame, so a change of it is followed with no listener. A `webglcontextlost` listener on the canvas ends the loop and removes its own listeners, then gives `lost`; `dispose` removes them too, so its own loss gives no signal. The drawing buffer follows the canvas in the loop's next frame, with no resize observer.
+- `signals.ts` owns every signal (`drawn`, `unsupported`, `refused`, `lost`, `slow`); `unsupported`, `refused`, `lost` and `slow` end a figure. `frameTimeGuard.ts` owns the slow test, a pure function of the recent frame intervals that imports neither three nor the DOM; its two values are named once there.
+- `draw.ts` is the one module of `overnightworks-figure/draw`: `mount` and the handle (the last signal and an idempotent `dispose`); its declarations name no three type. `figureLoader.ts` parses the bytes with three's GLTF loader and three-vrm's plugin and gives the parser an `<img>`-based texture loader. `figureFrame.ts` owns the picture: the camera, lights and clear colour of hopin's agent-tile mockup, framed on the head and shoulders, and the drawing buffer's size, the canvas's client size times the device pixel ratio capped at 2. `idleMotion.ts` owns the figure's idle life, a pure function of the seconds since the last frame and a source of chance that imports neither three nor the DOM: breathing and swaying, a blink 2 to 6 seconds after the last one, a glance 3 to 8 seconds after the last one began, with the values of the same mockup; while the page asks for reduced motion the blink stays, slower, and the rest rests. `draw.ts` owns the loop: one animation frame request at a time, the one place that draws. It runs only while the page is visible (`visibilitychange`) and an `IntersectionObserver` reports the canvas in the viewport; a frame it has requested is cancelled when either stops, and a resumed loop counts no time for the pause. The loop gives the motion the frame's time and `Math.random` and reads the page's `prefers-reduced-motion` each frame, so a change of it is followed with no listener. A `webglcontextlost` listener on the canvas ends the loop and removes its own listeners, then gives `lost`; `dispose` removes them too, so its own loss gives no signal. The loop feeds each frame's interval to the guard and ends the figure with `slow` when the guard says so; a pause starts the guard's window anew. A context lost while the figure loads gives `lost` once the load ends, before any loop: no loop listens for it earlier, so the mount reads the context's state at that point. The drawing buffer follows the canvas in the loop's next frame, with no resize observer.
 
 ## 3. Runtime View
 
@@ -112,21 +114,28 @@ sequenceDiagram
         else context
             M->>L: loadFigure(bytes)
             L-->>M: VRM, or an error
-            M->>F: first frame
-            M-->>A: onSignal(drawn), handle
-            loop each animation frame while the page is visible and the canvas is in the viewport, until dispose
-                M->>I: advance(elapsed, reduced motion)
-                I-->>M: pose
-                M->>F: draw(pose)
-            end
-            opt the context is lost while the figure lives
-                M-->>A: onSignal(lost); the loop ends, no restore
+            alt the context was lost while the figure loaded
+                M-->>A: onSignal(lost), handle
+            else
+                M->>F: first frame
+                M-->>A: onSignal(drawn), handle
+                loop each animation frame while the page is visible and the canvas is in the viewport, until dispose
+                    M->>I: advance(elapsed, reduced motion)
+                    I-->>M: pose
+                    M->>F: draw(pose)
+                end
+                opt the context is lost while the figure lives
+                    M-->>A: onSignal(lost); the loop ends, no restore
+                end
+                opt the frame-time guard finds the figure slow
+                    M-->>A: onSignal(slow); the loop ends, no restore
+                end
             end
         end
     end
 ```
 
-*`mount`'s one flow; derived from `src/draw.ts`. An error anywhere in loading or drawing, or a texture that fails, gives `refused` and frees the renderer; `mount` never rejects.* After `drawn`, the figure is drawn each animation frame, at the canvas's size and the device pixel ratio of that frame, while the page is visible and the canvas is in the viewport, until `dispose` or a context loss; no signal is given for a frame or a pause. A figure that ended runs no loop.
+*`mount`'s one flow; derived from `src/draw.ts`. An error anywhere in loading or drawing, or a texture that fails, gives `refused` and frees the renderer; `mount` never rejects.* After `drawn`, the figure is drawn each animation frame, at the canvas's size and the device pixel ratio of that frame, while the page is visible and the canvas is in the viewport, until `dispose`, a context loss or a `slow` ending; no signal is given for a frame or a pause. A figure that ended runs no loop.
 
 The loader's texture loader reads each image through an `<img>`, because three's default fetches a `blob:` URL and the script policy refuses that; it also records a failed image, which three itself swallows. Its file loader always fails, so a buffer outside the GLB gives `refused` and no request, whatever the check said. The canvas is the host's: the renderer never writes its `style`, and no element is created.
 
@@ -211,4 +220,3 @@ WebGL 2 makes it red. The browser project drives `mount`'s other signals, the ha
 - Extension objects a file uses without declaring them in `extensionsUsed` are not scanned.
 - The package does not validate image data: a corrupt image that the browser decodes without an error is drawn as decoded.
 - The command reads the whole file before the check judges its size.
-- A context lost while the figure loads, before `drawn`, is not seen: the loss listener is attached only once the loop starts, so the figure gives `drawn` on a lost context. `slow` has no producer.

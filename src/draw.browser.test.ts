@@ -154,6 +154,19 @@ describe('mount in a browser', () => {
 		expect(signals).toEqual([figureSignal.lost]);
 	});
 
+	it('resolves with lost, never drawn, on a canvas whose context is lost while the figure loads, and requests no frame', async () => {
+		const canvas = newCanvas();
+		const signals: FigureSignal[] = [];
+		const mounting = mount(canvas, buildConformantVrm(), { onSignal: (signal) => signals.push(signal) });
+		loseContext(canvas);
+		const handle = await mounting;
+		handles.push(handle);
+
+		expect(handle.signal).toBe(figureSignal.lost);
+		expect(signals).toEqual([figureSignal.lost]);
+		expect(frames.requested).toBe(0);
+	});
+
 	it('gives its first signal before the promise resolves and the handle carries it', async () => {
 		let resolved = false;
 		const signalsBeforeResolve: FigureSignal[] = [];
@@ -501,6 +514,88 @@ describe('mount in a browser', () => {
 			expect(live.handle.signal).toBe(figureSignal.drawn);
 			await vi.waitFor(() => expect(sameBytes(shown!.pixels, first)).toBe(false), { timeout: 15000 });
 		});
+
+		describe('a drawn figure that cannot keep its frame time', () => {
+			let clock: FrameClock;
+
+			beforeEach(() => {
+				clock = fakeFrameClock();
+			});
+
+			afterEach(() => clock.restore());
+
+			/** Runs `count` frames, each `milliseconds` after the one before. */
+			function runFrames(count: number, milliseconds: number): void {
+				for (let frame = 0; frame < count; frame++) clock.advance(milliseconds);
+			}
+
+			it('gives slow once through onSignal, reads slow, and requests no frame after it', async () => {
+				const { handle, signals } = await mountOn(attachedCanvas(), buildConformantVrm());
+				await vi.waitFor(() => expect(clock.pending).toBe(1));
+
+				runFrames(40, 60);
+
+				expect(signals).toEqual([figureSignal.drawn, figureSignal.slow]);
+				expect(handle.signal).toBe(figureSignal.slow);
+				const requested = clock.requested;
+				runFrames(2, 60);
+				expect(clock.requested).toBe(requested);
+				expect(clock.pending).toBe(0);
+				expect(signals).toEqual([figureSignal.drawn, figureSignal.slow]);
+			});
+
+			it('gives no slow for forty frames 33 ms apart', async () => {
+				const { handle, signals } = await mountOn(attachedCanvas(), buildConformantVrm());
+				await vi.waitFor(() => expect(clock.pending).toBe(1));
+
+				runFrames(40, 33);
+
+				expect(signals).toEqual([figureSignal.drawn]);
+				expect(handle.signal).toBe(figureSignal.drawn);
+			});
+
+			it('starts the window anew after a pause, so a slow gap is not a slow frame', async () => {
+				const { signals } = await mountOn(attachedCanvas(), buildConformantVrm());
+				await vi.waitFor(() => expect(clock.pending).toBe(1));
+				runFrames(39, 60);
+
+				setPageVisibility('hidden');
+				await vi.waitFor(() => expect(clock.pending).toBe(0));
+				clock.advance(10000);
+				setPageVisibility('visible');
+				await vi.waitFor(() => expect(clock.pending).toBe(1));
+				runFrames(1, 33);
+
+				expect(signals).toEqual([figureSignal.drawn]);
+			});
+
+			it('leaves a second figure drawn and moving when the first one is ended by slow', async () => {
+				const first = await mountOn(attachedCanvas(), buildConformantVrm());
+				await vi.waitFor(() => expect(clock.pending).toBe(1));
+				runFrames(20, 60);
+				const second = await mountOn(attachedCanvas(), buildConformantVrm());
+				await vi.waitFor(() => expect(clock.pending).toBe(2));
+
+				runFrames(20, 60);
+
+				expect(first.signals).toEqual([figureSignal.drawn, figureSignal.slow]);
+				expect(second.handle.signal).toBe(figureSignal.drawn);
+				expect(clock.pending).toBe(1);
+				runFrames(1, 60);
+				expect(second.signals).toEqual([figureSignal.drawn]);
+			});
+
+			it('disposes a slow figure twice without an error, and gives no further signal', async () => {
+				const { handle, signals } = await mountOn(attachedCanvas(), buildConformantVrm());
+				await vi.waitFor(() => expect(clock.pending).toBe(1));
+				runFrames(40, 60);
+
+				handle.dispose();
+
+				expect(() => handle.dispose()).not.toThrow();
+				expect(signals).toEqual([figureSignal.drawn, figureSignal.slow]);
+			});
+		});
 	});
 });
 
@@ -549,6 +644,60 @@ function setPageVisibility(state: 'hidden' | 'visible'): void {
 /** Gives the document its own visibility state back, so the next test sees the browser's. */
 function restorePageVisibility(): void {
 	Reflect.deleteProperty(document, 'visibilityState');
+}
+
+interface FrameClock {
+	/** The animation frames the figure asked for since the clock began. */
+	readonly requested: number;
+	/** The animation frames asked for and not yet run or cancelled. */
+	readonly pending: number;
+	/** Moves the time on by `milliseconds` and runs the frames pending before the move, each with the new time. */
+	advance(milliseconds: number): void;
+	/** Gives back the real `performance.now` and frame functions. */
+	restore(): void;
+}
+
+/**
+ * Replaces `performance.now` and the animation frame functions with a clock the test moves, so a frame interval is the one the test
+ * drives. `restore` gives the real functions back.
+ */
+function fakeFrameClock(): FrameClock {
+	const realNow = performance.now;
+	const realRequestFrame = window.requestAnimationFrame;
+	const realCancelFrame = window.cancelAnimationFrame;
+	let now = 0;
+	let nextId = 1;
+	let pending = new Map<number, FrameRequestCallback>();
+	let requested = 0;
+	performance.now = () => now;
+	window.requestAnimationFrame = (callback) => {
+		requested++;
+		const id = nextId++;
+		pending.set(id, callback);
+		return id;
+	};
+	window.cancelAnimationFrame = (id) => {
+		pending.delete(id);
+	};
+	return {
+		get requested() {
+			return requested;
+		},
+		get pending() {
+			return pending.size;
+		},
+		advance(milliseconds) {
+			now += milliseconds;
+			const due = [...pending.values()];
+			pending = new Map();
+			for (const callback of due) callback(now);
+		},
+		restore() {
+			performance.now = realNow;
+			window.requestAnimationFrame = realRequestFrame;
+			window.cancelAnimationFrame = realCancelFrame;
+		}
+	};
 }
 
 /**
