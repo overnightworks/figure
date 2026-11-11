@@ -67,7 +67,6 @@ export function buildHeaderOnlyGlb(): Uint8Array {
 	return buildGlb().subarray(0, HEADER_BYTES).map((byte, index) => (index === 8 ? HEADER_BYTES : byte));
 }
 
-/** The values a conformant VRM carries; the caller reads them from the profile so the builder restates none. */
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const PNG_HEADER_CHUNK_BYTES = 13;
 const PNG_CHUNK_OVERHEAD_BYTES = 12;

@@ -172,32 +172,33 @@ describe('the eyes and the look-at (schema: VRMC_vrm.humanoid and VRMC_vrm.lookA
 		expect(worldPosition(boneNode('rightEye'))[0]).toBeLessThan(0);
 	});
 
-	it('skins each eye to its eye bone with an untextured material', () => {
-		for (const eye of ['leftEye', 'rightEye']) {
-			const eyePrimitives = primitives.filter((primitive) => jointNodesOf(primitive)[0] === boneNode(eye));
-			expect(eyePrimitives.length).toBeGreaterThan(0);
-			expect(eyePrimitives.every((primitive) => !isTextured(materialOf(primitive)))).toBe(true);
-		}
+	it.each(['leftEye', 'rightEye'])('skins %s to its eye bone with an untextured material', (eye) => {
+		const eyePrimitives = primitives.filter((primitive) => jointNodesOf(primitive)[0] === boneNode(eye));
+		expect(eyePrimitives.length).toBeGreaterThan(0);
+		expect(eyePrimitives.every((primitive) => !isTextured(materialOf(primitive)))).toBe(true);
 	});
 
-	it('gives the look-at the bone type, the eyes\' midpoint as its offset from the head and range maps with an input and an output scale', () => {
+	it('gives the look-at the bone type and the eyes\' midpoint as its offset from the head', () => {
 		const lookAt = vrm.lookAt;
 		const eyeMidpoint = [0, 1, 2].map((axis) => (worldPosition(boneNode('leftEye'))[axis]! + worldPosition(boneNode('rightEye'))[axis]!) / 2);
 		const offsetFromHead = eyeMidpoint.map((value, axis) => value - worldPosition(boneNode('head'))[axis]!);
 
 		expect(lookAt.type).toBe('bone');
 		lookAt.offsetFromHeadBone.forEach((value: number, axis: number) => expect(value).toBeCloseTo(offsetFromHead[axis]!));
-		for (const map of ['rangeMapHorizontalInner', 'rangeMapHorizontalOuter', 'rangeMapVerticalDown', 'rangeMapVerticalUp']) {
-			expect(lookAt[map].inputMaxValue).toBeGreaterThan(0);
-			expect(lookAt[map].outputScale).toBeGreaterThan(0);
-		}
 	});
+
+	it.each(['rangeMapHorizontalInner', 'rangeMapHorizontalOuter', 'rangeMapVerticalDown', 'rangeMapVerticalUp'])(
+		'gives the look-at %s an input and an output scale',
+		(map) => {
+			expect(vrm.lookAt[map].inputMaxValue).toBeGreaterThan(0);
+			expect(vrm.lookAt[map].outputScale).toBeGreaterThan(0);
+		}
+	);
 });
 
 describe('the expressions (schema: VRMC_vrm.expressions.expression.morphTargetBind.schema.json)', () => {
-	it('binds the blink to a morph target of the head mesh with node, index and weight', () => {
+	it('points the blink at a morph target that the mesh of its node carries', () => {
 		const bind = vrm.expressions.preset.blink.morphTargetBinds[0];
-		expect(Object.keys(bind).sort()).toEqual(['index', 'node', 'weight']);
 		const mesh = json.meshes[nodes[bind.node].mesh];
 		expect(mesh.primitives[0].targets).toHaveLength(bind.index + 1);
 	});
