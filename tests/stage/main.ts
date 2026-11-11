@@ -18,6 +18,9 @@ interface Slot {
 /** The figure every drawing mounts: the synthetic one until the visitor picks a file. */
 let figureBytes: Uint8Array = buildConformantVrm();
 
+/** Whether the stage reports its agent as thinking: a freshly mounted figure is told at once. */
+let thinking = false;
+
 /** Writes a signal beside the slot only while its canvas is the one shown: a replaced canvas still records its own signal. */
 function showSignal(slot: Slot, canvas: HTMLCanvasElement, signal: FigureSignal): void {
 	canvas.dataset.signal = signal;
@@ -42,6 +45,7 @@ async function mountSlot(slot: Slot): Promise<void> {
 		return;
 	}
 	slot.handle = handle;
+	handle.think(thinking);
 }
 
 function createSlot(cssWidth: number, stage: HTMLElement): Slot {
@@ -62,8 +66,15 @@ function createSlot(cssWidth: number, stage: HTMLElement): Slot {
 }
 
 const stage = document.querySelector<HTMLElement>('#stage')!;
+const thinkButton = document.querySelector<HTMLButtonElement>('#think')!;
 const picker = document.querySelector<HTMLInputElement>('#picker')!;
 const slots = cssWidths.map((cssWidth) => createSlot(cssWidth, stage));
+
+thinkButton.addEventListener('click', () => {
+	thinking = !thinking;
+	thinkButton.setAttribute('aria-pressed', String(thinking));
+	slots.forEach((slot) => slot.handle?.think(thinking));
+});
 
 picker.addEventListener('change', async () => {
 	const picked = picker.files?.[0];

@@ -1,6 +1,6 @@
 import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Scene, Vector3, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
-import type { IdlePose } from './idleMotion.js';
+import { spreadPosture, type FigurePose } from './figureMotion.js';
 
 /** The picture's camera, lights and clear colour are the values of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html. */
 const camera = { fieldOfView: 22, near: 0.05, far: 20 };
@@ -51,7 +51,7 @@ function currentSize(canvas: HTMLCanvasElement): DrawingSize {
 /** A figure's lights and camera, built once, and the frame that draws it. */
 export interface FigureStage {
 	/** Sets the figure to `pose` and draws it, the drawing buffer first following the canvas when its size or the pixel ratio changed. */
-	draw(pose: IdlePose, elapsedSeconds: number): void;
+	draw(pose: FigurePose, elapsedSeconds: number): void;
 }
 
 /** The stage for `vrm` at rest, on the renderer's canvas: the camera frames the eyes where they are now, so the figure moves in front of it. */
@@ -64,6 +64,9 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	const scene = lightedScene(vrm);
 	const spine = vrm.humanoid.getNormalizedBoneNode('spine')!;
 	const head = vrm.humanoid.getNormalizedBoneNode('head')!;
+	const neck = vrm.humanoid.getNormalizedBoneNode('neck');
+	const chest = vrm.humanoid.getNormalizedBoneNode('chest');
+	const bones = { neck: neck !== null, chest: chest !== null };
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;
 	let view: PerspectiveCamera;
@@ -77,7 +80,10 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 				drawn = size;
 			}
 			spine.rotation.x = pose.breath;
-			head.rotation.set(pose.head.pitch, pose.head.yaw, pose.head.roll);
+			const spread = spreadPosture(pose.posture, bones);
+			head.rotation.set(pose.head.pitch + spread.head.pitch, pose.head.yaw + spread.head.yaw, pose.head.roll + spread.head.roll);
+			neck?.rotation.set(spread.neck.pitch, spread.neck.yaw, spread.neck.roll);
+			chest?.rotation.set(spread.chest.pitch, spread.chest.yaw, spread.chest.roll);
 			vrm.expressionManager!.setValue('blink', pose.blink);
 			vrm.lookAt!.yaw = pose.look.yaw;
 			vrm.lookAt!.pitch = pose.look.pitch;
