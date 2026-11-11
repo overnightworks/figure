@@ -1,0 +1,8 @@
+claim_id = "e1e0006b4db747298e86ab8cec57d9ed"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "2b40be2d958cfd084879cea7b2246f397d8262ac"
+branch = "claude/issue-42-a-figure-s-arms-rest-at-its-sides"
+scope = ["README.md", "docs/ARCHITECTURE.md", "quality/config.toml", "src/conformantFigure.test.ts", "src/draw.browser.test.ts", "src/figureDriving.browser.test.ts", "src/figureFrame.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "tests"]
+opened_commit = "9668513e77d163559963dcab6ec2df5ebccf900f"
+whole_reason = "The posture in the driver, the frame that applies it and the arms on the test figure that prove it are one behaviour; a posture no test can see was the defect."
