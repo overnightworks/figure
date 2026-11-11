@@ -1,6 +1,6 @@
-import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Scene, Vector3, type WebGLRenderer } from 'three';
+import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
-import { spreadPosture, type FigurePose } from './figureMotion.js';
+import { spreadPosture, type FigurePose, type Turn } from './figureMotion.js';
 
 /** The picture's camera, lights and clear colour are the values of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html. */
 const camera = { fieldOfView: 22, near: 0.05, far: 20 };
@@ -48,6 +48,11 @@ function currentSize(canvas: HTMLCanvasElement): DrawingSize {
 	return { width: Math.max(2, canvas.clientWidth), height: Math.max(2, canvas.clientHeight), pixelRatio: drawingPixelRatio() };
 }
 
+/** Sets a bone's rotation to `turn`; a bone the model lacks is skipped. */
+function turnBone(bone: Object3D | null, turn: Turn): void {
+	bone?.rotation.set(turn.pitch, turn.yaw, turn.roll);
+}
+
 /** A figure's lights and camera, built once, and the frame that draws it. */
 export interface FigureStage {
 	/** Sets the figure to `pose` and draws it, the drawing buffer first following the canvas when its size or the pixel ratio changed. */
@@ -67,6 +72,10 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	const neck = vrm.humanoid.getNormalizedBoneNode('neck');
 	const chest = vrm.humanoid.getNormalizedBoneNode('chest');
 	const bones = { neck: neck !== null, chest: chest !== null };
+	const leftShoulder = vrm.humanoid.getNormalizedBoneNode('leftShoulder');
+	const rightShoulder = vrm.humanoid.getNormalizedBoneNode('rightShoulder');
+	const leftUpperArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm');
+	const rightUpperArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;
 	let view: PerspectiveCamera;
@@ -84,6 +93,10 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 			head.rotation.set(pose.head.pitch + spread.head.pitch, pose.head.yaw + spread.head.yaw, pose.head.roll + spread.head.roll);
 			neck?.rotation.set(spread.neck.pitch, spread.neck.yaw, spread.neck.roll);
 			chest?.rotation.set(spread.chest.pitch, spread.chest.yaw, spread.chest.roll);
+			turnBone(leftShoulder, pose.arms.leftShoulder);
+			turnBone(rightShoulder, pose.arms.rightShoulder);
+			turnBone(leftUpperArm, pose.arms.leftUpperArm);
+			turnBone(rightUpperArm, pose.arms.rightUpperArm);
 			vrm.expressionManager!.setValue('blink', pose.blink);
 			vrm.lookAt!.yaw = pose.look.yaw;
 			vrm.lookAt!.pitch = pose.look.pitch;

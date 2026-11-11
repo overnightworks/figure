@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng } from '../tests/glbBuilder.js';
-import { centreOf, coversSomething, emulateReducedMotion, readPixels, spotsOf, type Spot } from '../tests/browserCanvas.js';
+import { centreOf, coversSomething, emulateReducedMotion, readPixels, spotsOf, type FaceFeature, type Spot } from '../tests/browserCanvas.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 
@@ -12,6 +12,8 @@ const requestFrameOwn = window.requestAnimationFrame;
 /** How far the nose has to move to the side or up, in pixels at a canvas 200 wide, for a test to call it turned, and how near its resting place it has to be to call it back. */
 const turnedPixels = { side: 10, up: 4 };
 const backPixels = 4;
+/** A lowered arm hangs from its shoulder, so its pixels run this far down at 200 px wide; a T-pose arm is only as thick as its bone, about 30 px. */
+const armHangPixels = 60;
 
 describe('a figure driven by the host', () => {
 	const canvases: HTMLCanvasElement[] = [];
@@ -58,15 +60,59 @@ describe('a figure driven by the host', () => {
 		return { canvas, handle };
 	}
 
-	/** The nose as the latest frame of `canvas` shows it, once the figure has drawn after `afterFrame`. */
-	async function noseAfter(canvas: HTMLCanvasElement, afterFrame: number): Promise<Spot> {
+	/** The features as the latest frame of `canvas` shows them, once the figure has drawn after `afterFrame`. */
+	async function featuresAfter(canvas: HTMLCanvasElement, afterFrame: number): Promise<Record<FaceFeature, Spot[]>> {
 		await vi.waitFor(() => expect(frames).toBeGreaterThan(afterFrame), { timeout: 5000 });
 		await vi.waitFor(() => expect(shown.get(canvas)).toBeDefined());
 		const { pixels, width, height } = shown.get(canvas)!;
-		const nose = centreOf(spotsOf(pixels, width, height).nose);
+		return spotsOf(pixels, width, height);
+	}
+
+	/** The nose as the latest frame of `canvas` shows it, once the figure has drawn after `afterFrame`. */
+	async function noseAfter(canvas: HTMLCanvasElement, afterFrame: number): Promise<Spot> {
+		const nose = centreOf((await featuresAfter(canvas, afterFrame)).nose);
 		if (nose.count === 0) throw new Error('the nose is not on the canvas');
 		return nose;
 	}
+
+	/** The arms as the latest frame of `canvas` shows them. */
+	async function armsNow(canvas: HTMLCanvasElement): Promise<Spot[]> {
+		return (await featuresAfter(canvas, frames + 2)).arm;
+	}
+
+	/** The arms hang at the figure's sides below the nose: on both sides of it, their middle below it, and their pixels running down far enough. */
+	function expectArmsLowered(arms: Spot[], nose: Spot): void {
+		const lowest = Math.max(...arms.map((spot) => spot.y));
+		const highest = Math.min(...arms.map((spot) => spot.y));
+		expect(arms.length).toBeGreaterThan(0);
+		expect(arms.some((spot) => spot.x < nose.x)).toBe(true);
+		expect(arms.some((spot) => spot.x > nose.x)).toBe(true);
+		expect(centreOf(arms).y).toBeGreaterThan(nose.y);
+		expect(lowest - highest).toBeGreaterThan(armHangPixels);
+	}
+
+	it.each([
+		['the synthetic figure', undefined],
+		['a figure without shoulder bones', (json: Record<string, any>) => {
+			delete json.extensions.VRMC_vrm.humanoid.humanBones.leftShoulder;
+			delete json.extensions.VRMC_vrm.humanoid.humanBones.rightShoulder;
+		}]
+	])('hangs the arms lowered beside the body on %s', async (_, change) => {
+		const bytes = change === undefined ? buildConformantVrm() : buildVrmGlbWithImages([buildFigureTexturePng()], change);
+		const { canvas } = await mountFigure(bytes);
+		const nose = await noseNow(canvas);
+
+		expectArmsLowered(await armsNow(canvas), nose);
+	});
+
+	it('holds the arms down under reduced motion from the first frame', async () => {
+		await emulateReducedMotion();
+		const { canvas } = await mountFigure();
+		await vi.waitFor(() => expect(shown.get(canvas)).toBeDefined());
+		const nose = await noseNow(canvas);
+
+		expectArmsLowered(await armsNow(canvas), nose);
+	});
 
 	async function noseNow(canvas: HTMLCanvasElement): Promise<Spot> {
 		return noseAfter(canvas, frames + 2);

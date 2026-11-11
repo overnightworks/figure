@@ -19,7 +19,8 @@ import {
 	type SkinnedPrimitive,
 	type Vector3
 } from './figureModel.ts';
-import { faceColours, faceLookAt, faceMeshes, FACE_MORPH_TARGETS } from './figureFace.ts';
+import { armMeshes } from './figureArms.ts';
+import { faceLookAt, faceMeshes, FACE_MORPH_TARGETS, untexturedColours } from './figureFace.ts';
 
 /** The values a conformant VRM carries; the caller reads them from the profile so the builder restates none. */
 export interface ConformantVrmValues {
@@ -76,8 +77,18 @@ function heavyMesh(triangles: number): MeshData {
 	};
 }
 
-/** The joints of the skin, in the order of its `joints`: the torso is skinned to the first two, the head and the eyes to the rest. */
-const SKIN_JOINT_NAMES: readonly string[] = ['spine', 'chest', 'head', 'leftEye', 'rightEye'];
+/** The joints of the skin, in the order of its `joints`: the torso is skinned to the first two, the head, the eyes and the arms to the rest. */
+const SKIN_JOINT_NAMES: readonly string[] = [
+	'spine',
+	'chest',
+	'head',
+	'leftEye',
+	'rightEye',
+	'leftUpperArm',
+	'leftLowerArm',
+	'rightUpperArm',
+	'rightLowerArm'
+];
 
 function jointIndexOf(bone: string): number {
 	const index = SKIN_JOINT_NAMES.indexOf(bone);
@@ -93,7 +104,8 @@ function skinnedMeshes(chestHeight: number, heavy?: HeavyFigure): SkinnedMesh[] 
 	const meshes: SkinnedMesh[] = [
 		{ name: 'torso', primitives: [{ data: torso, material: 'skin', morphs: [] }] },
 		{ name: 'head', primitives: [{ data: head, material: 'skin', morphs: [morphDeltas(head.positions.length / 3, upperFront, BLINK_OFFSET)] }] },
-		...faceMeshes(jointIndexOf)
+		...faceMeshes(jointIndexOf),
+		...armMeshes(jointIndexOf)
 	];
 	if (heavy === undefined) return meshes;
 	const lightTriangles = meshes.reduce((sum, mesh) => sum + mesh.primitives.reduce((primitiveSum, { data }) => primitiveSum + data.indices.length / 3, 0), 0);
@@ -216,7 +228,7 @@ export function buildConformantVrmParts(
 			nodes,
 			skins: [{ inverseBindMatrices, skeleton: 0, joints: jointNodes }],
 			meshes: meshEntries,
-			materials: FIGURE_MATERIALS.map((material) => (material === 'skin' ? skinMaterial(images.length) : untexturedMaterial(faceColours[material]))),
+			materials: FIGURE_MATERIALS.map((material) => (material === 'skin' ? skinMaterial(images.length) : untexturedMaterial(untexturedColours[material]))),
 			textures: images.map((_, source) => ({ source })),
 			images: imageEntries,
 			buffers: [{ byteLength: packer.byteLength }],

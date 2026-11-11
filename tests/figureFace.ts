@@ -16,11 +16,12 @@ import {
 /** Where the head's front face lies, and the features stand a little in front of it. */
 const FRONT_Z = HEAD_CENTRE[2] + HEAD_HALF_SIZE[2] + 0.005;
 
-/** The untextured colours of the face, as glTF base colour factors (red, green, blue and alpha, 0 to 1). */
-export const faceColours: Record<Exclude<FigureMaterial, 'skin'>, readonly [number, number, number, number]> = {
+/** The untextured colours of the face and the arms, as glTF base colour factors (red, green, blue and alpha, 0 to 1). */
+export const untexturedColours: Record<Exclude<FigureMaterial, 'skin'>, readonly [number, number, number, number]> = {
 	eye: [0.1, 0.35, 0.95, 1],
 	nose: [1, 0.85, 0.1, 1],
-	feature: [0.04, 0.02, 0.02, 1]
+	feature: [0.04, 0.02, 0.02, 1],
+	arm: [0.1, 0.7, 0.3, 1]
 };
 
 type FeatureKind = 'eye' | 'nose' | 'mouth' | 'corner' | 'brow';

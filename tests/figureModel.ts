@@ -36,9 +36,12 @@ const TRUNK: readonly BoneSpec[] = [
 	{ name: 'head', parentName: 'neck', translation: [0, 0.08, 0] }
 ];
 
+/** Where a shoulder sits from the chest, for the left side; the right side mirrors its X. */
+const SHOULDER_TRANSLATION: Vector3 = [0.15, 0.15, 0];
+
 /** One side's arm and leg chains: a name, the bone it hangs from and its offset for the left side (the right side mirrors X). */
 const LIMB_CHAINS: readonly { readonly name: string; readonly parentName: string; readonly translation: Vector3 }[] = [
-	{ name: 'UpperArm', parentName: 'chest', translation: [0.15, 0.15, 0] },
+	{ name: 'UpperArm', parentName: 'Shoulder', translation: [0.05, 0, 0] },
 	{ name: 'LowerArm', parentName: 'UpperArm', translation: [0.25, 0, 0] },
 	{ name: 'Hand', parentName: 'LowerArm', translation: [0.25, 0, 0] },
 	{ name: 'UpperLeg', parentName: 'hips', translation: [0.1, -0.05, 0] },
@@ -46,12 +49,20 @@ const LIMB_CHAINS: readonly { readonly name: string; readonly parentName: string
 	{ name: 'Foot', parentName: 'LowerLeg', translation: [0, -0.45, 0] }
 ];
 
+function shoulderSpecs(): BoneSpec[] {
+	return SIDES.map(({ prefix, direction }) => ({
+		name: prefix + 'Shoulder',
+		parentName: 'chest',
+		translation: [SHOULDER_TRANSLATION[0] * direction, SHOULDER_TRANSLATION[1], SHOULDER_TRANSLATION[2]] as Vector3
+	}));
+}
+
 function limbSpecs(): BoneSpec[] {
-	const isLimbBone = (name: string) => LIMB_CHAINS.some((limb) => limb.name === name);
+	const isSideBone = (name: string) => name === 'Shoulder' || LIMB_CHAINS.some((limb) => limb.name === name);
 	return SIDES.flatMap(({ prefix, direction }) =>
 		LIMB_CHAINS.map(({ name, parentName, translation }) => ({
 			name: prefix + name,
-			parentName: isLimbBone(parentName) ? prefix + parentName : parentName,
+			parentName: isSideBone(parentName) ? prefix + parentName : parentName,
 			translation: [translation[0] * direction, translation[1], translation[2]] as Vector3
 		}))
 	);
@@ -65,9 +76,9 @@ function eyeSpecs(): BoneSpec[] {
 	}));
 }
 
-/** The bones from the hips down, each after its parent: the trunk with chest and neck, then both arms, both legs and both eyes. */
+/** The bones from the hips down, each after its parent: the trunk with chest and neck, then both shoulders, both arms, both legs and both eyes. */
 export function figureSkeleton(): Bone[] {
-	const specs = [...TRUNK, ...limbSpecs(), ...eyeSpecs()];
+	const specs = [...TRUNK, ...shoulderSpecs(), ...limbSpecs(), ...eyeSpecs()];
 	const indexOfName = new Map(specs.map((spec, index) => [spec.name, index]));
 	return specs.map(({ name, parentName, translation }) => ({
 		name,
@@ -97,7 +108,7 @@ export interface MeshData {
 }
 
 /** The figure's materials: the skin's textured one, then the untextured ones of the face, each a colour of its own. */
-export const FIGURE_MATERIALS = ['skin', 'eye', 'nose', 'feature'] as const;
+export const FIGURE_MATERIALS = ['skin', 'eye', 'nose', 'feature', 'arm'] as const;
 export type FigureMaterial = (typeof FIGURE_MATERIALS)[number];
 
 /** One primitive of a skinned mesh; `morphs` holds, per morph target, the offset of every vertex as flat X, Y, Z values. */

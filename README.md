@@ -58,8 +58,9 @@ freed cannot give another.
 
 **The app owns** the canvas and its CSS size, the fetch of the bytes, its symbol and `dispose`. **The package does** the
 rest: it sizes the drawing buffer to the canvas's client size times the device pixel ratio (at most 2) in every frame,
-so a resized canvas is followed with no call; it gives the figure its idle motion (breathing, blinking, glancing) and its thinking look; while
-the page asks for reduced motion it only blinks, slower, and takes and leaves the thinking look at once; and it draws only
+so a resized canvas is followed with no call; it poses the figure at rest with its arms lowered at its sides, and gives the figure its idle
+motion (breathing, blinking, glancing) and its thinking look; while the page asks for reduced motion it blinks, slower, holds the arms
+down with no idle motion, and takes and leaves the thinking look at once; and it draws only
 while the page is visible and the canvas is in the viewport. It never writes the canvas's `style` and adds no element to the page.
 
 The page may run under a strict script policy. The package's browser tests run it under
