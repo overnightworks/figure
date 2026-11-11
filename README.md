@@ -61,7 +61,7 @@ in the viewport. It never writes the canvas's `style` and creates no element.
 
 The page may run under a strict script policy. The package's browser tests run it under
 `default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' blob:; worker-src 'self'`: no inline script,
-no `eval`, no network beyond the app's own origin. Textures are read through `<img>` elements on `blob:` URLs, so
+no `eval`, no network beyond the app's own origin; under it the app sizes its canvas through `canvas.style` from script, since inline styles and stylesheets are blocked. Textures are read through `<img>` elements on `blob:` URLs, so
 `img-src` needs `blob:`; a figure that names a file outside its own bytes is `refused`, never fetched.
 
 ## Install
