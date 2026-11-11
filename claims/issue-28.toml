@@ -1,0 +1,8 @@
+claim_id = "1c8362ec2005472ab97400647a5b5f64"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "16b4805d035d836e6648a1906e21a453caa4a542"
+branch = "claude/issue-28-an-idle-figure-breathes-blinks-and-glanc"
+scope = ["docs/ARCHITECTURE.md", "src", "tests"]
+opened_commit = "d893f7091d82a9e2b71070503b8b74611dce7d22"
+whole_reason = "The loop, the motion module, their Node and browser tests, the test figure they move and the architecture text are one behaviour; a loop without motion cannot be observed."
