@@ -1,0 +1,8 @@
+claim_id = "311a411789854c5b9a2ce73ae4dcc725"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "97c6936b14542a0087716969aea11d34460f2f61"
+branch = "claude/issue-37-the-synthetic-figure-has-a-face"
+scope = ["quality/config.toml", "scripts", "src/budgetRules.test.ts", "src/check.test.ts", "src/conformantFigure.test.ts", "src/draw.browser.test.ts", "src/figureLoader.browser.test.ts", "src/figurePng.test.ts", "src/figureValidator.test.ts", "src/textureRules.test.ts", "src/vrmRules.test.ts", "tests"]
+opened_commit = "73ec13f2273ca12344ff2c6ec5c21dbc24982e6d"
+whole_reason = "The figure's face, the model the tests read it through and the tests that pin the figure are one fixture; a face without its readers proves nothing."
