@@ -1,6 +1,6 @@
 import { crc32, inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { buildFigureTexturePng, buildImagePng, figureTexture } from '../tests/glbBuilder.js';
+import { buildCompressedImagePng, buildFigureTexturePng, buildImagePng, figureTexture, plainScanlines } from '../tests/glbBuilder.js';
 
 const signatureBytes = 8;
 const chunkOverheadBytes = 12;
@@ -60,5 +60,23 @@ describe('the figure texture PNG', () => {
 describe('a PNG written by the builder', () => {
 	it('refuses image data that does not fit one stored block', () => {
 		expect(() => buildImagePng(128, 128, [0, 0, 0, 255])).toThrow(RangeError);
+	});
+});
+
+describe('a compressed PNG written by the builder', () => {
+	it.each([
+		[1, 1],
+		[3, 2],
+		[70, 40],
+		[600, 4]
+	])('inflates a %i by %i image to its unfiltered rows of one colour', (width, height) => {
+		const colour = [10, 20, 30, 255] as const;
+		const png = chunksOf(buildCompressedImagePng(width, height, colour));
+		expect(png.map(({ type }) => type)).toEqual(['IHDR', 'IDAT', 'IEND']);
+		expect(Buffer.from(inflateSync(png[1]!.content))).toEqual(Buffer.from(plainScanlines(width, height, colour)));
+	});
+
+	it('takes far fewer bytes than the pixels it holds', () => {
+		expect(buildCompressedImagePng(512, 512, figureTexture.colour).length).toBeLessThan(512 * 512);
 	});
 });

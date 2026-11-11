@@ -102,25 +102,71 @@ const FRONT_FACE_NORMAL_Z = 1;
 interface SkinnedMesh {
 	readonly name: string;
 	readonly data: MeshData;
-	/** What a morph target moves: the vertices it names move by the offset. */
-	readonly morph?: readonly number[];
+	/** What each morph target moves: per target, the offset of every vertex, as flat X, Y, Z values. */
+	readonly morphs: readonly (readonly number[])[];
+}
+
+/** A figure made heavy: its meshes together hold `triangles`, and one more mesh of them carries `morphTargets` morph targets. */
+export interface HeavyFigure {
+	readonly triangles: number;
+	readonly morphTargets: number;
+}
+
+const HEAVY_MESH_CENTRE: Vector3 = [0, 1.4, 0.15];
+const HEAVY_MESH_SIZE = 0.6;
+const HEAVY_MORPH_STEP = 0.001;
+const MAX_INDEXED_VERTICES = 0x10000;
+
+/** A flat grid of `triangles` triangles in front of the torso, a pair to each cell, every vertex bound to the first joint; the last row may stop short. */
+function heavyMesh(triangles: number): MeshData {
+	const cells = Math.ceil(triangles / 2);
+	const columns = Math.ceil(Math.sqrt(cells));
+	const rows = Math.ceil(cells / columns);
+	if ((columns + 1) * (rows + 1) > MAX_INDEXED_VERTICES) {
+		throw new RangeError(`${triangles} triangles need more vertices than a 16-bit index reaches`);
+	}
+	const vertices = Array.from({ length: (columns + 1) * (rows + 1) }, (_, vertex) => [vertex % (columns + 1), Math.floor(vertex / (columns + 1))] as const);
+	const indices = Array.from({ length: cells }, (_, cell) => {
+		const first = Math.floor(cell / columns) * (columns + 1) + (cell % columns);
+		return [first, first + 1, first + columns + 2, first, first + columns + 2, first + columns + 1];
+	}).flat();
+	return {
+		positions: vertices.flatMap(([column, row]) => [
+			HEAVY_MESH_CENTRE[0] + (column / columns - 0.5) * HEAVY_MESH_SIZE,
+			HEAVY_MESH_CENTRE[1] + (row / rows - 0.5) * HEAVY_MESH_SIZE,
+			HEAVY_MESH_CENTRE[2]
+		]),
+		normals: vertices.flatMap(() => [0, 0, FRONT_FACE_NORMAL_Z]),
+		textureCoordinates: vertices.flatMap(([column, row]) => [column / columns, row / rows]),
+		joints: vertices.flatMap(() => [0, 0, 0, 0]),
+		weights: vertices.flatMap(() => [1, 0, 0, 0]),
+		indices: indices.slice(0, 3 * triangles)
+	};
 }
 
 /** The joints of the skin, in the order of its `joints`; the torso is skinned to the first two, the head to the third. */
 const SKIN_JOINT_NAMES = ['spine', 'chest', 'head'] as const;
 
-function skinnedMeshes(chestHeight: number): SkinnedMesh[] {
+function skinnedMeshes(chestHeight: number, heavy?: HeavyFigure): SkinnedMesh[] {
 	const torso = skinnedBox(TORSO_CENTRE, TORSO_HALF_SIZE, (position) => (position[1]! < chestHeight ? 0 : 1));
 	const head = skinnedBox(HEAD_CENTRE, HEAD_HALF_SIZE, () => 2);
 	const upperFront = (vertex: number) =>
 		head.normals[3 * vertex + 2] === FRONT_FACE_NORMAL_Z && head.positions[3 * vertex + 1]! > HEAD_CENTRE[1];
-	return [
-		{ name: 'torso', data: torso },
-		{ name: 'head', data: head, morph: morphDeltas(head.positions.length / 3, upperFront, BLINK_OFFSET) }
+	const meshes: SkinnedMesh[] = [
+		{ name: 'torso', data: torso, morphs: [] },
+		{ name: 'head', data: head, morphs: [morphDeltas(head.positions.length / 3, upperFront, BLINK_OFFSET)] }
 	];
+	if (heavy === undefined) return meshes;
+	const lightTriangles = meshes.reduce((sum, { data }) => sum + data.indices.length / 3, 0);
+	const data = heavyMesh(heavy.triangles - lightTriangles);
+	const vertexCount = data.positions.length / 3;
+	const morphs = Array.from({ length: heavy.morphTargets }, (_, target) =>
+		morphDeltas(vertexCount, () => true, [0, HEAVY_MORPH_STEP * (target + 1), 0])
+	);
+	return [...meshes, { name: 'heavy', data, morphs }];
 }
 
-function addPrimitive(packer: BinaryPacker, { data, morph }: SkinnedMesh): Record<string, unknown> {
+function addPrimitive(packer: BinaryPacker, { data, morphs }: SkinnedMesh): Record<string, unknown> {
 	const { float, unsignedByte, unsignedShort } = COMPONENT_TYPE;
 	const attributes: Record<string, AccessorSpec> = {
 		POSITION: { values: data.positions, componentType: float, type: 'VEC3', bounded: true },
@@ -131,12 +177,12 @@ function addPrimitive(packer: BinaryPacker, { data, morph }: SkinnedMesh): Recor
 	};
 	const addAttributes = (specs: Record<string, AccessorSpec>) =>
 		Object.fromEntries(Object.entries(specs).map(([name, spec]) => [name, packer.addAccessor({ ...spec, target: BUFFER_TARGET.vertexAttributes })]));
-	const morphTarget: Record<string, AccessorSpec> = { POSITION: { values: morph ?? [], componentType: float, type: 'VEC3', bounded: true } };
+	const morphTarget = (values: readonly number[]): Record<string, AccessorSpec> => ({ POSITION: { values, componentType: float, type: 'VEC3', bounded: true } });
 	return {
 		attributes: addAttributes(attributes),
 		indices: packer.addAccessor({ values: data.indices, componentType: unsignedShort, type: 'SCALAR', target: BUFFER_TARGET.indices }),
 		material: 0,
-		...(morph === undefined ? {} : { targets: [addAttributes(morphTarget)] })
+		...(morphs.length === 0 ? {} : { targets: morphs.map((values) => addAttributes(morphTarget(values))) })
 	};
 }
 
@@ -153,6 +199,17 @@ function addImages(packer: BinaryPacker, images: readonly Uint8Array[]) {
 	return images.map((image) => ({ bufferView: packer.addView(image), mimeType: 'image/png' }));
 }
 
+/** The slots of the one material, in the order they take the textures after the base colour; a texture no material names is never loaded. */
+const EXTRA_TEXTURE_SLOTS = ['emissiveTexture', 'occlusionTexture', 'normalTexture'] as const;
+
+function figureMaterial(textureCount: number): Record<string, unknown> {
+	if (textureCount > 1 + EXTRA_TEXTURE_SLOTS.length) {
+		throw new RangeError(`the material names at most ${1 + EXTRA_TEXTURE_SLOTS.length} textures, not ${textureCount}`);
+	}
+	const extra = EXTRA_TEXTURE_SLOTS.slice(0, Math.max(0, textureCount - 1)).map((slot, index) => [slot, { index: index + 1 }]);
+	return { pbrMetallicRoughness: { baseColorTexture: { index: 0 } }, ...Object.fromEntries(extra) };
+}
+
 function skeletonNodes(skeleton: readonly Bone[]) {
 	return skeleton.map(({ name, translation }, index) => {
 		const children = skeleton.flatMap((child, childIndex) => (child.parent === index ? [childIndex] : []));
@@ -162,11 +219,13 @@ function skeletonNodes(skeleton: readonly Bone[]) {
 
 /**
  * The conformant synthetic VRM's JSON and binary chunk: a skeleton with chest and neck, two skinned boxes, a blink morph target
- * bound by the `blink` preset, a core material with a base colour texture, and `images` (by default the figure's PNG) as the texture sources.
+ * bound by the `blink` preset, a core material with a base colour texture, and `images` (by default the figure's PNG) as the texture sources,
+ * the material naming each of them in a slot of its own. With `heavy`, a third mesh of grid triangles carries the morph targets and the meshes together hold the triangles it names.
  */
 export function buildConformantVrmParts(
 	values: ConformantVrmValues,
-	images: readonly Uint8Array[] = [buildFigureTexturePng()]
+	images: readonly Uint8Array[] = [buildFigureTexturePng()],
+	heavy?: HeavyFigure
 ): { json: Record<string, any>; binary: Uint8Array } {
 	const skeleton = figureSkeleton();
 	requireBones(skeleton, values.requiredHumanBones);
@@ -174,7 +233,7 @@ export function buildConformantVrmParts(
 	const positions = worldPositions(skeleton);
 	const packer = new BinaryPacker();
 	const imageEntries = addImages(packer, images);
-	const meshes = skinnedMeshes(positions[boneIndex('chest')]![1]);
+	const meshes = skinnedMeshes(positions[boneIndex('chest')]![1], heavy);
 	const meshEntries = meshes.map((mesh) => ({ name: mesh.name, primitives: [addPrimitive(packer, mesh)] }));
 	const jointNodes = SKIN_JOINT_NAMES.map(boneIndex);
 	const inverseBindMatrices = packer.addAccessor({
@@ -207,8 +266,8 @@ export function buildConformantVrmParts(
 			nodes,
 			skins: [{ inverseBindMatrices, skeleton: 0, joints: jointNodes }],
 			meshes: meshEntries,
-			materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
-			textures: [{ source: 0 }],
+			materials: [figureMaterial(images.length)],
+			textures: images.map((_, source) => ({ source })),
 			images: imageEntries,
 			buffers: [{ byteLength: packer.byteLength }],
 			bufferViews: packer.bufferViews,
@@ -336,6 +395,102 @@ export function buildImagePng(width: number, height: number, colour: Rgba): Uint
 	]);
 }
 
+const LENGTH_CODE_BASES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+const LENGTH_CODE_EXTRA_BITS = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+const DISTANCE_CODE_BASES = [
+	1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577
+];
+const DISTANCE_CODE_EXTRA_BITS = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+const FIRST_LENGTH_SYMBOL = 257;
+const END_OF_BLOCK_SYMBOL = 256;
+const LONGEST_MATCH = 258;
+const SHORTEST_MATCH = 3;
+const FIXED_BLOCK_TYPE = 1;
+
+/** The last code whose base does not exceed `value`. */
+function codeOf(bases: readonly number[], value: number): number {
+	return bases.filter((base) => base <= value).length - 1;
+}
+
+/** Packs bits into bytes from the least significant bit, as deflate does; Huffman codes go in from their most significant bit. */
+class BitWriter {
+	private readonly bytes: number[] = [];
+	private pending = 0;
+	private pendingBits = 0;
+
+	writeValue(value: number, bitCount: number): void {
+		for (let bit = 0; bit < bitCount; bit++) {
+			this.pending |= ((value >> bit) & 1) << this.pendingBits;
+			if (++this.pendingBits === 8) {
+				this.bytes.push(this.pending);
+				this.pending = 0;
+				this.pendingBits = 0;
+			}
+		}
+	}
+
+	writeCode(code: number, bitCount: number): void {
+		for (let bit = bitCount - 1; bit >= 0; bit--) {
+			this.writeValue((code >> bit) & 1, 1);
+		}
+	}
+
+	/** The bytes written, the last one filled up with zero bits. */
+	finish(): Uint8Array {
+		return Uint8Array.from(this.pendingBits === 0 ? this.bytes : [...this.bytes, this.pending]);
+	}
+}
+
+/** The fixed Huffman code of a literal or length symbol (RFC 1951, section 3.2.6). */
+function writeFixedSymbol(writer: BitWriter, symbol: number): void {
+	if (symbol < 144) writer.writeCode(0x30 + symbol, 8);
+	else if (symbol < 256) writer.writeCode(0x190 + symbol - 144, 9);
+	else if (symbol < 280) writer.writeCode(symbol - 256, 7);
+	else writer.writeCode(0xc0 + symbol - 280, 8);
+}
+
+/**
+ * A zlib stream (RFC 1950) of `data`, which must repeat its first `period` bytes throughout: one fixed-Huffman block (RFC 1951, section
+ * 3.2.6) holding the first period as literals and the rest as matches at that distance, so no compressor is needed and an image of one
+ * colour takes a few bytes a row.
+ */
+function repeatingZlibStream(data: Uint8Array, period: number): Uint8Array {
+	const writer = new BitWriter();
+	writer.writeValue(1, 1);
+	writer.writeValue(FIXED_BLOCK_TYPE, 2);
+	let position = 0;
+	for (; position < Math.min(period, data.length); position++) writeFixedSymbol(writer, data[position]!);
+	while (data.length - position >= SHORTEST_MATCH) {
+		const length = Math.min(LONGEST_MATCH, data.length - position);
+		const lengthCode = codeOf(LENGTH_CODE_BASES, length);
+		writeFixedSymbol(writer, FIRST_LENGTH_SYMBOL + lengthCode);
+		writer.writeValue(length - LENGTH_CODE_BASES[lengthCode]!, LENGTH_CODE_EXTRA_BITS[lengthCode]!);
+		const distanceCode = codeOf(DISTANCE_CODE_BASES, period);
+		writer.writeCode(distanceCode, 5);
+		writer.writeValue(period - DISTANCE_CODE_BASES[distanceCode]!, DISTANCE_CODE_EXTRA_BITS[distanceCode]!);
+		position += length;
+	}
+	for (; position < data.length; position++) writeFixedSymbol(writer, data[position]!);
+	writeFixedSymbol(writer, END_OF_BLOCK_SYMBOL);
+	const deflated = writer.finish();
+	const bytes = new Uint8Array(ZLIB_HEADER.length + deflated.length + 4);
+	bytes.set(ZLIB_HEADER, 0);
+	bytes.set(deflated, ZLIB_HEADER.length);
+	new DataView(bytes.buffer).setUint32(bytes.length - 4, adler32(data));
+	return bytes;
+}
+
+/** Writes a PNG of `width` by `height` pixels of one colour whose image data is compressed to runs, so its bytes stay few at any size. */
+export function buildCompressedImagePng(width: number, height: number, colour: Rgba): Uint8Array {
+	const scanlines = plainScanlines(width, height, colour);
+	return concatenate([
+		Uint8Array.from(PNG_SIGNATURE),
+		pngChunk('IHDR', pngHeaderContent(width, height)),
+		pngChunk('IDAT', repeatingZlibStream(scanlines, 1 + 4 * width)),
+		pngChunk('IEND', new Uint8Array())
+	]);
+}
+
 /** The figure's texture as a PNG. */
 export function buildFigureTexturePng(): Uint8Array {
 	return buildImagePng(figureTexture.width, figureTexture.height, figureTexture.colour);
@@ -452,4 +607,42 @@ export function buildWebp(form: WebpForm, width: number, height: number, options
 /** The conformant synthetic VRM as a GLB: its JSON and binary chunk. */
 export function buildConformantVrmGlb(values: ConformantVrmValues): Uint8Array {
 	return buildGlb(buildConformantVrmParts(values));
+}
+
+/** The limits a figure at the budgets fills; the caller reads them from the profile. */
+export interface FigureBudgets {
+	readonly fileBudgetBytes: number;
+	readonly maxTriangles: number;
+	readonly maxMorphTargetsPerPrimitive: number;
+	readonly maxTextureSidePixels: number;
+	readonly maxTexels: number;
+}
+
+/** The sides of the images that together hold exactly `texels`, none longer than `maxSide`: full squares of that side while they fit, then what is left. */
+function imageSizesFilling(texels: number, maxSide: number): [number, number][] {
+	const sizes: [number, number][] = [];
+	for (let left = texels; left > 0; ) {
+		const width = Math.min(maxSide, left);
+		const height = Math.min(maxSide, Math.floor(left / width));
+		sizes.push([width, height]);
+		left -= width * height;
+	}
+	return sizes;
+}
+
+/**
+ * A conformant VRM at the budgets: textures filling the texel budget, the triangle budget in its meshes, and as many morph targets on one
+ * mesh as the file budget leaves, at most the budget a primitive. It reports what it holds, so a caller need not read it back.
+ */
+export function buildBudgetVrm(values: ConformantVrmValues, budgets: FigureBudgets): { glb: Uint8Array; morphTargets: number } {
+	const colour = figureTexture.colour;
+	const images = imageSizesFilling(budgets.maxTexels, budgets.maxTextureSidePixels).map(([width, height]) => buildCompressedImagePng(width, height, colour));
+	const buildWith = (morphTargets: number) =>
+		buildGlb(buildConformantVrmParts(values, images, { triangles: budgets.maxTriangles, morphTargets }));
+	const withoutMorphs = buildWith(0).length;
+	const perTarget = buildWith(1).length - withoutMorphs;
+	let morphTargets = Math.min(budgets.maxMorphTargetsPerPrimitive, Math.floor((budgets.fileBudgetBytes - withoutMorphs) / perTarget));
+	let glb = buildWith(morphTargets);
+	while (glb.length > budgets.fileBudgetBytes && morphTargets > 0) glb = buildWith(--morphTargets);
+	return { glb, morphTargets };
 }

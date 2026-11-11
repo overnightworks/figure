@@ -2,10 +2,7 @@
 
 ## 1. Context and Scope
 
-figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's
-bytes to a list of refusals, and the command `figure check <file>` around it; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into
-an app's canvas and keeps it alive: the figure breathes, blinks and glances until the app disposes it. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` in a browser before three parses
-the file, and an app calls `mount` on a canvas.
+figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's bytes to a list of refusals, and the command `figure check <file>` around it; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into an app's canvas and keeps it alive: the figure breathes, blinks and glances until the app disposes it. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` in a browser before three parses the file, and an app calls `mount` on a canvas.
 
 ```mermaid
 flowchart LR
@@ -137,10 +134,9 @@ sequenceDiagram
 
 *`mount`'s one flow; derived from `src/draw.ts`. An error anywhere in loading or drawing, or a texture that fails, gives `refused` and frees the renderer; `mount` never rejects.* After `drawn`, the figure is drawn each animation frame, at the canvas's size and the device pixel ratio of that frame, while the page is visible and the canvas is in the viewport, until `dispose`, a context loss or a `slow` ending; no signal is given for a frame or a pause. A figure that ended runs no loop.
 
-The loader's texture loader reads each image through an `<img>`, because three's default fetches a `blob:` URL and the script policy refuses that; it also records a failed image, which three itself swallows. Its file loader always fails, so a buffer outside the GLB gives `refused` and no request, whatever the check said. The canvas is the host's: the renderer never writes its `style`, and no element is created.
+The loader's texture loader reads each image through an `<img>`, because three's default fetches a `blob:` URL and the script policy refuses that; it also records a failed image, which three itself swallows. Its file loader always fails, so a buffer outside the GLB gives `refused` and no request, whatever the check said. The canvas is the host's: the renderer never writes its `style`, and the renderer adds no element to the page.
 
-The check's rules run in a fixed order. A refusal that leaves the later rules unjudgeable ends the check; the others all
-report:
+The check's rules run in a fixed order. A refusal that leaves the later rules unjudgeable ends the check; the others all report:
 
 1. `too_large` (judged on the file's length alone, and reported beside any later refusal);
 2. `not_glb` ends the check;
@@ -148,59 +144,31 @@ report:
 4. `glb_chunk` (every chunk compared with the bytes that are there) ends the check;
 5. `glb_json` ends the check;
 6. `extension_not_allowed`, `uri_not_allowed` and `buffer_outside_glb`, all reported;
-7. the VRM rules: `not_vrm` alone when the VRM 1.0 extension is absent, else `preset_missing` (one per preset),
-   `humanoid_bone_missing` (one per required bone, `gltf_invalid` for a bone whose node names no entry of `nodes`), `look_at_missing` and the three `licence_*` codes;
-8. the budgets, which read plain glTF and so judge a file that is `not_vrm` too: `too_many_triangles`,
-   `too_many_morph_targets`, and `gltf_invalid` for a mesh, accessor or index they cannot read;
-9. the texture budgets (`src/textureRules.ts`), which also read the binary chunk: `texture_too_large`,
-   `too_many_texels`, `image_invalid`, and `gltf_invalid` for an image or buffer view they cannot read.
+7. the VRM rules: `not_vrm` alone when the VRM 1.0 extension is absent, else `preset_missing` (one per preset), `humanoid_bone_missing` (one per required bone, `gltf_invalid` for a bone whose node names no entry of `nodes`), `look_at_missing` and the three `licence_*` codes;
+8. the budgets, which read plain glTF and so judge a file that is `not_vrm` too: `too_many_triangles`, `too_many_morph_targets`, and `gltf_invalid` for a mesh, accessor or index they cannot read;
+9. the texture budgets (`src/textureRules.ts`), which also read the binary chunk: `texture_too_large`, `too_many_texels`, `image_invalid`, and `gltf_invalid` for an image or buffer view they cannot read.
 
-Triangles are counted from accessor fields, never from geometry: per primitive of each mesh once, the `count` of the
-`indices` accessor (else `POSITION`) divided by three for mode 4, less two for modes 5 and 6, none for modes 0 to 3.
-Only the presence of a preset or the look-at is judged.
+Triangles are counted from accessor fields, never from geometry: per primitive of each mesh once, the `count` of the `indices` accessor (else `POSITION`) divided by three for mode 4, less two for modes 5 and 6, none for modes 0 to 3. Only the presence of a preset or the look-at is judged.
 
-Textures are judged from headers only. Each entry of `images` counts once, however many textures use it; an image with
-a `uri` is left to `uri_not_allowed`. Its bytes are the range its buffer view names in the binary chunk, compared with
-the chunk's length before any read. `imageSize` (`src/imageSize.ts`) sizes a PNG, a JPEG or a WebP by the image's first
-bytes, never by its `mimeType`, each in its own reader (`pngHeader.ts`, `jpegHeader.ts`, `webpHeader.ts`); any other
-image type is `image_invalid`. A JPEG's size is its first frame header, found by a forward walk over the segments; a
-WebP's is the first chunk's own header (lossy, lossless or the extended canvas). The stated size is compared with the
-budgets and never used to allocate or read.
+Textures are judged from headers only. Each entry of `images` counts once, however many textures use it; an image with a `uri` is left to `uri_not_allowed`. Its bytes are the range its buffer view names in the binary chunk, compared with the chunk's length before any read. `imageSize` (`src/imageSize.ts`) sizes a PNG, a JPEG or a WebP by the image's first bytes, never by its `mimeType`, each in its own reader (`pngHeader.ts`, `jpegHeader.ts`, `webpHeader.ts`); any other image type is `image_invalid`. A JPEG's size is its first frame header, found by a forward walk over the segments; a WebP's is the first chunk's own header (lossy, lossless or the extended canvas). The stated size is compared with the budgets and never used to allocate or read.
 
 ## 4. Deployment View
 
-The build is `tsc` alone and emits ESM and declarations to `dist/`. `prepack` runs it, so `pnpm pack` yields a tarball
-whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm. The build resolves imports as a bundler does, because three-vrm's types need it; `tests/tsconfig.node.json` type-checks the modules `bin.ts` reaches under Node's own resolution, which demands each relative import's `.js`.
+The build is `tsc` alone and emits ESM and declarations to `dist/`. `prepack` runs it, so `pnpm pack` yields a tarball whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm. The build resolves imports as a bundler does, because three-vrm's types need it; `tests/tsconfig.node.json` type-checks the modules `bin.ts` reaches under Node's own resolution, which demands each relative import's `.js`.
 
-A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the
-build packs `overnightworks-figure-<version>.tgz` into `release-files` and proves it with
-`scripts/check_packed_tarball.sh`, and quality's tag job publishes the tarball on an immutable release, whose notes carry
-the tarball's `sha512-` integrity for a consumer that pins it by URL. Releases exist; a consumer finds them on the
-repository's releases page (`https://github.com/overnightworks/figure/releases`). quality's `docs/release.md` owns the path.
+A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the build packs `overnightworks-figure-<version>.tgz` into `release-files` and proves it with `scripts/check_packed_tarball.sh`, and quality's tag job publishes the tarball on an immutable release. A release holds exactly that tarball; its notes carry the tarball's URL and `sha512-` integrity for a consumer that pins it by URL, then the gzip size of a consumer bundle that only checks and of one that also mounts, both computed from the packed tarball by `scripts/measure_bundle_size.mjs`. A failing size step fails the build before the tag. A consumer finds releases on the repository's releases page (`https://github.com/overnightworks/figure/releases`). quality's `docs/release.md` owns the path.
+
+`scripts/measure_budget_figure.mjs` is the measurement behind the profile's budgets: it builds a synthetic figure at the budgets, checks it, mounts it in headless Chromium on a canvas 390 CSS pixels wide and reports the frame interval, whether `slow` came, the renderer and the GPU memory computed from what the figure uploads. A budget changes only on such a measurement.
 
 ## 5. Crosscutting Concepts
 
-**Trust.** A figure file is untrusted input; no code comes from it. The check is about conformance and about
-protecting phones; it is not an app's security boundary. `mount` runs the check before three sees a byte.
+**Trust.** A figure file is untrusted input; no code comes from it. The check is about conformance and about protecting phones; it is not an app's security boundary. `mount` runs the check before three sees a byte.
 
-**Proof strategy.** Branch coverage is 100 % over the check's cases, the in-process command tests and the browser project (`src/*.browser.test.ts`, headless Chromium through vitest's Playwright provider) together; one `vitest run --coverage` runs both projects and reports one `lcov.info`; the entry module `bin.ts` is reached only as a process, so its lines count as uncovered in that report
-(branches stay 100 % because it has none). A second layer drives `dist/bin.js` as a process for each exit code, and CI
-installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that
-shares no code with the check.
+**Proof strategy.** Branch coverage is 100 % over the check's cases, the in-process command tests and the browser project (`src/*.browser.test.ts`, headless Chromium through vitest's Playwright provider) together; one `vitest run --coverage` runs both projects and reports one `lcov.info`; the entry module `bin.ts` is reached only as a process, so its lines count as uncovered in that report (branches stay 100 % because it has none). A second layer drives `dist/bin.js` as a process for each exit code, and CI installs the packed tarball into an empty directory and runs it. Synthetic GLB bytes come from a test builder that shares no code with the check.
 
-The builder's one conformant VRM is a small figure: the required bones plus chest and neck on a hierarchy, a torso and a
-head box with vertex data skinned to spine, chest and head, a blink morph target bound by the `blink` preset, a core
-material with a base colour texture, and a PNG with image data and checksums. Every test, the script the workflows run
-and the tarball proof start from this file. Today it is proven by the check (no refusal), by tests that read its
-structure back from the glTF 2.0 and VRM 1.0 schemas, by the Khronos glTF validator (no error; it also decodes the PNG),
-and by the browser layer, where `mount` draws it and shows the texture's colour.
+The builder's one conformant VRM is a small figure: the required bones plus chest and neck on a hierarchy, a torso and a head box with vertex data skinned to spine, chest and head, a blink morph target bound by the `blink` preset, a core material with a base colour texture, and a PNG with image data and checksums. Every test, the script the workflows run and the tarball proof start from this file. Today it is proven by the check (no refusal), by tests that read its structure back from the glTF 2.0 and VRM 1.0 schemas, by the Khronos glTF validator (no error; it also decodes the PNG), and by the browser layer, where `mount` draws it and shows the texture's colour.
 
-A browser layer (`tests/e2e`, Playwright) packs the tarball, installs it into a temporary consumer, bundles that with Vite
-and serves it in headless Chromium under the script policy `default-src 'none'; script-src 'self'; connect-src 'self';
-img-src 'self' blob:; worker-src 'self'`, which every response of the page carries. It proves that the check runs in a
-browser on raw bytes, that `mount` gives `drawn` with the texture's colour on the canvas, and that loading code, files and
-textures breaks no part of the policy. Its coverage is not measured: the browser project covers the same code. A missing
-WebGL 2 makes it red. The browser project drives `mount`'s other signals, the handle and the canvas contract.
+A browser layer (`tests/e2e`, Playwright) packs the tarball, installs it into a temporary consumer, bundles that with Vite and serves it in headless Chromium under the script policy `default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' blob:; worker-src 'self'`, which every response of the page carries. It proves that the check runs in a browser on raw bytes, that `mount` gives `drawn` with the texture's colour on the canvas, and that loading code, files and textures breaks no part of the policy. Its coverage is not measured: the browser project covers the same code. A missing WebGL 2 makes it red. The browser project drives `mount`'s other signals, the handle and the canvas contract.
 
 ## 6. Constraints and reasons
 
