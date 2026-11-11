@@ -3,8 +3,8 @@
 ## 1. Context and Scope
 
 figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's
-bytes to a list of refusals, and the command `figure check <file>` around it; and the drawing export `overnightworks-figure/draw`, whose `mount` draws one frame of a figure into
-an app's canvas. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` in a browser before three parses
+bytes to a list of refusals, and the command `figure check <file>` around it; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into
+an app's canvas and keeps it drawn as the canvas resizes. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` in a browser before three parses
 the file, and an app calls `mount` on a canvas.
 
 ```mermaid
@@ -50,8 +50,11 @@ flowchart TD
     draw["draw.ts: mount, the handle"] --> check
     draw --> signals
     draw --> figureLoader
+    draw --> followCanvas
     draw --> figureFrame
     figureLoader["figureLoader.ts: GLTF and VRM loading, the img texture loader"]
+    followCanvas["followCanvas.ts: when the picture is drawn again"]
+    followCanvas --> figureFrame
     figureFrame["figureFrame.ts: lights, camera, one frame"]
     signals["signals.ts: the closed set of signals"]
 ```
