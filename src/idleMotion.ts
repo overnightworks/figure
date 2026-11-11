@@ -13,7 +13,7 @@
  */
 
 /** Radians the spine leans forward at the top of a breath. */
-const breathLean = 0.022;
+export const breathLean = 0.022;
 const breathPeriodSeconds = 4.6;
 /** The sway's amplitude in radians and angular frequency in radians per second, for each axis of the head. */
 const sway = {

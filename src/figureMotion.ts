@@ -1,4 +1,4 @@
-import { createIdleMotion, longestStepSeconds } from './idleMotion.js';
+import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.js';
 
 /**
  * The figure's motion as a function of the facts the host reports, the time and a source of chance, with no three and no DOM: it
@@ -70,12 +70,10 @@ const radiansPerDegree = Math.PI / 180;
  * because its bone runs along +X; the shoulders rise by 0.012 rad at the top of a breath, the left upper arm swings 0.01 rad about x.
  */
 const restingArm = { upperArmRoll: 1.38, shoulderRise: 0.012, upperArmSwing: 0.01 };
-/** The spine's lean at the top of a breath, in radians, which is the idle pose's breath at its largest. */
-const breathLeanRadians = 0.022;
 
 /** The arms at rest for a breath of `breath` radians: the breath as a share of its largest lean sets the shoulders' and the swing's share. */
 function restingArms(breath: number): Arms {
-	const share = breath / breathLeanRadians;
+	const share = breath / breathLean;
 	return {
 		leftShoulder: { yaw: 0, pitch: 0, roll: restingArm.shoulderRise * share },
 		rightShoulder: { yaw: 0, pitch: 0, roll: -restingArm.shoulderRise * share },
