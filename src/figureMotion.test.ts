@@ -32,19 +32,6 @@ function watch(frames: number, factsAt: (frame: number) => FigureFacts, reducedM
 	return Array.from({ length: frames }, (_, frame) => motion.advance(factsAt(frame), frameSeconds, reducedMotion));
 }
 
-/** The blinks a figure makes in `seconds`, stepping 50 ms at a time: each stretch of frames with the eyes closing counts once. */
-function blinksIn(facts: FigureFacts, seconds: number): number {
-	const motion = createFigureMotion(seededRandom(seed));
-	let blinking = false;
-	let blinks = 0;
-	for (let step = 0; step < seconds / 0.05; step++) {
-		const closing = motion.advance(facts, 0.05, false).blink > 0;
-		if (closing && !blinking) blinks++;
-		blinking = closing;
-	}
-	return blinks;
-}
-
 /** The longest stretch, in seconds, the eyes stay closing in `poses`. */
 function longestBlinkSeconds(poses: FigurePose[]): number {
 	let longest = 0;
@@ -120,19 +107,12 @@ describe('the figure motion', () => {
 		expect(after.some((pose) => Math.abs(pose.look.yaw) > 5 && Math.abs(pose.look.yaw) <= widestIdleLookYaw)).toBe(true);
 	});
 
-	it('blinks at 0.8 of its idle rate while thinking', () => {
-		const longRunSeconds = 4000;
+	it('blinks at 0.8 of its idle weight while thinking, starting at the same instants as when idle', () => {
+		const idling = watch(6000, () => idle);
+		const thought = watch(6000, () => thinking);
 
-		const ratio = blinksIn(thinking, longRunSeconds) / blinksIn(idle, longRunSeconds);
-
-		expect(ratio).toBeGreaterThan(0.75);
-		expect(ratio).toBeLessThan(0.85);
-	});
-
-	it('closes the eyes fully when it blinks while thinking', () => {
-		const peak = Math.max(...watch(3000, () => thinking).map((pose) => pose.blink));
-
-		expect(peak).toBeCloseTo(1, 1);
+		expect(idling.some((pose) => pose.blink > 0.9)).toBe(true);
+		thought.forEach((pose, frame) => expect(pose.blink).toBeCloseTo(idling[frame]!.blink * 0.8, 9));
 	});
 
 	it('reaches the thinking pose at once under reduced motion, holds it, and leaves it at once', () => {

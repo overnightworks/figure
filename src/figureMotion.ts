@@ -6,7 +6,7 @@ import { createIdleMotion, longestStepSeconds } from './idleMotion.js';
  * join before idle, and the one that is true and strongest decides the gaze.
  *
  * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and
- * to the figure's side, the head's turn, the blink at 0.8 of its idle rate, the idle glance suppressed, and the easing rates. The picture
+ * to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the easing rates. The picture
  * also raises a hand to the chin, which the figure does not do. Under reduced motion the pose is reached and left at once.
  */
 
@@ -45,8 +45,8 @@ type Gaze = { readonly yaw: number; readonly pitch: number };
 
 /** The gaze while thinking, in degrees: up and to the figure's side. */
 const thinkingGaze: Gaze = { yaw: -18, pitch: 13 };
-/** The head's extra turn at the full thinking look, in radians, and the blink's rate then, as a share of its idle rate. */
-const thinkingLook = { posture: { yaw: -0.2, pitch: -0.1, roll: 0.16 }, blinkRate: 0.8 };
+/** The head's extra turn at the full thinking look, in radians, and the blink's weight then, as a share of its idle weight. */
+const thinkingLook = { posture: { yaw: -0.2, pitch: -0.1, roll: 0.16 }, blinkWeight: 0.8 };
 /** The easing rates per second: the gaze's yaw and pitch, and the thinking look's weight. */
 const easing = { yaw: 7, pitch: 6, thinking: 4 };
 /** The head turns half the gaze's yaw and tilts 0.55 of its pitch; the look-at turns 2.4 times the gaze. */
@@ -88,13 +88,13 @@ export function createFigureMotion(random: () => number): FigureMotion {
 	return {
 		advance(facts, elapsedSeconds, reducedMotion) {
 			const step = Math.min(elapsedSeconds, longestStepSeconds);
-			const base = idle.advance(elapsedSeconds, reducedMotion, facts.thinking ? thinkingLook.blinkRate : 1);
+			const base = idle.advance(elapsedSeconds, reducedMotion);
 			const ease = (value: number, goal: number, rate: number) => value + (goal - value) * (reducedMotion ? 1 : 1 - Math.exp(-rate * step));
 			const goal = gazeFor(facts, base.glance);
 			gaze = { yaw: ease(gaze.yaw, goal.yaw, easing.yaw), pitch: ease(gaze.pitch, goal.pitch, easing.pitch) };
 			thinkingWeight = ease(thinkingWeight, facts.thinking ? 1 : 0, easing.thinking);
 			return {
-				blink: base.blink,
+				blink: facts.thinking ? base.blink * thinkingLook.blinkWeight : base.blink,
 				breath: base.breath,
 				head: {
 					yaw: gaze.yaw * radiansPerDegree * headShare.yaw + base.sway.yaw,
