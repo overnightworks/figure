@@ -10,6 +10,11 @@ entry = "vitest.config.ts"
 reason = "vitest finds its configuration at the root"
 
 [[layout.allow]]
+path = "tests/e2e/stage.spec.ts"
+rule = "test-layout"
+reason = "the browser layer sits beside the Node test builders in tests/, and a root e2e/ would need its own root entry"
+
+[[layout.allow]]
 path = "src/bin.ts"
 rule = "script-name"
 reason = "npm links the figure command to this file, whose shebang makes it executable"

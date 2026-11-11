@@ -133,4 +133,4 @@ The closed set lives in `src/codes.ts` and is exported as `overnightworks-figure
 ## Develop
 
 `pnpm run check` type-checks, `pnpm exec vitest run --coverage` runs the tests (build first), and `quality check`
-runs the shared static check. [AGENTS.md](AGENTS.md) lists the commands and rules for agents.
+runs the shared static check. `pnpm run stage` serves a demo page on localhost, where a figure mounts at 390 and 1280 px. [AGENTS.md](AGENTS.md) lists the commands and rules for agents.

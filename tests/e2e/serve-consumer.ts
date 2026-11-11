@@ -4,6 +4,25 @@ import type { Page } from '@playwright/test';
 
 export const origin = 'http://consumer.test';
 
+declare global {
+	interface Window {
+		securityPolicyViolations: string[];
+	}
+}
+
+/** Collects the page's errors and, in `window.securityPolicyViolations`, every violation of the script policy; returns the errors. */
+export async function recordPolicyViolations(page: Page): Promise<string[]> {
+	const pageErrors: string[] = [];
+	page.on('pageerror', (error) => pageErrors.push(error.message));
+	await page.addInitScript(() => {
+		window.securityPolicyViolations = [];
+		document.addEventListener('securitypolicyviolation', (event) => {
+			window.securityPolicyViolations.push(`${event.violatedDirective} ${event.blockedURI}`);
+		});
+	});
+	return pageErrors;
+}
+
 /** The script policy a figure page runs under; every response of the page carries exactly this header. */
 export const scriptPolicy =
 	"default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' blob:; worker-src 'self'";
