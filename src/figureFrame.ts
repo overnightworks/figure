@@ -1,6 +1,6 @@
 import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Scene, Vector3, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
-import type { IdlePose } from './idleMotion.js';
+import type { FigurePose } from './figureMotion.js';
 
 /** The picture's camera, lights and clear colour are the values of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html. */
 const camera = { fieldOfView: 22, near: 0.05, far: 20 };
@@ -8,6 +8,8 @@ const camera = { fieldOfView: 22, near: 0.05, far: 20 };
 const framing = { above: 0.25, below: 0.4, halfWidth: 0.31 };
 /** The most drawing-buffer pixels per CSS pixel: a denser screen gets this ratio, not its own. */
 const maximumPixelRatio = 2;
+/** The head's turn goes 0.4 to the neck and the rest to the head where the model has a neck; the chest follows 0.15 of its yaw. */
+const turnShare = { neck: 0.4, chestYaw: 0.15 };
 
 /** The drawing buffer's pixels per CSS pixel: the window's device pixel ratio, capped. */
 function drawingPixelRatio(): number {
@@ -51,7 +53,7 @@ function currentSize(canvas: HTMLCanvasElement): DrawingSize {
 /** A figure's lights and camera, built once, and the frame that draws it. */
 export interface FigureStage {
 	/** Sets the figure to `pose` and draws it, the drawing buffer first following the canvas when its size or the pixel ratio changed. */
-	draw(pose: IdlePose, elapsedSeconds: number): void;
+	draw(pose: FigurePose, elapsedSeconds: number): void;
 }
 
 /** The stage for `vrm` at rest, on the renderer's canvas: the camera frames the eyes where they are now, so the figure moves in front of it. */
@@ -64,6 +66,9 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	const scene = lightedScene(vrm);
 	const spine = vrm.humanoid.getNormalizedBoneNode('spine')!;
 	const head = vrm.humanoid.getNormalizedBoneNode('head')!;
+	const neck = vrm.humanoid.getNormalizedBoneNode('neck');
+	const chest = vrm.humanoid.getNormalizedBoneNode('chest');
+	const neckShare = neck === null ? 0 : turnShare.neck;
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;
 	let view: PerspectiveCamera;
@@ -77,7 +82,9 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 				drawn = size;
 			}
 			spine.rotation.x = pose.breath;
-			head.rotation.set(pose.head.pitch, pose.head.yaw, pose.head.roll);
+			head.rotation.set(pose.head.pitch * (1 - neckShare), pose.head.yaw * (1 - neckShare), pose.head.roll * (1 - neckShare));
+			neck?.rotation.set(pose.head.pitch * neckShare, pose.head.yaw * neckShare, pose.head.roll * neckShare);
+			chest?.rotation.set(0, pose.head.yaw * turnShare.chestYaw, 0);
 			vrm.expressionManager!.setValue('blink', pose.blink);
 			vrm.lookAt!.yaw = pose.look.yaw;
 			vrm.lookAt!.pitch = pose.look.pitch;
