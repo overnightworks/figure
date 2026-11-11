@@ -10,7 +10,7 @@
 // Usage: pnpm run build && node scripts/measure_budget_figure.mjs; needs `pnpm exec playwright install chromium` once.
 // It takes the machine's probe-stack lock and runs inside a 4 GiB memory cap on its own (a second wrapper would deadlock on
 // the lock); it fetches nothing, serves the page by request routing, and writes the page's bundle only to a temporary
-// directory that it removes (the figure stays in memory).
+// directory that its outer process removes even when the capped one is killed (the figure stays in memory).
 // Exit codes: 0 when the measurement ran (`slow` is a result, not a failure), 1 when the figure fails the check, no `drawn`
 // came, fewer than 300 frames came or the browser failed, 2 when dist/ is not built.
 import { spawnSync } from 'node:child_process';
@@ -26,6 +26,7 @@ import { buildBudgetVrm } from '../tests/glbBuilder.ts';
 const scriptPath = fileURLToPath(import.meta.url);
 const repositoryRoot = resolve(dirname(scriptPath), '..');
 const guardedMarker = 'FIGURE_MEASURE_GUARDED';
+const workDirectoryVariable = 'FIGURE_MEASURE_WORK_DIRECTORY';
 const canvasCssWidth = 390;
 const deviceScaleFactor = 2;
 const frameCount = 300;
@@ -34,7 +35,11 @@ const morphTextureBytesPerTexel = 16;
 const componentBytes = { 5121: 1, 5123: 2, 5125: 4, 5126: 4 };
 const componentCounts = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 
-/** Re-runs this script under the probe-stack lock and the memory cap, unless it already runs inside them. */
+/**
+ * Re-runs this script under the probe-stack lock and the memory cap, unless it already runs inside them. The temporary directory
+ * belongs to this process, which outlives the capped one: the cap's timeout or the kernel's memory kill ends the capped process
+ * without a `finally`.
+ */
 function runGuarded() {
 	const command = [
 		'flock', '-o', '-w', '3600', '/tmp/probe-stack.lock',
@@ -43,7 +48,16 @@ function runGuarded() {
 		'systemd-run', '--user', '--scope', '--quiet', '-p', 'MemoryMax=4G', '-p', 'MemorySwapMax=0',
 		process.execPath, scriptPath
 	];
-	const { status } = spawnSync(command[0], command.slice(1), { stdio: 'inherit', env: { ...process.env, [guardedMarker]: '1' } });
+	const workDirectory = mkdtempSync(join(tmpdir(), 'figure-budget-'));
+	let status;
+	try {
+		({ status } = spawnSync(command[0], command.slice(1), {
+			stdio: 'inherit',
+			env: { ...process.env, [guardedMarker]: '1', [workDirectoryVariable]: workDirectory }
+		}));
+	} finally {
+		rmSync(workDirectory, { recursive: true, force: true });
+	}
 	process.exit(status ?? 1);
 }
 
@@ -217,24 +231,19 @@ async function main() {
 		console.error(`the budget figure fails the check: ${refusals.map(({ code }) => code).join(' ')}`);
 		return 1;
 	}
-	const workDirectory = mkdtempSync(join(tmpdir(), 'figure-budget-'));
-	try {
-		const bundleDirectory = await bundlePage(workDirectory);
-		const measured = await measureInChromium(bundleDirectory, figure.glb);
-		const failed = measured.mounts.find(({ signals, clientWidth }) => !signals.includes('drawn') || clientWidth !== canvasCssWidth);
-		if (failed !== undefined) {
-			console.error(`a mount was not drawn on a ${canvasCssWidth} px canvas: signals ${failed.signals.join(' ')}, canvas ${failed.clientWidth} px`);
-			return 1;
-		}
-		if (measured.intervals.length < frameCount) {
-			console.error(`only ${measured.intervals.length} of ${frameCount} frame intervals came in ${measured.mounts.length} mounts`);
-			return 1;
-		}
-		report(figure, figureProfile.fileBudgetBytes, measured, gpuMemoryParts(readGlb(figure.glb), measured.maxTextureSize));
-		return 0;
-	} finally {
-		rmSync(workDirectory, { recursive: true, force: true });
+	const bundleDirectory = await bundlePage(process.env[workDirectoryVariable]);
+	const measured = await measureInChromium(bundleDirectory, figure.glb);
+	const failed = measured.mounts.find(({ signals, clientWidth }) => !signals.includes('drawn') || clientWidth !== canvasCssWidth);
+	if (failed !== undefined) {
+		console.error(`a mount was not drawn on a ${canvasCssWidth} px canvas: signals ${failed.signals.join(' ')}, canvas ${failed.clientWidth} px`);
+		return 1;
 	}
+	if (measured.intervals.length < frameCount) {
+		console.error(`only ${measured.intervals.length} of ${frameCount} frame intervals came in ${measured.mounts.length} mounts`);
+		return 1;
+	}
+	report(figure, figureProfile.fileBudgetBytes, measured, gpuMemoryParts(readGlb(figure.glb), measured.maxTextureSize));
+	return 0;
 }
 
 if (process.env[guardedMarker] === undefined) runGuarded();
