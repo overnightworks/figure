@@ -166,6 +166,13 @@ describe('the synthetic VRM at the budgets', () => {
 		expect(checkFigure(glb)).toEqual([]);
 	});
 
+	it('names every image through a texture that its material uses, so a renderer loads all of them', () => {
+		const material = budgetJson.materials[0];
+		const slots = [material.pbrMetallicRoughness.baseColorTexture, material.emissiveTexture, material.occlusionTexture, material.normalTexture];
+		const usedSources = slots.filter((slot) => slot !== undefined).map((slot) => budgetJson.textures[slot.index].source);
+		expect(usedSources.sort()).toEqual(budgetJson.images.map((_: Json, image: number) => image));
+	});
+
 	it('fills the triangle budget exactly', () => {
 		const triangles = budgetPrimitives.reduce((sum, primitive) => sum + budgetJson.accessors[primitive.indices].count / 3, 0);
 		expect(triangles).toBe(figureProfile.maxTriangles);

@@ -199,6 +199,17 @@ function addImages(packer: BinaryPacker, images: readonly Uint8Array[]) {
 	return images.map((image) => ({ bufferView: packer.addView(image), mimeType: 'image/png' }));
 }
 
+/** The slots of the one material, in the order they take the textures after the base colour; a texture no material names is never loaded. */
+const EXTRA_TEXTURE_SLOTS = ['emissiveTexture', 'occlusionTexture', 'normalTexture'] as const;
+
+function figureMaterial(textureCount: number): Record<string, unknown> {
+	if (textureCount > 1 + EXTRA_TEXTURE_SLOTS.length) {
+		throw new RangeError(`the material names at most ${1 + EXTRA_TEXTURE_SLOTS.length} textures, not ${textureCount}`);
+	}
+	const extra = EXTRA_TEXTURE_SLOTS.slice(0, Math.max(0, textureCount - 1)).map((slot, index) => [slot, { index: index + 1 }]);
+	return { pbrMetallicRoughness: { baseColorTexture: { index: 0 } }, ...Object.fromEntries(extra) };
+}
+
 function skeletonNodes(skeleton: readonly Bone[]) {
 	return skeleton.map(({ name, translation }, index) => {
 		const children = skeleton.flatMap((child, childIndex) => (child.parent === index ? [childIndex] : []));
@@ -208,8 +219,8 @@ function skeletonNodes(skeleton: readonly Bone[]) {
 
 /**
  * The conformant synthetic VRM's JSON and binary chunk: a skeleton with chest and neck, two skinned boxes, a blink morph target
- * bound by the `blink` preset, a core material with a base colour texture, and `images` (by default the figure's PNG) as the texture sources.
- * With `heavy`, a third mesh of grid triangles carries the morph targets and the meshes together hold the triangles it names.
+ * bound by the `blink` preset, a core material with a base colour texture, and `images` (by default the figure's PNG) as the texture sources,
+ * the material naming each of them in a slot of its own. With `heavy`, a third mesh of grid triangles carries the morph targets and the meshes together hold the triangles it names.
  */
 export function buildConformantVrmParts(
 	values: ConformantVrmValues,
@@ -255,8 +266,8 @@ export function buildConformantVrmParts(
 			nodes,
 			skins: [{ inverseBindMatrices, skeleton: 0, joints: jointNodes }],
 			meshes: meshEntries,
-			materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
-			textures: [{ source: 0 }],
+			materials: [figureMaterial(images.length)],
+			textures: images.map((_, source) => ({ source })),
 			images: imageEntries,
 			buffers: [{ byteLength: packer.byteLength }],
 			bufferViews: packer.bufferViews,
