@@ -18,8 +18,10 @@ interface Slot {
 /** The figure every drawing mounts: the synthetic one until the visitor picks a file. */
 let figureBytes: Uint8Array = buildConformantVrm();
 
+/** Writes a signal beside the slot only while its canvas is the one shown: a replaced canvas still records its own signal. */
 function showSignal(slot: Slot, canvas: HTMLCanvasElement, signal: FigureSignal): void {
 	canvas.dataset.signal = signal;
+	if (!slot.mountPoint.contains(canvas)) return;
 	slot.signalText.textContent = signal;
 	slot.mountAgain.hidden = signal === figureSignal.drawn;
 }
@@ -33,7 +35,13 @@ async function mountSlot(slot: Slot): Promise<void> {
 	slot.mountPoint.replaceChildren(canvas);
 	slot.signalText.textContent = 'mounting';
 	slot.mountAgain.hidden = true;
-	slot.handle = await mount(canvas, figureBytes, { onSignal: (signal) => showSignal(slot, canvas, signal) });
+	const handle = await mount(canvas, figureBytes, { onSignal: (signal) => showSignal(slot, canvas, signal) });
+	// A mount that resolves after a newer one replaced its canvas is released here, so its context and loop do not leak.
+	if (!slot.mountPoint.contains(canvas)) {
+		handle.dispose();
+		return;
+	}
+	slot.handle = handle;
 }
 
 function createSlot(cssWidth: number, stage: HTMLElement): Slot {
