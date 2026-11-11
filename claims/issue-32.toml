@@ -1,8 +1,0 @@
-claim_id = "70f988588693481ca846f12a5d05381c"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "71adc175d6a7c2711e6f28a614e7aab74c28c947"
-branch = "claude/issue-32-a-figure-that-cannot-keep-its-frame-time"
-scope = ["docs/ARCHITECTURE.md", "src"]
-opened_commit = "2ef01e4fbbfd07ed9b997c7bf738375b4d071a27"
-whole_reason = "The frame-time guard, the loop that feeds it, the mount that ends on it, their tests and the architecture text are one lifecycle change of the drawing module; src is named as a directory because the guard gets its own module."
