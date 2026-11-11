@@ -39,7 +39,10 @@ export async function showFigure(canvas: HTMLCanvasElement, figureUrl: string, s
 ```
 
 The app calls `handle.dispose()` when it is done with the figure; a second call does nothing. `handle.signal` is the last
-signal given. `mount` never rejects, and the first signal has reached `onSignal` before it resolves.
+signal given. `handle.think(working)` tells the figure whether the agent's model is working: the app reports only the fact,
+and the figure decides its motion, so it looks up and aside while `working` is true and goes back to its idle motion
+when it is false. The same value again changes nothing, and on a figure that ended or was disposed the call does nothing.
+`mount` never rejects, and the first signal has reached `onSignal` before it resolves.
 
 | Signal | Means | The app |
 |---|---|---|
@@ -55,9 +58,9 @@ freed cannot give another.
 
 **The app owns** the canvas and its CSS size, the fetch of the bytes, its symbol and `dispose`. **The package does** the
 rest: it sizes the drawing buffer to the canvas's client size times the device pixel ratio (at most 2) in every frame,
-so a resized canvas is followed with no call; it gives the figure its idle motion (breathing, blinking, glancing); while
-the page asks for reduced motion it only blinks, slower; and it draws only while the page is visible and the canvas is
-in the viewport. It never writes the canvas's `style` and adds no element to the page.
+so a resized canvas is followed with no call; it gives the figure its idle motion (breathing, blinking, glancing) and its thinking look; while
+the page asks for reduced motion it only blinks, slower, and takes and leaves the thinking look at once; and it draws only
+while the page is visible and the canvas is in the viewport. It never writes the canvas's `style` and adds no element to the page.
 
 The page may run under a strict script policy. The package's browser tests run it under
 `default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' blob:; worker-src 'self'`: no inline script,

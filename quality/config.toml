@@ -43,3 +43,8 @@ reason = "it tests the test builder in tests/, and vitest runs only src/**/*.tes
 path = "src/figureValidator.test.ts"
 rule = "test-layout"
 reason = "it tests the test builder in tests/, and vitest runs only src/**/*.test.ts"
+
+[[layout.allow]]
+path = "src/figureDriving.browser.test.ts"
+rule = "test-layout"
+reason = "it drives the handle's think through the draw, motion and frame modules together on a canvas, so no single module is its subject"

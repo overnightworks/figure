@@ -66,6 +66,17 @@ test.describe('the demo stage under the script policy', () => {
 		await expectNoViolations(page, pageErrors);
 	});
 
+	test('the think control reports the fact to both figures, which stay drawn', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+
+		await page.getByRole('button', { name: 'think' }).click();
+		await expect(page.getByRole('button', { name: 'think' })).toHaveAttribute('aria-pressed', 'true');
+		await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
 	test('a picked figure replaces both drawings on fresh canvases', async ({ page }) => {
 		const pageErrors = await openStage(page, stage);
 		await expectTwoDrawings(page);
