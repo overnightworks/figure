@@ -1,13 +1,40 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng, buildPng } from '../tests/glbBuilder.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 
+/** The page's own frame request, which the tests wait on without the watcher counting it. */
+const requestFrameOwn = window.requestAnimationFrame;
+
+function nextFrame(): Promise<void> {
+	return new Promise((resolve) => requestFrameOwn.call(window, () => resolve()));
+}
+
 describe('mount in a browser', () => {
 	const canvases: HTMLCanvasElement[] = [];
 	const handles: FigureHandle[] = [];
+	/** The frames the figure asked for and ran since the test began. */
+	const frames = { requested: 0, ran: 0 };
+	/** What the canvas held when the last frame the figure ran was done: read in the frame's own task, where the buffer still holds the picture. */
+	let shown: { width: number; height: number; pixels: Uint8Array } | undefined;
+	let watchedCanvas: HTMLCanvasElement | undefined;
+
+	beforeEach(() => {
+		frames.requested = 0;
+		frames.ran = 0;
+		shown = undefined;
+		watchedCanvas = undefined;
+		window.requestAnimationFrame = (callback) => {
+			frames.requested++;
+			return requestFrameOwn.call(window, (time) => {
+				callback(time);
+				frames.ran++;
+				if (watchedCanvas !== undefined) shown = { width: watchedCanvas.width, height: watchedCanvas.height, pixels: readPixels(watchedCanvas) };
+			});
+		};
+	});
 
 	function newCanvas(): HTMLCanvasElement {
 		const canvas = document.createElement('canvas');
@@ -22,9 +49,11 @@ describe('mount in a browser', () => {
 		return { handle, signals };
 	}
 
-	afterEach(() => {
+	afterEach(async () => {
+		window.requestAnimationFrame = requestFrameOwn;
 		handles.splice(0).forEach((handle) => handle.dispose());
 		canvases.splice(0).forEach((canvas) => canvas.remove());
+		await cdp().send('Emulation.setEmulatedMedia', { features: [] });
 	});
 
 	it('draws the conformant figure and tells it once', async () => {
@@ -32,8 +61,8 @@ describe('mount in a browser', () => {
 
 		expect(handle.signal).toBe(figureSignal.drawn);
 		expect(signals).toEqual([figureSignal.drawn]);
-		await new Promise((resolve) => requestAnimationFrame(resolve));
-		await new Promise((resolve) => requestAnimationFrame(resolve));
+		await nextFrame();
+		await nextFrame();
 		expect(signals).toEqual([figureSignal.drawn]);
 	});
 
@@ -191,7 +220,7 @@ describe('mount in a browser', () => {
 		expect(document.querySelectorAll('*')).toHaveLength(elementsBefore);
 	});
 
-	describe('a drawn figure follows its canvas', () => {
+	describe('a drawn figure lives on its canvas', () => {
 		let sizes: HTMLStyleElement;
 
 		beforeAll(() => {
@@ -204,27 +233,26 @@ describe('mount in a browser', () => {
 
 		afterEach(() => cdp().send('Emulation.clearDeviceMetricsOverride'));
 
-		/** A canvas in the document, 200 CSS pixels wide by its stylesheet class (its attribute size is the default 300 by 150). */
+		/** A canvas in the document, 200 CSS pixels wide by its stylesheet class (its attribute size is the default 300 by 150), whose frames the test reads. */
 		function attachedCanvas(): HTMLCanvasElement {
 			const canvas = newCanvas();
 			canvas.className = 'small';
 			document.body.append(canvas);
+			watchedCanvas = canvas;
 			return canvas;
 		}
 
-		/** Whether the drawing buffer holds any pixel the figure covers: a buffer nothing was drawn into is transparent everywhere. */
-		function figureIsDrawn(canvas: HTMLCanvasElement): boolean {
-			const context = canvas.getContext('webgl2');
-			if (context === null) throw new Error('the canvas has no WebGL 2 context');
-			const pixels = new Uint8Array(canvas.width * canvas.height * 4);
-			context.readPixels(0, 0, canvas.width, canvas.height, context.RGBA, context.UNSIGNED_BYTE, pixels);
-			return pixels.some((value, index) => index % 4 === 3 && value > 0);
+		/** The canvas as the last frame left it, once there is one. */
+		async function pictureNow(): Promise<Uint8Array> {
+			await vi.waitFor(() => expect(shown).toBeDefined());
+			return shown!.pixels;
 		}
 
-		/** Waits for two animation frames, the frames in which a resize observer would have fired. */
-		async function twoFrames(): Promise<void> {
-			await new Promise((resolve) => requestAnimationFrame(resolve));
-			await new Promise((resolve) => requestAnimationFrame(resolve));
+		/** The canvas as it is `count` frames of the figure later. */
+		async function pictureAfterFrames(count: number): Promise<Uint8Array> {
+			const ranBefore = frames.ran;
+			await vi.waitFor(() => expect(frames.ran).toBeGreaterThanOrEqual(ranBefore + count), { timeout: 5000 });
+			return pictureNow();
 		}
 
 		it.each([
@@ -243,40 +271,23 @@ describe('mount in a browser', () => {
 		it('follows a resize of the canvas by its host with no call on the handle, and the figure is still drawn', async () => {
 			const canvas = attachedCanvas();
 			await mountOn(canvas, buildConformantVrm());
-			const bufferAtEachResize: { width: number; drawn: boolean }[] = [];
-			const observer = new ResizeObserver(() => bufferAtEachResize.push({ width: canvas.width, drawn: figureIsDrawn(canvas) }));
-			observer.observe(canvas);
 
 			canvas.className = 'wide';
-			await vi.waitFor(() => expect(canvas.width).toBe(300));
-			observer.disconnect();
+			await vi.waitFor(() => expect(shown?.width).toBe(300));
 
-			expect(canvas.height).toBe(150);
-			expect(bufferAtEachResize.at(-1)).toEqual({ width: 300, drawn: true });
+			expect(shown?.height).toBe(150);
+			expect(coversSomething(shown!.pixels)).toBe(true);
 		});
 
 		it('follows a change of the device pixel ratio alone, with the canvas size unchanged', async () => {
 			await emulateDevicePixelRatio(1);
-			const queries: MediaQueryList[] = [];
-			const matchMediaOwn = window.matchMedia;
-			window.matchMedia = (query: string) => {
-				const list = matchMediaOwn.call(window, query);
-				queries.push(list);
-				return list;
-			};
-			try {
-				const canvas = attachedCanvas();
-				await mountOn(canvas, buildConformantVrm());
+			const canvas = attachedCanvas();
+			await mountOn(canvas, buildConformantVrm());
 
-				await emulateDevicePixelRatio(2);
-				const ratioQuery = queries.filter((list) => list.media.startsWith('(resolution:')).at(-1);
-				ratioQuery?.dispatchEvent(new Event('change'));
-				await vi.waitFor(() => expect(canvas.width).toBe(400));
+			await emulateDevicePixelRatio(2);
+			await vi.waitFor(() => expect(canvas.width).toBe(400));
 
-				expect(canvas.height).toBe(200);
-			} finally {
-				window.matchMedia = matchMediaOwn;
-			}
+			expect(canvas.height).toBe(200);
 		});
 
 		it('writes no style attribute on a mount or a resize', async () => {
@@ -295,27 +306,103 @@ describe('mount in a browser', () => {
 			handle.dispose();
 
 			canvas.className = 'wide';
-			await twoFrames();
+			await nextFrame();
+			await nextFrame();
 
 			expect(canvas.width).toBe(200);
 		});
 
-		it('observes nothing once the figure is refused', async () => {
+		it('follows nothing once the figure is refused', async () => {
 			const canvas = attachedCanvas();
 			canvas.className = 'wide';
 			await mountOn(canvas, new TextEncoder().encode('plain text'));
 
 			canvas.className = 'small';
-			await twoFrames();
+			await nextFrame();
+			await nextFrame();
 
 			expect(canvas.width).toBe(300);
+		});
+
+		it('draws frames that differ as time passes', async () => {
+			await mountOn(attachedCanvas(), buildConformantVrm());
+			const first = await pictureNow();
+
+			await vi.waitFor(() => expect(sameBytes(shown!.pixels, first)).toBe(false), { timeout: 15000 });
+		});
+
+		it('draws the figure under reduced motion', async () => {
+			await emulateReducedMotion();
+			await mountOn(attachedCanvas(), buildConformantVrm());
+
+			expect(coversSomething(await pictureNow())).toBe(true);
+		});
+
+		it('holds still when the page asks for reduced motion while the figure lives, between its blinks', async () => {
+			await mountOn(attachedCanvas(), buildConformantVrm());
+			await pictureNow();
+
+			await emulateReducedMotion();
+
+			await vi.waitFor(
+				async () => {
+					const earlier = await pictureAfterFrames(1);
+					expect(sameBytes(earlier, await pictureAfterFrames(40))).toBe(true);
+				},
+				{ timeout: 30000 }
+			);
+		});
+
+		it('asks for no frame and draws nothing after dispose', async () => {
+			const { handle } = await mountOn(attachedCanvas(), buildConformantVrm());
+			await pictureNow();
+			handle.dispose();
+			const { requested, ran } = frames;
+
+			await nextFrame();
+			await nextFrame();
+			await nextFrame();
+
+			expect(frames).toEqual({ requested, ran });
+		});
+
+		it('asks for no frame once the figure is refused', async () => {
+			await mountOn(attachedCanvas(), new TextEncoder().encode('plain text'));
+
+			await nextFrame();
+			await nextFrame();
+
+			expect(frames.requested).toBe(0);
 		});
 	});
 });
 
+/** The canvas's drawing buffer as RGBA bytes; read in the task that drew it, a buffer holds nothing afterwards. */
+function readPixels(canvas: HTMLCanvasElement): Uint8Array {
+	const context = canvas.getContext('webgl2');
+	if (context === null) throw new Error('the canvas has no WebGL 2 context');
+	const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+	context.readPixels(0, 0, canvas.width, canvas.height, context.RGBA, context.UNSIGNED_BYTE, pixels);
+	return pixels;
+}
+
+/** Whether the pixels hold any the figure covers: a buffer nothing was drawn into is transparent everywhere. */
+function coversSomething(pixels: Uint8Array): boolean {
+	return pixels.some((value, index) => index % 4 === 3 && value > 0);
+}
+
+function sameBytes(first: Uint8Array, second: Uint8Array): boolean {
+	return first.length === second.length && first.every((value, index) => value === second[index]);
+}
+
+/** Sets the page's `prefers-reduced-motion` to `reduce` through the browser's own media emulation, which is what a person's setting reaches the package as. */
+async function emulateReducedMotion(): Promise<void> {
+	await cdp().send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+}
+
 /**
- * Sets the page's device pixel ratio through the browser's own device emulation. Redefining `window.devicePixelRatio` would
- * change the value a read sees but fire no change, which is what a media query on the ratio reports.
+ * Sets the page's device pixel ratio through the browser's own device emulation, as a zoom or a move to another screen changes
+ * it, so the figure's next read of `window.devicePixelRatio` sees the browser's value.
  */
 async function emulateDevicePixelRatio(ratio: number): Promise<void> {
 	await cdp().send('Emulation.setDeviceMetricsOverride', {

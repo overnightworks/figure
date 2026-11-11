@@ -1,9 +1,9 @@
 import { WebGLRenderer } from 'three';
 import { VRMUtils, type VRM } from '@pixiv/three-vrm';
 import { checkFigure } from './check.js';
-import { drawFigureFrame } from './figureFrame.js';
-import { followCanvas } from './followCanvas.js';
+import { createFigureStage, type FigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
+import { createIdleMotion } from './idleMotion.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 
 export { figureSignal, type FigureSignal } from './signals.js';
@@ -42,15 +42,38 @@ function openRenderer(canvas: HTMLCanvasElement): WebGLRenderer | FigureSignal {
 	}
 }
 
+/** The page's own preference; a query's `matches` is live, so reading it each frame follows a change while the figure lives. */
+const reducedMotionQuery = '(prefers-reduced-motion: reduce)';
+
+/** Draws the stage now, then each animation frame until the returned function stops it: the loop is the one place that draws. */
+function runLoop(stage: FigureStage): () => void {
+	const motion = createIdleMotion(Math.random);
+	const reducedMotion = matchMedia(reducedMotionQuery);
+	let previousTime = performance.now();
+	const drawAt = (time: number) => {
+		const elapsedSeconds = (time - previousTime) / 1000;
+		previousTime = time;
+		stage.draw(motion.advance(elapsedSeconds, reducedMotion.matches), elapsedSeconds);
+	};
+	let pendingFrame = 0;
+	const onFrame = (time: number) => {
+		drawAt(time);
+		pendingFrame = requestAnimationFrame(onFrame);
+	};
+	drawAt(previousTime);
+	pendingFrame = requestAnimationFrame(onFrame);
+	return () => cancelAnimationFrame(pendingFrame);
+}
+
 async function start(canvas: HTMLCanvasElement, bytes: Uint8Array): Promise<Outcome> {
 	if (checkFigure(bytes).length > 0) return ended(figureSignal.refused);
 	const opened = openRenderer(canvas);
 	if (typeof opened === 'string') return ended(opened);
 	const renderer = opened;
 	let vrm: VRM | undefined;
-	let stopFollowing = () => {};
+	let stopLoop = () => {};
 	const release = () => {
-		stopFollowing();
+		stopLoop();
 		if (vrm !== undefined) VRMUtils.deepDispose(vrm.scene);
 		renderer.dispose();
 		renderer.forceContextLoss();
@@ -58,8 +81,7 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array): Promise<Outc
 	try {
 		vrm = await loadFigure(bytes);
 		const figure = vrm;
-		drawFigureFrame(renderer, canvas, figure);
-		stopFollowing = followCanvas(canvas, () => drawFigureFrame(renderer, canvas, figure));
+		stopLoop = runLoop(createFigureStage(renderer, canvas, figure));
 		return { signal: figureSignal.drawn, release };
 	} catch {
 		release();
@@ -68,8 +90,9 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array): Promise<Outc
 }
 
 /**
- * Draws the VRM in `bytes` into `canvas`, whose CSS size the host owns, and keeps it drawn: the figure is drawn again when the
- * canvas's size or the device pixel ratio changes, until `dispose`. It resolves to a handle holding the first signal, which `onSignal` has had by then. It never rejects: an error `onSignal` throws is reported to the window's error handlers.
+ * Draws the VRM in `bytes` into `canvas`, whose CSS size the host owns, and keeps it alive: the figure breathes, sways, blinks and
+ * glances, or only blinks while the page asks for reduced motion, and is drawn each animation frame at the canvas's size and the
+ * device pixel ratio, until `dispose`. It resolves to a handle holding the first signal, which `onSignal` has had by then. It never rejects: an error `onSignal` throws is reported to the window's error handlers.
  */
 export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
 	const { signal, release } = await start(canvas, bytes).catch(() => ended(figureSignal.refused));
