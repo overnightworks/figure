@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { build } from 'vite';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './serve-consumer.js';
@@ -24,6 +24,33 @@ async function buildStage(): Promise<BuiltStage> {
 	return { bundleDirectory, remove: () => rmSync(workDirectory, { recursive: true, force: true }) };
 }
 
+/** Opens the stage under the script policy and returns the page errors it collects; it does not wait for the drawings. */
+async function openStage(page: Page, stage: BuiltStage): Promise<string[]> {
+	const pageErrors = await recordPolicyViolations(page);
+	await serveConsumer(page, stage.bundleDirectory, {});
+	const response = await page.goto(`${origin}/`);
+	expect(response?.headers()['content-security-policy']).toBe(scriptPolicy);
+	return pageErrors;
+}
+
+async function expectTwoDrawings(page: Page): Promise<void> {
+	await expect(page.locator('canvas[data-signal="drawn"]')).toHaveCount(2, { timeout: drawingTimeout });
+}
+
+async function pickNotAFigure(page: Page): Promise<void> {
+	await page.locator('#picker').setInputFiles({
+		name: 'not-glb.txt',
+		mimeType: 'text/plain',
+		buffer: Buffer.from('plain text')
+	});
+}
+
+/** The closing assertions of every test: no script-policy violation and no page error. */
+async function expectNoViolations(page: Page, pageErrors: string[]): Promise<void> {
+	expect(await page.evaluate(() => window.securityPolicyViolations)).toEqual([]);
+	expect(pageErrors).toEqual([]);
+}
+
 test.describe('the demo stage under the script policy', () => {
 	let stage: BuiltStage;
 	test.beforeAll(async () => {
@@ -32,23 +59,16 @@ test.describe('the demo stage under the script policy', () => {
 	test.afterAll(() => stage.remove());
 
 	test('mounts the synthetic figure at 390 and 1280 px, and the policy is never violated', async ({ page }) => {
-		const pageErrors = await recordPolicyViolations(page);
-		await serveConsumer(page, stage.bundleDirectory, {});
-
-		const response = await page.goto(`${origin}/`);
-		expect(response?.headers()['content-security-policy']).toBe(scriptPolicy);
-		await expect(page.locator('canvas[data-signal="drawn"]')).toHaveCount(2, { timeout: drawingTimeout });
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
 		await expect(page.locator('canvas').nth(0)).toHaveCSS('width', '390px');
 		await expect(page.locator('canvas').nth(1)).toHaveCSS('width', '1280px');
-		expect(await page.evaluate(() => window.securityPolicyViolations)).toEqual([]);
-		expect(pageErrors).toEqual([]);
+		await expectNoViolations(page, pageErrors);
 	});
 
 	test('a picked figure replaces both drawings on fresh canvases', async ({ page }) => {
-		const pageErrors = await recordPolicyViolations(page);
-		await serveConsumer(page, stage.bundleDirectory, {});
-		await page.goto(`${origin}/`);
-		await expect(page.locator('canvas[data-signal="drawn"]')).toHaveCount(2, { timeout: drawingTimeout });
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
 		const previousCanvas = await page.locator('canvas').nth(0).elementHandle();
 
 		await page.locator('#picker').setInputFiles({
@@ -57,26 +77,33 @@ test.describe('the demo stage under the script policy', () => {
 			buffer: Buffer.from(buildConformantVrm())
 		});
 		await expect.poll(() => previousCanvas!.evaluate((canvas) => canvas.isConnected), { timeout: drawingTimeout }).toBe(false);
-		await expect(page.locator('canvas[data-signal="drawn"]')).toHaveCount(2, { timeout: drawingTimeout });
-		expect(await page.evaluate(() => window.securityPolicyViolations)).toEqual([]);
-		expect(pageErrors).toEqual([]);
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
 	});
 
 	test('a picked file that is no figure ends both drawings with their signal and offers mount again', async ({ page }) => {
-		const pageErrors = await recordPolicyViolations(page);
-		await serveConsumer(page, stage.bundleDirectory, {});
-		await page.goto(`${origin}/`);
-		await expect(page.locator('canvas[data-signal="drawn"]')).toHaveCount(2, { timeout: drawingTimeout });
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
 
-		await page.locator('#picker').setInputFiles({
-			name: 'not-glb.txt',
-			mimeType: 'text/plain',
-			buffer: Buffer.from('plain text')
-		});
+		await pickNotAFigure(page);
 		await expect(page.locator('canvas[data-signal="refused"]')).toHaveCount(2, { timeout: drawingTimeout });
 		await expect(page.getByRole('button', { name: 'mount again' })).toHaveCount(2);
 		await expect(page.getByRole('button', { name: 'mount again' }).first()).toBeVisible();
-		expect(await page.evaluate(() => window.securityPolicyViolations)).toEqual([]);
-		expect(pageErrors).toEqual([]);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	test('mount again replaces an ended canvas with a fresh one', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		await pickNotAFigure(page);
+		await expect(page.getByRole('button', { name: 'mount again' })).toHaveCount(2, { timeout: drawingTimeout });
+		const endedCanvas = await page.locator('canvas').nth(0).elementHandle();
+
+		await page.getByRole('button', { name: 'mount again' }).first().click();
+		await expect.poll(() => endedCanvas!.evaluate((canvas) => canvas.isConnected), { timeout: drawingTimeout }).toBe(false);
+		await expect(page.locator('canvas')).toHaveCount(2);
+		await expect(page.locator('canvas[data-signal="refused"]')).toHaveCount(2, { timeout: drawingTimeout });
+		await expect(page.getByRole('button', { name: 'mount again' })).toHaveCount(2);
+		await expectNoViolations(page, pageErrors);
 	});
 });
