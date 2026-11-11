@@ -30,3 +30,10 @@ export function buildConformantVrm(): Uint8Array {
 export function buildVrmGlbWithImages(images: readonly Uint8Array[], change: (json: VrmJson) => void = () => {}): Uint8Array {
 	return buildGlb(vrmParts(images, change));
 }
+
+/** The JSON and binary chunks of a GLB, read from its bytes as glTF 2.0 lays them out (section 4.4). */
+export function readGlb(glb: Uint8Array): { json: Record<string, any>; binary: Uint8Array } {
+	const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
+	const jsonEnd = 20 + view.getUint32(12, true);
+	return { json: JSON.parse(new TextDecoder().decode(glb.subarray(20, jsonEnd))), binary: glb.subarray(jsonEnd + 8) };
+}
