@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkFigure } from './check.js';
 import { figureProfile } from './profile.js';
 import { buildVrmGlb, vrmParts } from '../tests/figureFixtures.js';
+import { buildBudgetVrm } from '../tests/glbBuilder.js';
 
 type Json = Record<string, any>;
 
@@ -151,5 +152,38 @@ describe('the blink expression (schema: VRMC_vrm.expressions.expression.morphTar
 	it('leaves every other preset empty', () => {
 		const others = figureProfile.presets.filter((name) => name !== 'blink');
 		expect(others.map((name) => vrm.expressions.preset[name])).toEqual(others.map(() => ({})));
+	});
+});
+
+describe('the synthetic VRM at the budgets', () => {
+	const { glb, morphTargets } = buildBudgetVrm(figureProfile, figureProfile);
+	const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
+	const budgetJson: Json = JSON.parse(new TextDecoder().decode(glb.subarray(20, 20 + view.getUint32(12, true))));
+	const budgetPrimitives: Json[] = budgetJson.meshes.flatMap((mesh: Json) => mesh.primitives);
+	const binaryStart = 20 + view.getUint32(12, true) + 8;
+
+	it('passes the check with no refusal', () => {
+		expect(checkFigure(glb)).toEqual([]);
+	});
+
+	it('fills the triangle budget exactly', () => {
+		const triangles = budgetPrimitives.reduce((sum, primitive) => sum + budgetJson.accessors[primitive.indices].count / 3, 0);
+		expect(triangles).toBe(figureProfile.maxTriangles);
+	});
+
+	it('fills the texel budget exactly, with no image longer than the side budget', () => {
+		const sizes = budgetJson.images.map((image: Json) => {
+			const header = budgetJson.bufferViews[image.bufferView].byteOffset + binaryStart + 16;
+			return [view.getUint32(header), view.getUint32(header + 4)];
+		});
+		expect(sizes.reduce((sum: number, [width, height]: number[]) => sum + width! * height!, 0)).toBe(figureProfile.maxTexels);
+		expect(Math.max(...sizes.flat())).toBeLessThanOrEqual(figureProfile.maxTextureSidePixels);
+	});
+
+	it('gives one primitive the morph targets the file budget leaves, no more than the profile allows', () => {
+		expect(Math.max(...budgetPrimitives.map((primitive) => primitive.targets?.length ?? 0))).toBe(morphTargets);
+		expect(morphTargets).toBeGreaterThan(1);
+		expect(morphTargets).toBeLessThanOrEqual(figureProfile.maxMorphTargetsPerPrimitive);
+		expect(glb.length).toBeLessThanOrEqual(figureProfile.fileBudgetBytes);
 	});
 });
