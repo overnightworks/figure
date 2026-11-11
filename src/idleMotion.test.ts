@@ -36,26 +36,25 @@ function stretches(poses: readonly IdlePose[], isOn: (pose: IdlePose) => boolean
 }
 
 /** Whether every part but the blink is at rest; a rotation of -0 is at rest. */
-function isAtRest({ breath, head, look }: IdlePose): boolean {
-	return [breath, head.yaw, head.pitch, head.roll, look.yaw, look.pitch].every((value) => value === 0);
+function isAtRest({ breath, sway, glance }: IdlePose): boolean {
+	return [breath, sway.yaw, sway.pitch, sway.roll, glance.yaw, glance.pitch].every((value) => value === 0);
 }
 
 function seconds(frames: number): number {
 	return frames * frameSeconds;
 }
 
-/** The frames a glance starts in: the first away from straight ahead after the figure looked straight ahead. */
+/** The frames a glance starts in: the first away from straight ahead after the glance looked straight ahead. */
 function glanceStarts(poses: readonly IdlePose[]): number[] {
-	const away = (pose: IdlePose) => Math.abs(pose.look.yaw) > 0.01 || Math.abs(pose.look.pitch) > 0.01;
-	const straight = (pose: IdlePose) => Math.abs(pose.look.yaw) < 0.002 && Math.abs(pose.look.pitch) < 0.002;
 	const starts: number[] = [];
 	let armed = true;
 	poses.forEach((pose, frame) => {
-		if (armed && away(pose)) {
+		const straight = pose.glance.yaw === 0 && pose.glance.pitch === 0;
+		if (armed && !straight) {
 			starts.push(frame);
 			armed = false;
 		}
-		if (straight(pose)) armed = true;
+		if (straight) armed = true;
 	});
 	return starts;
 }
@@ -95,7 +94,7 @@ describe('the idle motion', () => {
 				expect(gap).toBeGreaterThanOrEqual(3 - 2 * frameSeconds);
 				expect(gap).toBeLessThanOrEqual(8 + 2 * frameSeconds);
 			});
-			expect(Math.max(...poses.map((pose) => Math.abs(pose.look.yaw)))).toBeGreaterThan(5);
+			expect(Math.max(...poses.map((pose) => Math.abs(pose.glance.yaw)))).toBeGreaterThan(5);
 		});
 
 		it('breathes and sways, so the pose varies over time', () => {
@@ -103,7 +102,7 @@ describe('the idle motion', () => {
 			const range = (values: number[]) => Math.max(...values) - Math.min(...values);
 
 			expect(range(poses.map((pose) => pose.breath))).toBeGreaterThan(0.04);
-			expect(range(poses.map((pose) => pose.head.yaw))).toBeGreaterThan(0.05);
+			expect(range(poses.map((pose) => pose.sway.yaw))).toBeGreaterThan(0.05);
 		});
 
 		it('keeps its blink and rests everything else under reduced motion', () => {
