@@ -4,6 +4,7 @@ import { checkFigure } from './check.js';
 import { createFigureStage, type FigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
 import { createIdleMotion } from './idleMotion.js';
+import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 
 export { figureSignal, type FigureSignal } from './signals.js';
@@ -14,7 +15,7 @@ export interface MountOptions {
 }
 
 export interface FigureHandle {
-	/** The last signal the figure gave: `drawn` while it lives, then the signal that ended it, `lost` included; never empty. */
+	/** The last signal the figure gave: `drawn` while it lives, then the signal that ended it, `lost` and `slow` included; never empty. */
 	readonly signal: FigureSignal;
 	/** Frees the scene, the renderer and the canvas's context; a second call does nothing. */
 	dispose(): void;
@@ -45,15 +46,20 @@ function openRenderer(canvas: HTMLCanvasElement): WebGLRenderer | FigureSignal {
 /** The page's own preference; a query's `matches` is live, so reading it each frame follows a change while the figure lives. */
 const reducedMotionQuery = '(prefers-reduced-motion: reduce)';
 
+/** The signals that end a drawn figure from inside its loop. */
+type LoopEnding = typeof figureSignal.lost | typeof figureSignal.slow;
+
 /**
  * Draws the stage now, then each animation frame while the page is visible and the canvas is in the viewport: the loop is the one
- * place that draws. A context lost while it runs ends it: the loop and its listeners go, then `onLost` is called once. The returned
- * function ends it for good; a second call does nothing.
+ * place that draws. A context lost while it runs, or a frame-time guard that finds the figure slow, ends it: the loop and its
+ * listeners go, then `onEnd` is called once with the reason. The returned function ends it for good; a second call does nothing.
  */
-function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onLost: () => void): () => void {
+function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: LoopEnding) => void): () => void {
 	const motion = createIdleMotion(Math.random);
 	const reducedMotion = matchMedia(reducedMotionQuery);
 	let previousTime = performance.now();
+	/** The last frame intervals the guard judges, in milliseconds; a pause starts them anew. */
+	let recentIntervals: readonly number[] = [];
 	const drawAt = (time: number) => {
 		const elapsedSeconds = (time - previousTime) / 1000;
 		previousTime = time;
@@ -63,14 +69,18 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onLost: () => vo
 	let stopped = false;
 	let inViewport = false;
 	const onFrame = (time: number) => {
+		const intervalMilliseconds = time - previousTime;
 		drawAt(time);
-		pendingFrame = requestAnimationFrame(onFrame);
+		recentIntervals = recordFrameInterval(recentIntervals, intervalMilliseconds);
+		if (isSlow(recentIntervals)) end(figureSignal.slow);
+		else pendingFrame = requestAnimationFrame(onFrame);
 	};
 	/** Runs the loop while it may, stops a frame it has requested while it may not; a resumed loop draws at once, with no time counted for the pause. */
 	const syncWithPage = () => {
 		const mayRun = !stopped && inViewport && document.visibilityState === 'visible';
 		if (mayRun && pendingFrame === undefined) {
 			previousTime = performance.now();
+			recentIntervals = [];
 			drawAt(previousTime);
 			pendingFrame = requestAnimationFrame(onFrame);
 		} else if (!mayRun && pendingFrame !== undefined) {
@@ -82,10 +92,11 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onLost: () => vo
 		inViewport = entries.at(-1)?.isIntersecting === true;
 		syncWithPage();
 	});
-	const onContextLost = () => {
+	const end = (ending: LoopEnding) => {
 		stop();
-		onLost();
+		onEnd(ending);
 	};
+	const onContextLost = () => end(figureSignal.lost);
 	const stop = () => {
 		stopped = true;
 		syncWithPage();
@@ -116,7 +127,9 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 	try {
 		vrm = await loadFigure(bytes);
 		const figure = vrm;
-		stopLoop = runLoop(createFigureStage(renderer, canvas, figure), canvas, () => give(figureSignal.lost));
+		// A loss during the load fired its event before the loop listens for it, so the state is read here.
+		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release };
+		stopLoop = runLoop(createFigureStage(renderer, canvas, figure), canvas, give);
 		return { signal: figureSignal.drawn, release };
 	} catch {
 		release();
@@ -128,7 +141,8 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
  * Draws the VRM in `bytes` into `canvas`, whose CSS size the host owns, and keeps it alive: the figure breathes, sways, blinks and
  * glances, or only blinks while the page asks for reduced motion, and is drawn each animation frame at the canvas's size and the
  * device pixel ratio, until `dispose`. While the page is hidden or the canvas is out of the viewport it is not drawn, and it goes on
- * without a jump when both are back. A context lost while it lives gives `lost` and ends it for good, with no restore: a remount needs a fresh canvas.
+ * without a jump when both are back. A context lost while the figure loads or lives gives `lost`, and a figure its frame-time guard finds too
+ * slow to keep gives `slow`; either ends it for good, with no restore: a remount needs a fresh canvas.
  * It resolves to a handle holding the first signal, which `onSignal` has had by then. It never rejects: an error `onSignal` throws is reported to the window's error handlers.
  */
 export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
