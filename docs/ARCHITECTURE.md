@@ -134,7 +134,7 @@ sequenceDiagram
 
 *`mount`'s one flow; derived from `src/draw.ts`. An error anywhere in loading or drawing, or a texture that fails, gives `refused` and frees the renderer; `mount` never rejects.* After `drawn`, the figure is drawn each animation frame, at the canvas's size and the device pixel ratio of that frame, while the page is visible and the canvas is in the viewport, until `dispose`, a context loss or a `slow` ending; no signal is given for a frame or a pause. A figure that ended runs no loop.
 
-The loader's texture loader reads each image through an `<img>`, because three's default fetches a `blob:` URL and the script policy refuses that; it also records a failed image, which three itself swallows. Its file loader always fails, so a buffer outside the GLB gives `refused` and no request, whatever the check said. The canvas is the host's: the renderer never writes its `style`, and no element is created.
+The loader's texture loader reads each image through an `<img>`, because three's default fetches a `blob:` URL and the script policy refuses that; it also records a failed image, which three itself swallows. Its file loader always fails, so a buffer outside the GLB gives `refused` and no request, whatever the check said. The canvas is the host's: the renderer never writes its `style`, and the renderer adds no element to the page.
 
 The check's rules run in a fixed order. A refusal that leaves the later rules unjudgeable ends the check; the others all report:
 

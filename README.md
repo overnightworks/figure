@@ -57,7 +57,7 @@ freed cannot give another.
 rest: it sizes the drawing buffer to the canvas's client size times the device pixel ratio (at most 2) in every frame,
 so a resized canvas is followed with no call; it gives the figure its idle motion (breathing, blinking, glancing); while
 the page asks for reduced motion it only blinks, slower; and it draws only while the page is visible and the canvas is
-in the viewport. It never writes the canvas's `style` and creates no element.
+in the viewport. It never writes the canvas's `style` and adds no element to the page.
 
 The page may run under a strict script policy. The package's browser tests run it under
 `default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' blob:; worker-src 'self'`: no inline script,
