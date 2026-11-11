@@ -48,10 +48,11 @@ const EYE_HEIGHT = headBoneHeight + EYE_TRANSLATION[1];
 const EYE_HALF_SIZE: Vector3 = [0.02, 0.02, 0.01];
 
 const EYES = pairOf('eye', EYE_TRANSLATION[0], EYE_HEIGHT, EYE_HALF_SIZE, ['leftEye', 'rightEye'], 'eye');
-const NOSE: Feature = { kind: 'nose', centre: [0, 1.63, FRONT_Z], halfSize: [0.025, 0.03, 0.03], bone: 'head', material: 'nose' };
-const MOUTH: Feature = { kind: 'mouth', centre: [0, 1.56, FRONT_Z], halfSize: [0.04, 0.012, 0.01], bone: 'head', material: 'feature' };
-const CORNERS = pairOf('corner', 0.05, 1.565, [0.01, 0.01, 0.01], ['head', 'head'], 'feature');
-const BROWS = pairOf('brow', 0.05, 1.735, [0.035, 0.008, 0.01], ['head', 'head'], 'feature');
+// Below the eyes and inside the head's box (1.53 to 1.77): the eyes sit low enough that the framing's sample point stays on the skin.
+const NOSE: Feature = { kind: 'nose', centre: [0, EYE_HEIGHT - 0.04, FRONT_Z], halfSize: [0.025, 0.03, 0.03], bone: 'head', material: 'nose' };
+const MOUTH: Feature = { kind: 'mouth', centre: [0, EYE_HEIGHT - 0.085, FRONT_Z], halfSize: [0.04, 0.012, 0.01], bone: 'head', material: 'feature' };
+const CORNERS = pairOf('corner', 0.05, EYE_HEIGHT - 0.08, [0.01, 0.01, 0.01], ['head', 'head'], 'feature');
+const BROWS = pairOf('brow', 0.05, EYE_HEIGHT + 0.045, [0.035, 0.008, 0.01], ['head', 'head'], 'feature');
 
 /** How a morph target moves the features of one kind: each vertex scales about its feature's centre, then the feature shifts; a shift in X mirrors with the side. */
 interface Sculpt {

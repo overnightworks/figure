@@ -26,7 +26,7 @@ export const HEAD_CENTRE: Vector3 = [0, 1.65, 0];
 export const HEAD_HALF_SIZE: Vector3 = [0.12, 0.12, 0.12];
 
 /** Where an eye bone sits from the head bone, for the left eye; the right eye mirrors its X. */
-export const EYE_TRANSLATION: Vector3 = [0.05, 0.16, 0.12];
+export const EYE_TRANSLATION: Vector3 = [0.05, 0.1, 0.12];
 
 const TRUNK: readonly BoneSpec[] = [
 	{ name: 'hips', parentName: undefined, translation: [0, 1, 0] },
