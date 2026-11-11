@@ -34,6 +34,16 @@ export interface FigurePose {
 	readonly posture: Turn;
 	/** The look-at's angles in degrees. */
 	readonly look: { readonly yaw: number; readonly pitch: number };
+	/** The arms' rest posture, the same in every state: the shoulders rise and fall with the breath, the upper arms are lowered. */
+	readonly arms: Arms;
+}
+
+/** The turns of the arms' bones in radians; the lower arms and the hands stay at rest. */
+export interface Arms {
+	readonly leftShoulder: Turn;
+	readonly rightShoulder: Turn;
+	readonly leftUpperArm: Turn;
+	readonly rightUpperArm: Turn;
 }
 
 export interface FigureMotion {
@@ -54,6 +64,25 @@ const headShare = { yaw: 0.5, pitch: 0.55 };
 const lookGain = 2.4;
 
 const radiansPerDegree = Math.PI / 180;
+
+/**
+ * The arms at rest, from the picture's applyPose: each upper arm is turned down 1.38 rad about its forward axis, the left one negative
+ * because its bone runs along +X; the shoulders rise by 0.012 rad at the top of a breath, the left upper arm swings 0.01 rad about x.
+ */
+const restingArm = { upperArmRoll: 1.38, shoulderRise: 0.012, upperArmSwing: 0.01 };
+/** The spine's lean at the top of a breath, in radians, which is the idle pose's breath at its largest. */
+const breathLeanRadians = 0.022;
+
+/** The arms at rest for a breath of `breath` radians: the breath as a share of its largest lean sets the shoulders' and the swing's share. */
+function restingArms(breath: number): Arms {
+	const share = breath / breathLeanRadians;
+	return {
+		leftShoulder: { yaw: 0, pitch: 0, roll: restingArm.shoulderRise * share },
+		rightShoulder: { yaw: 0, pitch: 0, roll: -restingArm.shoulderRise * share },
+		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * share, roll: -restingArm.upperArmRoll },
+		rightUpperArm: { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll }
+	};
+}
 
 /** The shares of a posture turn the neck takes, and the chest takes of its yaw; the head takes the rest. */
 const turnShare = { neck: 0.4, chestYaw: 0.15 };
@@ -106,7 +135,8 @@ export function createFigureMotion(random: () => number): FigureMotion {
 					pitch: thinkingWeight * thinkingLook.posture.pitch,
 					roll: thinkingWeight * thinkingLook.posture.roll
 				},
-				look: { yaw: gaze.yaw * lookGain, pitch: gaze.pitch * lookGain }
+				look: { yaw: gaze.yaw * lookGain, pitch: gaze.pitch * lookGain },
+				arms: restingArms(base.breath)
 			};
 		}
 	};

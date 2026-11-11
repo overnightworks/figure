@@ -209,6 +209,52 @@ describe('the spread of a posture turn', () => {
 	});
 });
 
+describe('the arms at rest', () => {
+	it.each([
+		['idle', idle],
+		['thinking', thinking]
+	])('lowers both upper arms about their forward axis, by 1.38 rad, the left one negative, when %s', (_, facts) => {
+		const poses = watch(600, () => facts);
+
+		poses.forEach(({ arms }) => {
+			expect(arms.leftUpperArm.roll).toBeCloseTo(-1.38, 12);
+			expect(arms.rightUpperArm.roll).toBeCloseTo(1.38, 12);
+			expect(arms.leftUpperArm.yaw).toBe(0);
+			expect(arms.rightUpperArm.yaw).toBe(0);
+		});
+	});
+
+	it('turns the shoulders with the breath, the left up and the right down, by 0.012 rad at the top of a breath', () => {
+		const poses = watch(1000, () => idle);
+		const rises = poses.map(({ arms }) => arms.leftShoulder.roll);
+
+		expect(Math.max(...rises)).toBeCloseTo(0.012, 4);
+		expect(Math.min(...rises)).toBeCloseTo(-0.012, 4);
+		poses.forEach(({ arms }) => expect(arms.rightShoulder.roll).toBeCloseTo(-arms.leftShoulder.roll, 12));
+	});
+
+	it('swings the left upper arm about its x axis with the breath, by 0.01 rad at the top of a breath, and leaves the right one still', () => {
+		const poses = watch(1000, () => idle);
+		const swings = poses.map(({ arms }) => arms.leftUpperArm.pitch);
+
+		expect(Math.max(...swings)).toBeCloseTo(0.01, 4);
+		expect(Math.min(...swings)).toBeCloseTo(-0.01, 4);
+		poses.forEach(({ arms }) => expect(arms.rightUpperArm.pitch).toBe(0));
+	});
+
+	it('holds the arms down under reduced motion, with the shoulders and the swing still, from the first frame', () => {
+		const poses = watch(600, (frame) => (frame < 300 ? idle : thinking), true);
+
+		poses.forEach(({ arms }) => {
+			expect(arms.leftUpperArm.roll).toBeCloseTo(-1.38, 12);
+			expect(arms.rightUpperArm.roll).toBeCloseTo(1.38, 12);
+			expect(arms.leftShoulder.roll).toBeCloseTo(0, 12);
+			expect(arms.rightShoulder.roll).toBeCloseTo(0, 12);
+			expect(arms.leftUpperArm.pitch).toBeCloseTo(0, 12);
+		});
+	});
+});
+
 /** The idle pose of release 0.2.0 for the seed above, 10 ms frames, no thinking and no reduced motion, as that release's idle module printed it at these frames. */
 const releasedIdle = [
 	{ frame: 540, pose: { blink: 0, breath: 0.020895656768874456, head: { yaw: 0.03635257427386759, pitch: 0.011104483145713905, roll: 0.0199915048587643 }, look: { yaw: 1.4179446541437428, pitch: -1.6970160640890233 } } },
