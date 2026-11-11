@@ -36,7 +36,8 @@
     "test": "vitest run --project node",
     "test:coverage": "vitest run --coverage",
     "test:consumer": "playwright test --config tests/e2e/playwright.config.ts",
-    "test:browser": "vitest run --project browser"
+    "test:browser": "vitest run --project browser",
+    "stage": "vite build --config tests/stage/vite.config.ts && vite preview --config tests/stage/vite.config.ts"
   },
   "packageManager": "pnpm@10.32.1",
   "devEngines": {

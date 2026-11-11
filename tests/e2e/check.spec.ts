@@ -1,27 +1,8 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { buildFigureTexturePng, figureTexture } from '../glbBuilder.js';
 import { buildConsumer, type BuiltConsumer } from './build-consumer.js';
-import { origin, scriptPolicy, serveConsumer } from './serve-consumer.js';
-
-declare global {
-	interface Window {
-		securityPolicyViolations: string[];
-	}
-}
-
-/** Collects the page's errors and, in `window.securityPolicyViolations`, every violation of the script policy; returns the errors. */
-async function recordPolicyViolations(page: Page): Promise<string[]> {
-	const pageErrors: string[] = [];
-	page.on('pageerror', (error) => pageErrors.push(error.message));
-	await page.addInitScript(() => {
-		window.securityPolicyViolations = [];
-		document.addEventListener('securitypolicyviolation', (event) => {
-			window.securityPolicyViolations.push(`${event.violatedDirective} ${event.blockedURI}`);
-		});
-	});
-	return pageErrors;
-}
+import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './serve-consumer.js';
 
 /** The RGBA of the pixel at `across` and `down`, fractions of the PNG's width and height, decoded in a page that has no policy. */
 async function pixelAt(context: BrowserContext, png: Buffer, across: number, down: number): Promise<number[]> {
