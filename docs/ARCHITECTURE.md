@@ -3,8 +3,8 @@
 ## 1. Context and Scope
 
 figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's
-bytes to a list of refusals, and the command `figure check <file>` around it; and the drawing export `overnightworks-figure/draw`, whose `mount` draws one frame of a figure into
-an app's canvas. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` in a browser before three parses
+bytes to a list of refusals, and the command `figure check <file>` around it; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into
+an app's canvas and keeps it drawn as the canvas resizes. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` in a browser before three parses
 the file, and an app calls `mount` on a canvas.
 
 ```mermaid
@@ -50,8 +50,11 @@ flowchart TD
     draw["draw.ts: mount, the handle"] --> check
     draw --> signals
     draw --> figureLoader
+    draw --> followCanvas
     draw --> figureFrame
     figureLoader["figureLoader.ts: GLTF and VRM loading, the img texture loader"]
+    followCanvas["followCanvas.ts: when the picture is drawn again"]
+    followCanvas --> figureFrame
     figureFrame["figureFrame.ts: lights, camera, one frame"]
     signals["signals.ts: the closed set of signals"]
 ```
@@ -64,7 +67,7 @@ flowchart TD
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
 - `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone. No module they reach imports three or three-vrm.
 - `signals.ts` owns every signal (`drawn`, `unsupported`, `refused`, `lost`, `slow`); `lost` is given for a context already lost at the mount; a loss while a figure lives and `slow` have no producer yet.
-- `draw.ts` is the one module of `overnightworks-figure/draw`: `mount` and the handle (the last signal and an idempotent `dispose`); its declarations name no three type. `figureLoader.ts` parses the bytes with three's GLTF loader and three-vrm's plugin and gives the parser an `<img>`-based texture loader. `figureFrame.ts` owns the picture: the camera, lights and clear colour of hopin's agent-tile mockup, framed on the head and shoulders.
+- `draw.ts` is the one module of `overnightworks-figure/draw`: `mount` and the handle (the last signal and an idempotent `dispose`); its declarations name no three type. `figureLoader.ts` parses the bytes with three's GLTF loader and three-vrm's plugin and gives the parser an `<img>`-based texture loader. `figureFrame.ts` owns the picture: the camera, lights and clear colour of hopin's agent-tile mockup, framed on the head and shoulders, and the drawing buffer's size, the canvas's client size times the device pixel ratio capped at 2. `followCanvas.ts` owns when the picture is drawn again: a change of the canvas's client size or of that ratio, with no call from the host, until `dispose` removes its observers.
 
 ## 3. Runtime View
 
@@ -114,7 +117,7 @@ sequenceDiagram
     end
 ```
 
-*`mount`'s one flow; derived from `src/draw.ts`. An error anywhere in loading or drawing, or a texture that fails, gives `refused` and frees the renderer; `mount` never rejects.*
+*`mount`'s one flow; derived from `src/draw.ts`. An error anywhere in loading or drawing, or a texture that fails, gives `refused` and frees the renderer; `mount` never rejects.* After `drawn`, the figure is redrawn when the canvas resizes or the device pixel ratio changes; no signal is given for a redraw.
 
 The loader's texture loader reads each image through an `<img>`, because three's default fetches a `blob:` URL and the script policy refuses that; it also records a failed image, which three itself swallows. Its file loader always fails, so a buffer outside the GLB gives `refused` and no request, whatever the check said. The canvas is the host's: the renderer never writes its `style`, and no element is created.
 
