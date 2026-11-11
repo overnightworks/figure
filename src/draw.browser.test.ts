@@ -369,6 +369,25 @@ describe('mount in a browser', () => {
 			expect(frames).toEqual({ requested, ran });
 		});
 
+		it('asks for no frame after dispose, though the page is hidden and shown again and the canvas leaves and re-enters the viewport', async () => {
+			const canvas = attachedCanvas();
+			const { handle } = await mountOn(canvas, buildConformantVrm());
+			await pictureNow();
+			handle.dispose();
+			const { requested, ran } = frames;
+
+			setPageVisibility('hidden');
+			setPageVisibility('visible');
+			canvas.className = 'small away';
+			await vi.waitFor(() => expect(canvas.getBoundingClientRect().top).toBeGreaterThan(window.innerHeight));
+			canvas.className = 'small';
+			await nextFrame();
+			await nextFrame();
+			await nextFrame();
+
+			expect(frames).toEqual({ requested, ran });
+		});
+
 		it('asks for no frame once the figure is refused', async () => {
 			await mountOn(attachedCanvas(), new TextEncoder().encode('plain text'));
 
