@@ -1,17 +1,16 @@
 import { figureProfile } from '../src/profile.js';
-import { buildConformantVrmGlb, buildConformantVrmJson, buildConformantVrmParts, buildGlb, type GlbOptions } from './glbBuilder.js';
+import { buildConformantVrmParts } from './figureComposition.js';
+import { buildConformantVrmGlb, buildFigureTexturePng, buildGlb, type GlbOptions } from './glbBuilder.js';
 
-type VrmJson = ReturnType<typeof buildConformantVrmJson>;
+type VrmJson = ReturnType<typeof buildConformantVrmParts>['json'];
 
 /** The conformant synthetic VRM's JSON, changed by `change` into a counter-example. */
 export function vrmJson(change: (json: VrmJson) => void = () => {}): VrmJson {
-	const json = buildConformantVrmJson(figureProfile);
-	change(json);
-	return json;
+	return vrmParts(undefined, change).json;
 }
 
-/** The conformant synthetic VRM's JSON and binary chunk with `images` as its texture sources, the JSON changed by `change`. */
-export function vrmParts(images?: readonly Uint8Array[], change: (json: VrmJson) => void = () => {}) {
+/** The conformant synthetic VRM's JSON and binary chunk with `images` as its texture sources (by default the figure's PNG), the JSON changed by `change`. */
+export function vrmParts(images: readonly Uint8Array[] = [buildFigureTexturePng()], change: (json: VrmJson) => void = () => {}) {
 	const parts = buildConformantVrmParts(figureProfile, images);
 	change(parts.json);
 	return parts;
