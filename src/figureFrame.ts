@@ -1,5 +1,6 @@
 import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Scene, Vector3, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
+import type { IdlePose } from './idleMotion.js';
 
 /** The picture's camera, lights and clear colour are the values of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html. */
 const camera = { fieldOfView: 22, near: 0.05, far: 20 };
@@ -9,7 +10,7 @@ const framing = { above: 0.25, below: 0.4, halfWidth: 0.31 };
 const maximumPixelRatio = 2;
 
 /** The drawing buffer's pixels per CSS pixel: the window's device pixel ratio, capped. */
-export function drawingPixelRatio(): number {
+function drawingPixelRatio(): number {
 	return Math.min(window.devicePixelRatio, maximumPixelRatio);
 }
 
@@ -21,10 +22,8 @@ function lightedScene(vrm: VRM): Scene {
 	return scene;
 }
 
-/** A camera looking at the figure's head and shoulders, centred on the eyes, wide enough for the canvas's aspect. */
-function headAndShouldersCamera(vrm: VRM, aspect: number): PerspectiveCamera {
-	vrm.scene.updateMatrixWorld(true);
-	const eyes = vrm.lookAt!.getLookAtWorldPosition(new Vector3());
+/** A camera looking at the eyes of the figure at rest, centred on them, wide enough for the canvas's aspect. */
+function headAndShouldersCamera(eyes: Vector3, aspect: number): PerspectiveCamera {
 	const tangent = Math.tan(MathUtils.degToRad(camera.fieldOfView / 2));
 	const centreHeight = eyes.y + (framing.above - framing.below) / 2;
 	const distance = Math.max((framing.above + framing.below) / 2 / tangent, framing.halfWidth / (tangent * aspect));
@@ -34,16 +33,56 @@ function headAndShouldersCamera(vrm: VRM, aspect: number): PerspectiveCamera {
 	return view;
 }
 
-/** Draws the figure into the renderer's canvas: the drawing buffer is the canvas's client size at the drawing pixel ratio. */
-export function drawFigureFrame(renderer: WebGLRenderer, canvas: HTMLCanvasElement, vrm: VRM): void {
-	const width = Math.max(2, canvas.clientWidth);
-	const height = Math.max(2, canvas.clientHeight);
-	renderer.setClearColor(0, 0);
-	renderer.setPixelRatio(drawingPixelRatio());
-	renderer.setSize(width, height, false);
+/** What the drawing buffer depends on: the canvas's client size and the pixel ratio it is drawn at. */
+interface DrawingSize {
+	readonly width: number;
+	readonly height: number;
+	readonly pixelRatio: number;
+}
+
+function isSameSize(first: DrawingSize, second: DrawingSize): boolean {
+	return first.width === second.width && first.height === second.height && first.pixelRatio === second.pixelRatio;
+}
+
+function currentSize(canvas: HTMLCanvasElement): DrawingSize {
+	return { width: Math.max(2, canvas.clientWidth), height: Math.max(2, canvas.clientHeight), pixelRatio: drawingPixelRatio() };
+}
+
+/** A figure's lights and camera, built once, and the frame that draws it. */
+export interface FigureStage {
+	/** Sets the figure to `pose` and draws it, the drawing buffer first following the canvas when its size or the pixel ratio changed. */
+	draw(pose: IdlePose, elapsedSeconds: number): void;
+}
+
+/** The stage for `vrm` at rest, on the renderer's canvas: the camera frames the eyes where they are now, so the figure moves in front of it. */
+export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasElement, vrm: VRM): FigureStage {
 	vrm.scene.traverse((node) => {
 		node.frustumCulled = false;
 	});
-	vrm.update(0);
-	renderer.render(lightedScene(vrm), headAndShouldersCamera(vrm, width / height));
+	vrm.scene.updateMatrixWorld(true);
+	const eyes = vrm.lookAt!.getLookAtWorldPosition(new Vector3());
+	const scene = lightedScene(vrm);
+	const spine = vrm.humanoid.getNormalizedBoneNode('spine')!;
+	const head = vrm.humanoid.getNormalizedBoneNode('head')!;
+	renderer.setClearColor(0, 0);
+	let drawn: DrawingSize | undefined;
+	let view: PerspectiveCamera;
+	return {
+		draw(pose, elapsedSeconds) {
+			const size = currentSize(canvas);
+			if (drawn === undefined || !isSameSize(drawn, size)) {
+				renderer.setPixelRatio(size.pixelRatio);
+				renderer.setSize(size.width, size.height, false);
+				view = headAndShouldersCamera(eyes, size.width / size.height);
+				drawn = size;
+			}
+			spine.rotation.x = pose.breath;
+			head.rotation.set(pose.head.pitch, pose.head.yaw, pose.head.roll);
+			vrm.expressionManager!.setValue('blink', pose.blink);
+			vrm.lookAt!.yaw = pose.look.yaw;
+			vrm.lookAt!.pitch = pose.look.pitch;
+			vrm.update(elapsedSeconds);
+			renderer.render(scene, view);
+		}
+	};
 }
