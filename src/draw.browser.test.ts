@@ -225,13 +225,16 @@ describe('mount in a browser', () => {
 
 		beforeAll(() => {
 			sizes = document.createElement('style');
-			sizes.textContent = '.small { width: 200px; height: 100px; } .wide { width: 300px; height: 150px; }';
+			sizes.textContent = '.small { width: 200px; height: 100px; } .wide { width: 300px; height: 150px; } .away { margin-top: 20000px; }';
 			document.head.append(sizes);
 		});
 
 		afterAll(() => sizes.remove());
 
-		afterEach(() => cdp().send('Emulation.clearDeviceMetricsOverride'));
+		afterEach(async () => {
+			restorePageVisibility();
+			await cdp().send('Emulation.clearDeviceMetricsOverride');
+		});
 
 		/** A canvas in the document, 200 CSS pixels wide by its stylesheet class (its attribute size is the default 300 by 150), whose frames the test reads. */
 		function attachedCanvas(): HTMLCanvasElement {
@@ -366,6 +369,25 @@ describe('mount in a browser', () => {
 			expect(frames).toEqual({ requested, ran });
 		});
 
+		it('asks for no frame after dispose, though the page is hidden and shown again and the canvas leaves and re-enters the viewport', async () => {
+			const canvas = attachedCanvas();
+			const { handle } = await mountOn(canvas, buildConformantVrm());
+			await pictureNow();
+			handle.dispose();
+			const { requested, ran } = frames;
+
+			setPageVisibility('hidden');
+			setPageVisibility('visible');
+			canvas.className = 'small away';
+			await vi.waitFor(() => expect(canvas.getBoundingClientRect().top).toBeGreaterThan(window.innerHeight));
+			canvas.className = 'small';
+			await nextFrame();
+			await nextFrame();
+			await nextFrame();
+
+			expect(frames).toEqual({ requested, ran });
+		});
+
 		it('asks for no frame once the figure is refused', async () => {
 			await mountOn(attachedCanvas(), new TextEncoder().encode('plain text'));
 
@@ -373,6 +395,111 @@ describe('mount in a browser', () => {
 			await nextFrame();
 
 			expect(frames.requested).toBe(0);
+		});
+
+		it('draws no frame while the page is hidden and goes on once it is visible again', async () => {
+			await mountOn(attachedCanvas(), buildConformantVrm());
+			await pictureNow();
+			setPageVisibility('hidden');
+			await nextFrame();
+			const { requested, ran } = frames;
+
+			await nextFrame();
+			await nextFrame();
+			await nextFrame();
+
+			expect(frames).toEqual({ requested, ran });
+			setPageVisibility('visible');
+			await pictureAfterFrames(1);
+		});
+
+		it('draws no frame while the canvas is out of the viewport and goes on once it is back', async () => {
+			const canvas = attachedCanvas();
+			await mountOn(canvas, buildConformantVrm());
+			await pictureNow();
+			canvas.className = 'small away';
+			await vi.waitFor(() => expect(canvas.getBoundingClientRect().top).toBeGreaterThan(window.innerHeight));
+			await nextFrame();
+			const { requested, ran } = frames;
+
+			await nextFrame();
+			await nextFrame();
+			await nextFrame();
+
+			expect(frames).toEqual({ requested, ran });
+			canvas.className = 'small';
+			await pictureAfterFrames(1);
+		});
+
+		it('ends on a context loss once: the signal says lost, and no later frame or signal comes', async () => {
+			const canvas = attachedCanvas();
+			const { handle, signals } = await mountOn(canvas, buildConformantVrm());
+			await pictureNow();
+
+			const extension = loseContext(canvas);
+			await vi.waitFor(() => expect(signals).toEqual([figureSignal.drawn, figureSignal.lost]));
+			const { requested, ran } = frames;
+			extension.restoreContext();
+			await nextFrame();
+			await nextFrame();
+
+			expect(handle.signal).toBe(figureSignal.lost);
+			expect(signals).toEqual([figureSignal.drawn, figureSignal.lost]);
+			expect(frames).toEqual({ requested, ran });
+		});
+
+		it('resolves with lost on a new mount of a canvas whose context a figure lost while it lived', async () => {
+			const canvas = attachedCanvas();
+			await mountOn(canvas, buildConformantVrm());
+			await pictureNow();
+			loseContext(canvas);
+			await vi.waitFor(() => expect(canvas.getContext('webgl2')?.isContextLost()).toBe(true));
+
+			const { handle, signals } = await mountOn(canvas, buildConformantVrm());
+
+			expect(handle.signal).toBe(figureSignal.lost);
+			expect(signals).toEqual([figureSignal.lost]);
+		});
+
+		it('disposes a lost figure twice without an error, and gives no signal for it', async () => {
+			const canvas = attachedCanvas();
+			const { handle, signals } = await mountOn(canvas, buildConformantVrm());
+			await pictureNow();
+			loseContext(canvas);
+			await vi.waitFor(() => expect(signals).toContain(figureSignal.lost));
+
+			handle.dispose();
+
+			expect(() => handle.dispose()).not.toThrow();
+			expect(signals).toEqual([figureSignal.drawn, figureSignal.lost]);
+		});
+
+		it('gives no signal when a living figure is disposed on purpose', async () => {
+			const canvas = attachedCanvas();
+			const { handle, signals } = await mountOn(canvas, buildConformantVrm());
+			await pictureNow();
+
+			handle.dispose();
+			await vi.waitFor(() => expect(canvas.getContext('webgl2')?.isContextLost()).toBe(true));
+			await nextFrame();
+			await nextFrame();
+
+			expect(signals).toEqual([figureSignal.drawn]);
+		});
+
+		it('leaves a second figure drawn and moving when the first one loses its context', async () => {
+			const lostCanvas = attachedCanvas();
+			const liveCanvas = attachedCanvas();
+			const lost = await mountOn(lostCanvas, buildConformantVrm());
+			const live = await mountOn(liveCanvas, buildConformantVrm());
+			await pictureNow();
+
+			loseContext(lostCanvas);
+			await vi.waitFor(() => expect(lost.signals).toContain(figureSignal.lost));
+			const first = await pictureAfterFrames(1);
+
+			expect(live.handle.signal).toBe(figureSignal.drawn);
+			await vi.waitFor(() => expect(sameBytes(shown!.pixels, first)).toBe(false), { timeout: 15000 });
 		});
 	});
 });
@@ -411,4 +538,26 @@ async function emulateDevicePixelRatio(ratio: number): Promise<void> {
 		deviceScaleFactor: ratio,
 		mobile: false
 	});
+}
+
+/** Sets the document's visibility state and fires its `visibilitychange` event, as a tab switch does. */
+function setPageVisibility(state: 'hidden' | 'visible'): void {
+	Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+	document.dispatchEvent(new Event('visibilitychange'));
+}
+
+/** Gives the document its own visibility state back, so the next test sees the browser's. */
+function restorePageVisibility(): void {
+	Reflect.deleteProperty(document, 'visibilityState');
+}
+
+/**
+ * Makes the canvas's context lost, as a GPU reset does, and gives the extension that restores it: a lost context gives no
+ * extensions, so the restore uses this one. The browser delivers the loss event in a later task.
+ */
+function loseContext(canvas: HTMLCanvasElement): WEBGL_lose_context {
+	const extension = canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context');
+	if (!extension) throw new Error('the canvas has no WEBGL_lose_context extension');
+	extension.loseContext();
+	return extension;
 }
