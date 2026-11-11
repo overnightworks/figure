@@ -1,0 +1,8 @@
+claim_id = "fdf1fe2b7e134f3f98169a507d9adbbf"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "fa8e23ea9985e658c21d03836ef5e1854e5e98a4"
+branch = "claude/issue-30-a-figure-stops-rendering-off-screen-or-h"
+scope = ["docs/ARCHITECTURE.md", "src"]
+opened_commit = "c2b64b7fa822ecbd9ddf3656fbbfcc01eeb7f766"
+whole_reason = "The pause, the lost signal, the handle that carries it, their browser tests and the architecture text are one lifecycle change of the drawing module; src is named as a directory because the builder may give visibility its own module."
