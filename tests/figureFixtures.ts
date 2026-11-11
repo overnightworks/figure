@@ -1,17 +1,16 @@
 import { figureProfile } from '../src/profile.js';
-import { buildConformantVrmGlb, buildConformantVrmJson, buildConformantVrmParts, buildGlb, type GlbOptions } from './glbBuilder.js';
+import { buildConformantVrmParts } from './figureComposition.js';
+import { buildConformantVrmGlb, buildFigureTexturePng, buildGlb, type GlbOptions } from './glbBuilder.js';
 
-type VrmJson = ReturnType<typeof buildConformantVrmJson>;
+type VrmJson = ReturnType<typeof buildConformantVrmParts>['json'];
 
 /** The conformant synthetic VRM's JSON, changed by `change` into a counter-example. */
 export function vrmJson(change: (json: VrmJson) => void = () => {}): VrmJson {
-	const json = buildConformantVrmJson(figureProfile);
-	change(json);
-	return json;
+	return vrmParts(undefined, change).json;
 }
 
-/** The conformant synthetic VRM's JSON and binary chunk with `images` as its texture sources, the JSON changed by `change`. */
-export function vrmParts(images?: readonly Uint8Array[], change: (json: VrmJson) => void = () => {}) {
+/** The conformant synthetic VRM's JSON and binary chunk with `images` as its texture sources (by default the figure's PNG), the JSON changed by `change`. */
+export function vrmParts(images: readonly Uint8Array[] = [buildFigureTexturePng()], change: (json: VrmJson) => void = () => {}) {
 	const parts = buildConformantVrmParts(figureProfile, images);
 	change(parts.json);
 	return parts;
@@ -30,4 +29,11 @@ export function buildConformantVrm(): Uint8Array {
 /** A GLB of the conformant VRM whose texture sources are `images`, with `change` applied to the JSON afterwards. */
 export function buildVrmGlbWithImages(images: readonly Uint8Array[], change: (json: VrmJson) => void = () => {}): Uint8Array {
 	return buildGlb(vrmParts(images, change));
+}
+
+/** The JSON and binary chunks of a GLB, read from its bytes as glTF 2.0 lays them out (section 4.4). */
+export function readGlb(glb: Uint8Array): { json: Record<string, any>; binary: Uint8Array } {
+	const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
+	const jsonEnd = 20 + view.getUint32(12, true);
+	return { json: JSON.parse(new TextDecoder().decode(glb.subarray(20, jsonEnd))), binary: glb.subarray(jsonEnd + 8) };
 }

@@ -21,6 +21,13 @@ const SIDES = [
 	{ prefix: 'right', direction: -1 }
 ] as const;
 
+/** The head box of the figure's skin: its centre and its half sizes. */
+export const HEAD_CENTRE: Vector3 = [0, 1.65, 0];
+export const HEAD_HALF_SIZE: Vector3 = [0.12, 0.12, 0.12];
+
+/** Where an eye bone sits from the head bone, for the left eye; the right eye mirrors its X. */
+export const EYE_TRANSLATION: Vector3 = [0.05, 0.1, 0.12];
+
 const TRUNK: readonly BoneSpec[] = [
 	{ name: 'hips', parentName: undefined, translation: [0, 1, 0] },
 	{ name: 'spine', parentName: 'hips', translation: [0, 0.1, 0] },
@@ -50,9 +57,17 @@ function limbSpecs(): BoneSpec[] {
 	);
 }
 
-/** The bones from the hips down, each after its parent: the trunk with chest and neck, then both arms and both legs. */
+function eyeSpecs(): BoneSpec[] {
+	return SIDES.map(({ prefix, direction }) => ({
+		name: prefix + 'Eye',
+		parentName: 'head',
+		translation: [EYE_TRANSLATION[0] * direction, EYE_TRANSLATION[1], EYE_TRANSLATION[2]] as Vector3
+	}));
+}
+
+/** The bones from the hips down, each after its parent: the trunk with chest and neck, then both arms, both legs and both eyes. */
 export function figureSkeleton(): Bone[] {
-	const specs = [...TRUNK, ...limbSpecs()];
+	const specs = [...TRUNK, ...limbSpecs(), ...eyeSpecs()];
 	const indexOfName = new Map(specs.map((spec, index) => [spec.name, index]));
 	return specs.map(({ name, parentName, translation }) => ({
 		name,
@@ -79,6 +94,23 @@ export interface MeshData {
 	readonly joints: readonly number[];
 	readonly weights: readonly number[];
 	readonly indices: readonly number[];
+}
+
+/** The figure's materials: the skin's textured one, then the untextured ones of the face, each a colour of its own. */
+export const FIGURE_MATERIALS = ['skin', 'eye', 'nose', 'feature'] as const;
+export type FigureMaterial = (typeof FIGURE_MATERIALS)[number];
+
+/** One primitive of a skinned mesh; `morphs` holds, per morph target, the offset of every vertex as flat X, Y, Z values. */
+export interface SkinnedPrimitive {
+	readonly data: MeshData;
+	readonly material: FigureMaterial;
+	readonly morphs: readonly (readonly number[])[];
+}
+
+/** A mesh skinned to the figure's skin; all its primitives carry the same number of morph targets. */
+export interface SkinnedMesh {
+	readonly name: string;
+	readonly primitives: readonly SkinnedPrimitive[];
 }
 
 const FACES = [0, 1, 2].flatMap((axis) => [1, -1].map((sign) => ({ axis, sign })));

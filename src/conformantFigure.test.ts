@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { checkFigure } from './check.js';
 import { figureProfile } from './profile.js';
-import { buildVrmGlb, vrmParts } from '../tests/figureFixtures.js';
+import { buildVrmGlb, readGlb } from '../tests/figureFixtures.js';
 import { buildBudgetVrm } from '../tests/glbBuilder.js';
 
 type Json = Record<string, any>;
 
-const { json, binary } = vrmParts();
+const { json, binary } = readGlb(buildVrmGlb());
 const vrm = json.extensions.VRMC_vrm;
 const nodes: Json[] = json.nodes;
 
@@ -45,6 +45,21 @@ function worldPosition(node: number): number[] {
 
 const boneNode = (name: string): number => vrm.humanoid.humanBones[name].node;
 const primitives: Json[] = json.meshes.flatMap((mesh: Json) => mesh.primitives);
+const materialOf = (primitive: Json): Json => json.materials[primitive.material];
+const isTextured = (material: Json): boolean => material.pbrMetallicRoughness.baseColorTexture !== undefined;
+
+/** The node each vertex of a primitive is bound to, read from its first joint component. */
+function jointNodesOf(primitive: Json): number[] {
+	return valuesOf(primitive.attributes.JOINTS_0)
+		.filter((_, index) => index % 4 === 0)
+		.map((joint) => json.skins[0].joints[joint]);
+}
+
+/** The position deltas of a bound morph target, all the primitives of its mesh together. */
+function deltasOf(name: string): number[] {
+	const bind = vrm.expressions.preset[name].morphTargetBinds[0];
+	return json.meshes[nodes[bind.node].mesh].primitives.flatMap((primitive: Json) => valuesOf(primitive.targets[bind.index].POSITION));
+}
 
 describe('the conformant synthetic VRM (VRMC_vrm-1.0 schema: VRMC_vrm.humanoid.humanBones.schema.json)', () => {
 	it('passes the check with no refusal', () => {
@@ -77,9 +92,10 @@ describe('the conformant synthetic VRM (VRMC_vrm-1.0 schema: VRMC_vrm.humanoid.h
 });
 
 describe('the conformant synthetic VRM as glTF 2.0 meshes and skin (sections 3.7 and 3.10)', () => {
-	it('holds two skinned meshes whose nodes name the one skin', () => {
+	it('holds skinned meshes whose nodes all name the one skin', () => {
 		const skinned = nodes.filter((node) => node.mesh !== undefined);
-		expect(skinned.map((node) => node.skin)).toEqual([0, 0]);
+		expect(skinned.length).toBeGreaterThan(0);
+		expect(skinned.every((node) => node.skin === 0)).toBe(true);
 		expect(json.skins).toHaveLength(1);
 	});
 
@@ -131,36 +147,85 @@ describe('the conformant synthetic VRM as glTF 2.0 meshes and skin (sections 3.7
 		expect(json.images[texture.source].mimeType).toBe('image/png');
 		expect(json.extensionsUsed).toEqual(['VRMC_vrm']);
 		expect(json.materials[0].extensions).toBeUndefined();
-		expect(primitives.map((primitive) => primitive.material)).toEqual([0, 0]);
+	});
+
+	it('paints the skin with the textured material and nothing else with it', () => {
+		const skinJoints = [boneNode('spine'), boneNode('chest'), boneNode('head')];
+		const textured = primitives.filter((primitive) => isTextured(materialOf(primitive)));
+		expect(textured.length).toBeGreaterThan(0);
+		expect(textured.every((primitive) => skinJoints.includes(jointNodesOf(primitive)[0]!))).toBe(true);
+	});
+
+	it('gives the eyes, the nose and the features untextured materials, each a colour of its own', () => {
+		const untextured = [...new Set(primitives.filter((primitive) => !isTextured(materialOf(primitive))).map((primitive) => primitive.material))];
+		const colours = untextured.map((index) => JSON.stringify(json.materials[index].pbrMetallicRoughness.baseColorFactor));
+		expect(untextured.length).toBeGreaterThanOrEqual(3);
+		expect(new Set(colours).size).toBe(colours.length);
 	});
 });
 
-describe('the blink expression (schema: VRMC_vrm.expressions.expression.morphTargetBind.schema.json)', () => {
-	const bind = vrm.expressions.preset.blink.morphTargetBinds[0];
+describe('the eyes and the look-at (schema: VRMC_vrm.humanoid and VRMC_vrm.lookAt)', () => {
+	it('hangs the left and right eye from the head, on the left and right side of the figure', () => {
+		expect(parentOf(boneNode('leftEye'))).toBe(boneNode('head'));
+		expect(parentOf(boneNode('rightEye'))).toBe(boneNode('head'));
+		expect(worldPosition(boneNode('leftEye'))[0]).toBeGreaterThan(0);
+		expect(worldPosition(boneNode('rightEye'))[0]).toBeLessThan(0);
+	});
 
-	it('binds a morph target of the head mesh with node, index and weight', () => {
-		expect(Object.keys(bind).sort()).toEqual(['index', 'node', 'weight']);
+	it.each(['leftEye', 'rightEye'])('skins %s to its eye bone with an untextured material', (eye) => {
+		const eyePrimitives = primitives.filter((primitive) => jointNodesOf(primitive)[0] === boneNode(eye));
+		expect(eyePrimitives.length).toBeGreaterThan(0);
+		expect(eyePrimitives.every((primitive) => !isTextured(materialOf(primitive)))).toBe(true);
+	});
+
+	it('gives the look-at the bone type and the eyes\' midpoint as its offset from the head', () => {
+		const lookAt = vrm.lookAt;
+		const eyeMidpoint = [0, 1, 2].map((axis) => (worldPosition(boneNode('leftEye'))[axis]! + worldPosition(boneNode('rightEye'))[axis]!) / 2);
+		const offsetFromHead = eyeMidpoint.map((value, axis) => value - worldPosition(boneNode('head'))[axis]!);
+
+		expect(lookAt.type).toBe('bone');
+		lookAt.offsetFromHeadBone.forEach((value: number, axis: number) => expect(value).toBeCloseTo(offsetFromHead[axis]!));
+	});
+
+	it.each(['rangeMapHorizontalInner', 'rangeMapHorizontalOuter', 'rangeMapVerticalDown', 'rangeMapVerticalUp'])(
+		'gives the look-at %s an input and an output scale',
+		(map) => {
+			expect(vrm.lookAt[map].inputMaxValue).toBeGreaterThan(0);
+			expect(vrm.lookAt[map].outputScale).toBeGreaterThan(0);
+		}
+	);
+});
+
+describe('the expressions (schema: VRMC_vrm.expressions.expression.morphTargetBind.schema.json)', () => {
+	it('points the blink at a morph target that the mesh of its node carries', () => {
+		const bind = vrm.expressions.preset.blink.morphTargetBinds[0];
 		const mesh = json.meshes[nodes[bind.node].mesh];
 		expect(mesh.primitives[0].targets).toHaveLength(bind.index + 1);
 	});
 
-	it('moves vertices of the head', () => {
-		const target = json.meshes[nodes[bind.node].mesh].primitives[0].targets[bind.index];
-		expect(valuesOf(target.POSITION).some((delta) => delta !== 0)).toBe(true);
+	it.each(figureProfile.presets)('binds %s to a morph target with node, index and weight that moves vertices', (name) => {
+		const bind = vrm.expressions.preset[name].morphTargetBinds[0];
+		expect(Object.keys(bind).sort()).toEqual(['index', 'node', 'weight']);
+		expect(deltasOf(name).some((delta) => delta !== 0)).toBe(true);
 	});
 
-	it('leaves every other preset empty', () => {
-		const others = figureProfile.presets.filter((name) => name !== 'blink');
-		expect(others.map((name) => vrm.expressions.preset[name])).toEqual(others.map(() => ({})));
+	it('gives every mesh the same number of morph targets on each primitive, as glTF 2.0 requires', () => {
+		for (const mesh of json.meshes) {
+			expect(new Set(mesh.primitives.map((primitive: Json) => primitive.targets?.length ?? 0)).size).toBe(1);
+		}
+	});
+
+	it('gives each preset a shape of its own', () => {
+		const shapes = figureProfile.presets.map((name) => JSON.stringify(deltasOf(name)));
+		expect(new Set(shapes).size).toBe(figureProfile.presets.length);
 	});
 });
 
 describe('the synthetic VRM at the budgets', () => {
 	const { glb, morphTargets } = buildBudgetVrm(figureProfile, figureProfile);
-	const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
-	const budgetJson: Json = JSON.parse(new TextDecoder().decode(glb.subarray(20, 20 + view.getUint32(12, true))));
+	const { json: budgetJson, binary: budgetBinary } = readGlb(glb);
+	const budgetView = new DataView(budgetBinary.buffer, budgetBinary.byteOffset, budgetBinary.byteLength);
 	const budgetPrimitives: Json[] = budgetJson.meshes.flatMap((mesh: Json) => mesh.primitives);
-	const binaryStart = 20 + view.getUint32(12, true) + 8;
 
 	it('passes the check with no refusal', () => {
 		expect(checkFigure(glb)).toEqual([]);
@@ -180,8 +245,8 @@ describe('the synthetic VRM at the budgets', () => {
 
 	it('fills the texel budget exactly, with no image longer than the side budget', () => {
 		const sizes = budgetJson.images.map((image: Json) => {
-			const header = budgetJson.bufferViews[image.bufferView].byteOffset + binaryStart + 16;
-			return [view.getUint32(header), view.getUint32(header + 4)];
+			const header = budgetJson.bufferViews[image.bufferView].byteOffset + 16;
+			return [budgetView.getUint32(header), budgetView.getUint32(header + 4)];
 		});
 		expect(sizes.reduce((sum: number, [width, height]: number[]) => sum + width! * height!, 0)).toBe(figureProfile.maxTexels);
 		expect(Math.max(...sizes.flat())).toBeLessThanOrEqual(figureProfile.maxTextureSidePixels);
