@@ -122,7 +122,10 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	document.addEventListener('visibilitychange', syncWithPage);
 	canvas.addEventListener('webglcontextlost', onContextLost);
 	viewport.observe(canvas);
-	return { stop, think: (working) => void (facts = { thinking: working === true }) };
+	const think = (working: boolean) => {
+		facts = { thinking: working === true };
+	};
+	return { stop, think };
 }
 
 async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal: FigureSignal) => void): Promise<Outcome> {
