@@ -3,6 +3,6 @@ agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
 role = "builder"
 base = "167b8da6789f98994d1b18dbc94c11968c269b82"
 branch = "claude/issue-40-a-figure-shows-that-its-agent-thinks"
-scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "quality/config.toml", "src/draw.browser.test.ts", "src/draw.ts", "src/figureDriving.browser.test.ts", "src/figureFrame.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "src/idleMotion.test.ts", "src/idleMotion.ts", "tests/e2e/stage.spec.ts", "tests/stage"]
+scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "quality/config.toml", "src/draw.browser.test.ts", "src/draw.ts", "src/figureDriving.browser.test.ts", "src/figureFrame.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "src/idleMotion.test.ts", "src/idleMotion.ts", "tests/browserCanvas.ts", "tests/e2e/stage.spec.ts", "tests/stage"]
 opened_commit = "e01379772286cc2e5042f726faf3b2c6f73d86c2"
 whole_reason = "The method, the driver that decides its motion, the frame that applies it and the loop that feeds it are one behaviour; none is reachable or provable without the others."
