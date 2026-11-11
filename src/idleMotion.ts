@@ -50,13 +50,17 @@ export interface IdlePose {
 }
 
 export interface IdleMotion {
-	/** The pose `elapsedSeconds` after the last call, while the page asks for reduced motion or not. */
-	advance(elapsedSeconds: number, reducedMotion: boolean): IdlePose;
+	/**
+	 * The pose `elapsedSeconds` after the last call, while the page asks for reduced motion or not. The blink's waiting time runs at
+	 * `blinkRate` times real time, so a blink comes that much as often; a blink itself lasts as long as ever.
+	 */
+	advance(elapsedSeconds: number, reducedMotion: boolean, blinkRate?: number): IdlePose;
 }
 
 export function createIdleMotion(random: () => number): IdleMotion {
 	const between = ([minimum, maximum]: Interval) => minimum + random() * (maximum - minimum);
 	let clock = random() * clockStartSpreadSeconds;
+	let blinkClock = clock;
 	let blinkStart = between(blink.firstStart);
 	let blinkSeconds = -1;
 	let glanceStart = between(glance.firstStart);
@@ -64,13 +68,13 @@ export function createIdleMotion(random: () => number): IdleMotion {
 	let target = { yaw: 0, pitch: 0 };
 
 	const blinkWeight = (step: number, reducedMotion: boolean): number => {
-		if (blinkSeconds < 0 && clock > blinkStart) blinkSeconds = 0;
+		if (blinkSeconds < 0 && blinkClock > blinkStart) blinkSeconds = 0;
 		if (blinkSeconds < 0) return 0;
 		blinkSeconds += step;
 		const duration = reducedMotion ? blink.reducedDurationSeconds : blink.durationSeconds;
 		if (blinkSeconds < duration) return Math.sin((blinkSeconds / duration) * Math.PI);
 		blinkSeconds = -1;
-		blinkStart = clock + between(blink.gapAfterEnd);
+		blinkStart = blinkClock + between(blink.gapAfterEnd);
 		return 0;
 	};
 
@@ -85,9 +89,10 @@ export function createIdleMotion(random: () => number): IdleMotion {
 	};
 
 	return {
-		advance(elapsedSeconds, reducedMotion) {
+		advance(elapsedSeconds, reducedMotion, blinkRate = 1) {
 			const step = Math.min(elapsedSeconds, longestStepSeconds);
 			clock += step;
+			blinkClock += step * blinkRate;
 			const glanceNow = glanceTarget(reducedMotion);
 			const moving = reducedMotion ? 0 : 1;
 			const swayAt = ({ amplitude, frequency }: { amplitude: number; frequency: number }) => moving * amplitude * Math.sin(clock * frequency);
