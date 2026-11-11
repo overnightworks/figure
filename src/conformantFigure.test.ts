@@ -223,10 +223,9 @@ describe('the expressions (schema: VRMC_vrm.expressions.expression.morphTargetBi
 
 describe('the synthetic VRM at the budgets', () => {
 	const { glb, morphTargets } = buildBudgetVrm(figureProfile, figureProfile);
-	const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
-	const budgetJson: Json = JSON.parse(new TextDecoder().decode(glb.subarray(20, 20 + view.getUint32(12, true))));
+	const { json: budgetJson, binary: budgetBinary } = readGlb(glb);
+	const budgetView = new DataView(budgetBinary.buffer, budgetBinary.byteOffset, budgetBinary.byteLength);
 	const budgetPrimitives: Json[] = budgetJson.meshes.flatMap((mesh: Json) => mesh.primitives);
-	const binaryStart = 20 + view.getUint32(12, true) + 8;
 
 	it('passes the check with no refusal', () => {
 		expect(checkFigure(glb)).toEqual([]);
@@ -246,8 +245,8 @@ describe('the synthetic VRM at the budgets', () => {
 
 	it('fills the texel budget exactly, with no image longer than the side budget', () => {
 		const sizes = budgetJson.images.map((image: Json) => {
-			const header = budgetJson.bufferViews[image.bufferView].byteOffset + binaryStart + 16;
-			return [view.getUint32(header), view.getUint32(header + 4)];
+			const header = budgetJson.bufferViews[image.bufferView].byteOffset + 16;
+			return [budgetView.getUint32(header), budgetView.getUint32(header + 4)];
 		});
 		expect(sizes.reduce((sum: number, [width, height]: number[]) => sum + width! * height!, 0)).toBe(figureProfile.maxTexels);
 		expect(Math.max(...sizes.flat())).toBeLessThanOrEqual(figureProfile.maxTextureSidePixels);
