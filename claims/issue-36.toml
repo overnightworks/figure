@@ -1,0 +1,8 @@
+claim_id = "b91eb94b42624b4caf07cc2e68a57c52"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "97c6936b14542a0087716969aea11d34460f2f61"
+branch = "claude/issue-36-a-demo-stage-mounts-a-figure-under-the-s"
+scope = [".gitignore", "AGENTS.md", "README.md", "package.json", "pnpm-lock.yaml", "quality/config.toml", "tests/e2e", "tests/stage"]
+opened_commit = "17d17d1967b8a0b4e888737e034859a1b146ebea"
+whole_reason = "The stage page, the command that serves it, the spec that keeps it alive and the lines that name it are one tool; none is useful without the others."
