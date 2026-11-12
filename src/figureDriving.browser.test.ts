@@ -314,6 +314,22 @@ describe('a figure driven by the host', () => {
 		expect((await noseNow(canvas)).x).toBeGreaterThan(resting.x + turnedPixels.side);
 	});
 
+	it.each([
+		['across', new DOMRect(Number.NaN, 0, 200, 250)],
+		['down', new DOMRect(0, Number.POSITIVE_INFINITY, 200, 250)]
+	])('counts a speaker as nobody while the canvas gives no finite %s, and follows it once the canvas does', async (_, canvasRectangle) => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+		const rectangle = vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(canvasRectangle);
+
+		handle.listen(speakerAt(farLeft, level));
+		expect(await noseNow(canvas)).toEqual(resting);
+		rectangle.mockRestore();
+
+		expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side);
+	});
+
 	it('follows an element made by an iframe once it is moved into the canvas\'s document, with no call', async () => {
 		await emulateReducedMotion();
 		const { canvas, handle } = await mountFigure();
