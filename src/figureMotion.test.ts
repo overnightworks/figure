@@ -47,6 +47,16 @@ function atSecond(seconds: number): number {
 	return Math.round(seconds / frameSeconds) - 1;
 }
 
+/** The forward pitch of each pose's posture, in radians: a nod is all of it while the figure listens. */
+function pitchesOf(poses: FigurePose[]): number[] {
+	return poses.map((pose) => pose.posture.pitch);
+}
+
+/** The times, in seconds, of the frames where a nod's pitch rises from none: a nod starts on the frame before its first positive pitch. */
+function nodStartsOf(pitches: number[]): number[] {
+	return pitches.flatMap((pitch, frame) => (pitch > 0 && pitches[frame - 1] === 0 ? [(frame + 1) * frameSeconds] : []));
+}
+
 describe('the figure motion', () => {
 	it('shows the thinking look once the agent thinks, though the idle glance looks elsewhere', () => {
 		const glancing = watch(3000, () => idle);
@@ -271,10 +281,8 @@ describe('the figure motion while someone speaks', () => {
 
 		expect(idling.some((pose) => Math.abs(pose.look.yaw) > 5)).toBe(true);
 		listening.slice(atSecond(10)).forEach((pose) => expect(pose.look.yaw).toBeCloseTo(-48, 3));
-		listening.forEach((pose, frame) => {
-			expect(pose.breath).toBeCloseTo(idling[frame]!.breath, 12);
-			expect(pose.blink).toBeCloseTo(idling[frame]!.blink, 12);
-		});
+		listening.forEach((pose, frame) => expect(pose.breath).toBeCloseTo(idling[frame]!.breath, 12));
+		expect(listening.findIndex((pose) => pose.blink > 0)).toBe(idling.findIndex((pose) => pose.blink > 0));
 		expect(new Set(listening.slice(atSecond(10)).map((pose) => pose.head.roll)).size).toBeGreaterThan(100);
 	});
 
@@ -309,6 +317,72 @@ describe('the figure motion while someone speaks', () => {
 		const again = Array.from({ length: 200 }, () => motion.advance(idle, frameSeconds, false, { across: -0.5, down: 0 }));
 
 		expect(again).toEqual(given);
+	});
+
+	it('nods every 2.5 to 5 seconds while it listens, the first at the first frame it listens', () => {
+		const starts = nodStartsOf(pitchesOf(watch(6000, () => idle, false, () => speakerLeft)));
+
+		expect(starts[0]).toBeCloseTo(2 * frameSeconds, 9);
+		const gaps = starts.slice(1).map((start, index) => start - starts[index]!);
+		expect(gaps.length).toBeGreaterThan(10);
+		gaps.forEach((gap) => {
+			expect(gap).toBeGreaterThanOrEqual(2.5 - 1e-9);
+			expect(gap).toBeLessThan(5 + frameSeconds);
+		});
+	});
+
+	it('holds each nod for 0.9 seconds, its forward pitch a half sine peaking at 0.09 rad in the middle', () => {
+		const pitches = pitchesOf(watch(300, () => idle, false, () => speakerLeft));
+		const begin = pitches.findIndex((pitch) => pitch > 0);
+		const end = pitches.indexOf(0, begin);
+		const nod = pitches.slice(begin, end);
+		const peak = Math.max(...nod);
+
+		expect((end - begin) * frameSeconds).toBeGreaterThanOrEqual(0.88);
+		expect((end - begin) * frameSeconds).toBeLessThanOrEqual(0.91);
+		expect(peak).toBeCloseTo(0.09, 4);
+		expect(Math.abs(nod.indexOf(peak) * frameSeconds - 0.45)).toBeLessThan(frameSeconds + 1e-9);
+	});
+
+	it('gives the neck 0.4 of a nod and the head the rest, and the head all of it where the model has no neck', () => {
+		const peak = watch(300, () => idle, false, () => speakerLeft).reduce((highest, pose) => (pose.posture.pitch > highest.posture.pitch ? pose : highest));
+
+		expect(spreadPosture(peak.posture, { neck: true, chest: true }).neck.pitch).toBeCloseTo(0.4 * 0.09, 4);
+		expect(spreadPosture(peak.posture, { neck: true, chest: true }).head.pitch).toBeCloseTo(0.6 * 0.09, 4);
+		expect(spreadPosture(peak.posture, { neck: false, chest: false }).head.pitch).toBeCloseTo(0.09, 4);
+	});
+
+	it('never nods under reduced motion, though it listens', () => {
+		const pitches = pitchesOf(watch(6000, () => idle, true, () => speakerLeft));
+
+		expect(new Set(pitches)).toEqual(new Set([0]));
+	});
+
+	it('never nods while it thinks or while nobody speaks', () => {
+		const thinkingAlone = pitchesOf(watch(3000, () => thinking));
+		const thinkingListening = pitchesOf(watch(3000, () => thinking, false, () => speakerLeft));
+		const idleAlone = pitchesOf(watch(3000, () => idle));
+
+		expect(thinkingListening).toEqual(thinkingAlone);
+		expect(new Set(idleAlone)).toEqual(new Set([0]));
+	});
+
+	it('cuts a nod under way when listening ends, and does not resume it when listening comes back', () => {
+		const pitches = pitchesOf(watch(400, () => idle, false, (frame) => (frame < 30 || frame >= 40 ? speakerLeft : null)));
+
+		expect(pitches[29]!).toBeGreaterThan(0);
+		expect(pitches.slice(30, 40)).toEqual(new Array(10).fill(0));
+		expect(pitches.slice(40, 250)).toEqual(new Array(210).fill(0));
+	});
+
+	it.each([
+		[0, 2.5],
+		[0.999999, 5]
+	])('takes the gap between nods from the source of chance: a source giving %s gaps of %s seconds', (share, gap) => {
+		const motion = createFigureMotion(() => share);
+		const starts = nodStartsOf(Array.from({ length: 6000 }, () => motion.advance(idle, frameSeconds, false, speakerLeft).posture.pitch));
+
+		expect(starts[1]! - starts[0]!).toBeCloseTo(gap, 1);
 	});
 });
 

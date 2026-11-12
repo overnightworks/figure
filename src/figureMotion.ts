@@ -9,8 +9,8 @@ import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.j
  * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and
  * to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the easing rates. The picture
  * also raises a hand to the chin, which the figure does not do. The listening look is that of its listening state: the gaze toward the
- * speaker, the head's larger share of its yaw, the slower yaw and the lean; its nod is not taken. Under reduced motion the pose is
- * reached and left at once.
+ * speaker, the head's larger share of its yaw, the slower yaw and the lean, and a nod every 2.5 to 5 seconds, which the picture times
+ * and which `spreadPosture` shares between neck and head. Under reduced motion the pose is reached and left at once, and no nod comes.
  */
 
 /** What the host reports about its agent. */
@@ -79,6 +79,8 @@ const headShare = { yaw: 0.5, listeningYaw: 0.75, pitch: 0.55 };
 /** The look-at turns 2.4 times the gaze and no further than 90 degrees either way, as the picture clamps it. */
 const lookGain = 2.4;
 const lookReachDegrees = 90;
+/** The listening nod: a half sine of `durationSeconds` to a forward pitch of `peakRadians`, and the seconds from one nod's start to the next's, drawn from `gapSeconds`. */
+const nod = { durationSeconds: 0.9, peakRadians: 0.09, gapSeconds: [2.5, 5] as const };
 
 const radiansPerDegree = Math.PI / 180;
 
@@ -132,8 +134,41 @@ function gazeFor(facts: FigureFacts, speaker: SpeakerOffset | null, idleGlance: 
 	return speaker === null ? idleGlance : gazeToward(speaker);
 }
 
+/** The nod's forward pitch for the step just taken, in radians: zero when no nod is under way. */
+interface NodMotion {
+	advance(step: number, listening: boolean, reducedMotion: boolean): number;
+}
+
+/**
+ * The listening nod as the picture times it: the first comes at the first frame the figure listens, each next one a gap from the last
+ * one's start, and listening that ends cuts a nod under way. The clock runs through every step, so the gaps stay on one timeline.
+ */
+function createNod(random: () => number): NodMotion {
+	let clock = 0;
+	let nextStart = 0;
+	let startedAt: number | null = null;
+	const gapSeconds = () => nod.gapSeconds[0] + random() * (nod.gapSeconds[1] - nod.gapSeconds[0]);
+	return {
+		advance(step, listening, reducedMotion) {
+			clock += step;
+			if (!listening || reducedMotion) {
+				startedAt = null;
+				return 0;
+			}
+			if (clock > nextStart) {
+				startedAt = clock;
+				nextStart = clock + gapSeconds();
+			}
+			if (startedAt === null) return 0;
+			const age = clock - startedAt;
+			return age < nod.durationSeconds ? Math.sin((age / nod.durationSeconds) * Math.PI) * nod.peakRadians : 0;
+		}
+	};
+}
+
 export function createFigureMotion(random: () => number): FigureMotion {
 	const idle = createIdleMotion(random);
+	const nodding = createNod(random);
 	let gaze: Gaze = { yaw: 0, pitch: 0 };
 	let thinkingWeight = 0;
 	let leanWeight = 0;
@@ -144,6 +179,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 			const base = idle.advance(elapsedSeconds, reducedMotion);
 			const ease = (value: number, goal: number, rate: number) => value + (goal - value) * (reducedMotion ? 1 : 1 - Math.exp(-rate * step));
 			const listening = !facts.thinking && speaker !== null;
+			const nodPitch = nodding.advance(step, listening, reducedMotion);
 			const goal = gazeFor(facts, speaker, base.glance);
 			gaze = { yaw: ease(gaze.yaw, goal.yaw, listening ? easing.listeningYaw : easing.yaw), pitch: ease(gaze.pitch, goal.pitch, easing.pitch) };
 			thinkingWeight = ease(thinkingWeight, facts.thinking ? 1 : 0, easing.thinking);
@@ -158,7 +194,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				},
 				posture: {
 					yaw: thinkingWeight * thinkingLook.posture.yaw,
-					pitch: thinkingWeight * thinkingLook.posture.pitch,
+					pitch: thinkingWeight * thinkingLook.posture.pitch + nodPitch,
 					roll: thinkingWeight * thinkingLook.posture.roll
 				},
 				trunkLean: leanWeight * listeningLean.trunk,
