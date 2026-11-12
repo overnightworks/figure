@@ -1,7 +1,0 @@
-claim_id = "a2698b8a9df1427899024d5f514504d8"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "e5f3680d14cb8e0a5d83aed3e0806e0eeea6c5e6"
-branch = "claude/issue-57-the-third-release-ships-the-figure-that"
-scope = ["README.md", "docs/ARCHITECTURE.md", "package.json"]
-opened_commit = "f5c5d453810676d4a65fd434bd759bf5dd1e3bc7"
