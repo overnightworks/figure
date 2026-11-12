@@ -29,14 +29,19 @@ interface Picture {
 describe('a figure driven by the host', () => {
 	const canvases: HTMLCanvasElement[] = [];
 	const handles: FigureHandle[] = [];
+	const speakers: HTMLElement[] = [];
+	const iframes: HTMLIFrameElement[] = [];
 	/** What each watched canvas held when the figure drew it for the first `earlyFrames` times. */
 	const shownEarly = new Map<HTMLCanvasElement, Picture[]>();
 	/** What each watched canvas held when the figure last drew it, read in the frame's own task, where the buffer still holds the picture. */
 	const shown = new Map<HTMLCanvasElement, Picture>();
 	let frames = 0;
+	/** The canvas whose next drawn picture a test waits for, and that picture once the figure drew it. */
+	let firstFrameWaited: { canvas: HTMLCanvasElement; picture?: Picture } | undefined;
 
 	beforeEach(() => {
 		frames = 0;
+		firstFrameWaited = undefined;
 		shown.clear();
 		shownEarly.clear();
 		// A seeded source of chance keeps the idle glance and the blink the same in every run.
@@ -54,6 +59,8 @@ describe('a figure driven by the host', () => {
 		vi.restoreAllMocks();
 		handles.splice(0).forEach((handle) => handle.dispose());
 		canvases.splice(0).forEach((canvas) => canvas.remove());
+		speakers.splice(0).forEach((speaker) => speaker.remove());
+		iframes.splice(0).forEach((frame) => frame.remove());
 		await cdp().send('Emulation.setEmulatedMedia', { features: [] });
 	});
 
@@ -63,6 +70,7 @@ describe('a figure driven by the host', () => {
 		if (!coversSomething(pixels)) return;
 		const picture = { width: canvas.width, height: canvas.height, pixels };
 		shown.set(canvas, picture);
+		if (firstFrameWaited?.canvas === canvas) firstFrameWaited.picture ??= picture;
 		const early = shownEarly.get(canvas) ?? [];
 		if (early.length < earlyFrames) shownEarly.set(canvas, [...early, picture]);
 	}
@@ -153,6 +161,16 @@ describe('a figure driven by the host', () => {
 		return noseAfter(canvas, frames + 2);
 	}
 
+	/** The nose in the first picture `canvas` shows after `act` ran, which is the frame the figure draws next. */
+	async function firstFrameAfter(canvas: HTMLCanvasElement, act: () => void): Promise<Spot> {
+		const awaited: { canvas: HTMLCanvasElement; picture?: Picture } = { canvas };
+		firstFrameWaited = awaited;
+		act();
+		await vi.waitFor(() => expect(awaited.picture).toBeDefined(), { timeout: 5000 });
+		const { pixels, width, height } = awaited.picture!;
+		return centreOf(spotsOf(pixels, width, height).nose);
+	}
+
 	it('turns toward the side and up on think(true) and comes back on think(false)', async () => {
 		const { canvas, handle } = await mountFigure();
 		const resting = await noseNow(canvas);
@@ -204,6 +222,217 @@ describe('a figure driven by the host', () => {
 
 		expect(handle.signal).toBe(figureSignal.drawn);
 		expect(thinking.x).toBeLessThan(resting.x - turnedPixels.side);
+	});
+
+	/** Puts a small element of the page at `x` and `y` CSS pixels from the viewport's top left, in the page's body or detached when `attach` is false. */
+	function speakerAt(x: number, y: number, attach = true): HTMLElement {
+		const speaker = document.createElement('div');
+		speaker.style.cssText = `position: fixed; left: ${x}px; top: ${y}px; width: 20px; height: 20px`;
+		if (attach) document.body.append(speaker);
+		speakers.push(speaker);
+		return speaker;
+	}
+
+	/** Far enough to either side of the canvas that the gaze is at its full reach. */
+	const farLeft = -5000;
+	const farRight = 5000;
+	const level = 100;
+
+	it.each([
+		['left', farLeft, -1],
+		['right', farRight, 1]
+	])('turns the nose toward a speaker on the %s, and back when nobody speaks', async (_, x, side) => {
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+
+		handle.listen(speakerAt(x, level));
+		await vi.waitFor(async () => expect(((await noseNow(canvas)).x - resting.x) * side).toBeGreaterThan(turnedPixels.side), { timeout: 10000 });
+
+		handle.listen(null);
+		await vi.waitFor(async () => expect(Math.abs((await noseNow(canvas)).x - resting.x)).toBeLessThan(backPixels), { timeout: 10000 });
+	});
+
+	it('follows an element that moves, with no call', async () => {
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+		const speaker = speakerAt(farLeft, level);
+		handle.listen(speaker);
+		await vi.waitFor(async () => expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side), { timeout: 10000 });
+
+		speaker.style.left = `${farRight}px`;
+
+		await vi.waitFor(async () => expect((await noseNow(canvas)).x).toBeGreaterThan(resting.x + turnedPixels.side), { timeout: 10000 });
+	});
+
+	it('turns toward a speaker above and looks up at the next frame under reduced motion', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+
+		handle.listen(speakerAt(canvas.getBoundingClientRect().left, -5000));
+		const listening = await noseNow(canvas);
+
+		expect(listening.y).toBeLessThan(resting.y - turnedPixels.up);
+	});
+
+	it('turns at the first frame after the call under reduced motion, follows a moved speaker at its first frame, and a repeated call changes nothing', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+		const speaker = speakerAt(farLeft, level);
+
+		const listening = await firstFrameAfter(canvas, () => handle.listen(speaker));
+		const moved = await firstFrameAfter(canvas, () => (speaker.style.left = `${farRight}px`));
+		handle.listen(speaker);
+		const repeated = await noseNow(canvas);
+
+		expect(listening.x).toBeLessThan(resting.x - turnedPixels.side);
+		expect(moved.x).toBeGreaterThan(resting.x + turnedPixels.side);
+		expect(repeated).toEqual(moved);
+	});
+
+	it('counts a detached element and one of another document as nobody, and follows each once it returns', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+		const detached = speakerAt(farLeft, level, false);
+		const foreign = document.implementation.createHTMLDocument('another').createElement('div');
+		foreign.style.cssText = `position: fixed; left: ${farRight}px; top: ${level}px; width: 20px; height: 20px`;
+		foreign.ownerDocument.body.append(foreign);
+		speakers.push(foreign);
+
+		handle.listen(detached);
+		expect(await noseNow(canvas)).toEqual(resting);
+		document.body.append(detached);
+		expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side);
+		detached.remove();
+		expect(await noseNow(canvas)).toEqual(resting);
+
+		handle.listen(foreign);
+		expect(await noseNow(canvas)).toEqual(resting);
+		document.body.append(foreign);
+		expect((await noseNow(canvas)).x).toBeGreaterThan(resting.x + turnedPixels.side);
+	});
+
+	it.each([
+		['across', new DOMRect(Number.NaN, 0, 200, 250)],
+		['down', new DOMRect(0, Number.POSITIVE_INFINITY, 200, 250)]
+	])('counts a speaker as nobody while the canvas gives no finite %s, and follows it once the canvas does', async (_, canvasRectangle) => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+		const rectangle = vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(canvasRectangle);
+
+		handle.listen(speakerAt(farLeft, level));
+		expect(await noseNow(canvas)).toEqual(resting);
+		rectangle.mockRestore();
+
+		expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side);
+	});
+
+	it('follows an element made by an iframe once it is moved into the canvas\'s document, with no call', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+		const frame = document.createElement('iframe');
+		document.body.append(frame);
+		iframes.push(frame);
+		const foreign = frame.contentDocument!.createElement('div');
+		foreign.style.cssText = `position: fixed; left: ${farLeft}px; top: ${level}px; width: 20px; height: 20px`;
+		frame.contentDocument!.body.append(foreign);
+		speakers.push(foreign);
+
+		expect(foreign).not.toBeInstanceOf(Element);
+		handle.listen(foreign);
+		expect(await noseNow(canvas)).toEqual(resting);
+		document.body.append(foreign);
+
+		expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side);
+	});
+
+	it('shows the thinking look over a speaker, and the speaker once the thinking ends', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+		handle.think(true);
+		const thinking = await noseNow(canvas);
+
+		handle.listen(speakerAt(farRight, level));
+		const whileThinking = await noseNow(canvas);
+		handle.think(false);
+		const after = await noseNow(canvas);
+
+		expect(whileThinking).toEqual(thinking);
+		expect(after.x).toBeGreaterThan(resting.x + turnedPixels.side);
+	});
+
+	it('turns a figure that has no neck and no chest toward a speaker as well', async () => {
+		await emulateReducedMotion();
+		const bytes = buildVrmGlbWithImages([buildFigureTexturePng()], (json) => {
+			delete json.extensions.VRMC_vrm.humanoid.humanBones.neck;
+			delete json.extensions.VRMC_vrm.humanoid.humanBones.chest;
+		});
+		const { canvas, handle } = await mountFigure(bytes);
+		const resting = await noseNow(canvas);
+
+		handle.listen(speakerAt(farLeft, level));
+
+		expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side);
+	});
+
+	it.each([
+		['undefined', undefined],
+		['a string', 'speaker'],
+		['a plain object', { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1, height: 1 }) }],
+		['the document', document],
+		['a proxy that throws when judged', new Proxy({}, { getPrototypeOf: () => { throw new Error('refused'); } })],
+		['a proxy of an element, whose reads are refused', new Proxy(document.createElement('div'), {})],
+		['an object that only inherits from Element', Object.create(Element.prototype)],
+		['a plain object that reports being a connected element of the document', { nodeType: 1, isConnected: true, ownerDocument: document, getBoundingClientRect: () => ({ left: -5000, top: 100, width: 20, height: 20 }) }],
+		['a plain object that reports an empty rectangle', { nodeType: 1, isConnected: true, ownerDocument: document, getBoundingClientRect: () => ({}) }]
+	])('throws nothing for %s, counts it as nobody and goes on drawing', async (_, speaker) => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+
+		expect(() => handle.listen(speaker as Element)).not.toThrow();
+
+		expect(await noseNow(canvas)).toEqual(resting);
+		expect(handle.signal).toBe(figureSignal.drawn);
+	});
+
+	it('does nothing on a disposed figure and throws nothing when told of a speaker', async () => {
+		const { canvas, handle } = await mountFigure();
+		await noseNow(canvas);
+		handle.dispose();
+		const framesAtDispose = frames;
+
+		expect(() => handle.listen(speakerAt(farLeft, level))).not.toThrow();
+		await nextFrame();
+		await nextFrame();
+
+		expect(frames).toBe(framesAtDispose);
+	});
+
+	it.each([
+		['refused', new Uint8Array([1, 2, 3])],
+		['lost', undefined]
+	])('does nothing on a figure that ended with %s when told of a speaker', async (ending, bytes) => {
+		const { canvas, handle } = await mountFigure(bytes);
+		if (ending === figureSignal.lost) {
+			await noseNow(canvas);
+			canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!.loseContext();
+			await vi.waitFor(() => expect(handle.signal).toBe(figureSignal.lost));
+		}
+		const framesAtEnd = frames;
+
+		expect(() => handle.listen(speakerAt(farLeft, level))).not.toThrow();
+		expect(() => handle.listen(null)).not.toThrow();
+		await nextFrame();
+		await nextFrame();
+
+		expect(handle.signal).toBe(ending);
+		expect(frames).toBe(framesAtEnd);
 	});
 
 	it('moves only the figure it was called on when two figures are drawn', async () => {

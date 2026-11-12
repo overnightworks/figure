@@ -77,6 +77,27 @@ test.describe('the demo stage under the script policy', () => {
 		await expectNoViolations(page, pageErrors);
 	});
 
+	test('the speaker control names an element for both figures, which stay drawn while the dragged one moves', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+
+		for (const choice of ['left', 'right', 'drag', 'nobody']) {
+			await page.getByLabel(choice === 'drag' ? 'drag me' : choice, { exact: true }).check();
+			await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+			await expect(page.locator('[data-speaker]:not([hidden])')).toHaveCount(choice === 'nobody' ? 0 : 1);
+		}
+		await page.getByLabel('drag me').check();
+		const marker = page.locator('[data-speaker="drag"]');
+		const before = await marker.boundingBox();
+		await marker.hover();
+		await page.mouse.down();
+		await page.mouse.move(before!.x - 50, before!.y - 50);
+		await page.mouse.up();
+		expect((await marker.boundingBox())!.x).toBeLessThan(before!.x);
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
 	test('a picked figure replaces both drawings on fresh canvases', async ({ page }) => {
 		const pageErrors = await openStage(page, stage);
 		await expectTwoDrawings(page);

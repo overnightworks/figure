@@ -21,6 +21,15 @@ let figureBytes: Uint8Array = buildConformantVrm();
 /** Whether the stage reports its agent as thinking: a freshly mounted figure is told at once. */
 let thinking = false;
 
+/** Whom the stage reports as speaking: nobody, an element at the left edge, one at the right edge, or one the visitor drags. */
+type SpeakerChoice = 'nobody' | 'left' | 'right' | 'drag';
+
+/** The element each choice but nobody names, a small marker that sits in the viewport while its choice is the speaker. */
+const speakerMarkers = new Map<SpeakerChoice, HTMLElement>();
+
+/** The speaker the stage reports: a freshly mounted figure is told at once. */
+let speaker: HTMLElement | null = null;
+
 /** Writes a signal beside the slot only while its canvas is the one shown: a replaced canvas still records its own signal. */
 function showSignal(slot: Slot, canvas: HTMLCanvasElement, signal: FigureSignal): void {
 	canvas.dataset.signal = signal;
@@ -46,6 +55,7 @@ async function mountSlot(slot: Slot): Promise<void> {
 	}
 	slot.handle = handle;
 	handle.think(thinking);
+	handle.listen(speaker);
 }
 
 function createSlot(cssWidth: number, stage: HTMLElement): Slot {
@@ -69,6 +79,42 @@ const stage = document.querySelector<HTMLElement>('#stage')!;
 const thinkButton = document.querySelector<HTMLButtonElement>('#think')!;
 const picker = document.querySelector<HTMLInputElement>('#picker')!;
 const slots = cssWidths.map((cssWidth) => createSlot(cssWidth, stage));
+
+/** A marker the visitor can see and, for the dragged one, move with a pointer. */
+function createSpeakerMarker(choice: SpeakerChoice, position: Partial<CSSStyleDeclaration>): HTMLElement {
+	const marker = document.createElement('div');
+	marker.dataset.speaker = choice;
+	marker.textContent = 'speaker';
+	marker.hidden = true;
+	Object.assign(marker.style, { position: 'fixed', padding: '8px', background: 'gold', touchAction: 'none', ...position });
+	document.body.append(marker);
+	return marker;
+}
+
+/** Moves `marker` with the pointer while it is held on it. */
+function makeDraggable(marker: HTMLElement): void {
+	marker.style.cursor = 'grab';
+	marker.addEventListener('pointerdown', (event) => marker.setPointerCapture(event.pointerId));
+	marker.addEventListener('pointermove', (event) => {
+		if (!marker.hasPointerCapture(event.pointerId)) return;
+		marker.style.left = `${event.clientX - marker.offsetWidth / 2}px`;
+		marker.style.top = `${event.clientY - marker.offsetHeight / 2}px`;
+	});
+}
+
+speakerMarkers.set('left', createSpeakerMarker('left', { left: '8px', top: '40%' }));
+speakerMarkers.set('right', createSpeakerMarker('right', { right: '8px', top: '40%' }));
+speakerMarkers.set('drag', createSpeakerMarker('drag', { left: '50%', top: '60%' }));
+makeDraggable(speakerMarkers.get('drag')!);
+
+document.querySelector<HTMLFieldSetElement>('#speaker')!.addEventListener('change', (event) => {
+	const choice = (event.target as HTMLInputElement).value as SpeakerChoice;
+	speakerMarkers.forEach((marker, name) => {
+		marker.hidden = name !== choice;
+	});
+	speaker = speakerMarkers.get(choice) ?? null;
+	slots.forEach((slot) => slot.handle?.listen(speaker));
+});
 
 thinkButton.addEventListener('click', () => {
 	thinking = !thinking;

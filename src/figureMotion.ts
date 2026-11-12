@@ -2,17 +2,26 @@ import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.j
 
 /**
  * The figure's motion as a function of the facts the host reports, the time and a source of chance, with no three and no DOM: it
- * owns the order of the states and the blending between them. The states, strongest first, are thinking and idle; further facts
- * join before idle, and the one that is true and strongest decides the gaze.
+ * owns the order of the states and the blending between them. The states, strongest first, are thinking, listening and idle; the one
+ * that is true and strongest decides the gaze. Whether someone speaks, and where, is read by the caller each frame and given as
+ * numbers.
  *
  * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and
  * to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the easing rates. The picture
- * also raises a hand to the chin, which the figure does not do. Under reduced motion the pose is reached and left at once.
+ * also raises a hand to the chin, which the figure does not do. The listening look is that of its listening state: the gaze toward the
+ * speaker, the head's larger share of its yaw, the slower yaw and the lean; its nod is not taken. Under reduced motion the pose is
+ * reached and left at once.
  */
 
 /** What the host reports about its agent. */
 export interface FigureFacts {
 	readonly thinking: boolean;
+}
+
+/** Where a speaker's centre lies from the canvas's centre, as a share of half the viewport's width to the right and of half its height downward. */
+export interface SpeakerOffset {
+	readonly across: number;
+	readonly down: number;
 }
 
 /** A rotation in radians about the three axes. */
@@ -32,6 +41,8 @@ export interface FigurePose {
 	readonly head: Turn;
 	/** The turn a state adds to the head's, in radians, which `spreadPosture` spreads over the bones the model has; at rest it is zero. */
 	readonly posture: Turn;
+	/** The forward pitch in radians the listening lean adds to the spine and to the chest; the head's share is in `head`. */
+	readonly trunkLean: number;
 	/** The look-at's angles in degrees. */
 	readonly look: { readonly yaw: number; readonly pitch: number };
 	/** The arms' rest posture, the same in every state: the shoulders rise and fall with the breath, the upper arms are lowered. */
@@ -47,21 +58,27 @@ export interface Arms {
 }
 
 export interface FigureMotion {
-	/** The pose `elapsedSeconds` after the last call, given the facts now, while the page asks for reduced motion or not. */
-	advance(facts: FigureFacts, elapsedSeconds: number, reducedMotion: boolean): FigurePose;
+	/** The pose `elapsedSeconds` after the last call, given the facts now and where the speaker is, if anyone speaks, while the page asks for reduced motion or not. */
+	advance(facts: FigureFacts, elapsedSeconds: number, reducedMotion: boolean, speaker: SpeakerOffset | null): FigurePose;
 }
 
 type Gaze = { readonly yaw: number; readonly pitch: number };
 
 /** The gaze while thinking, in degrees: up and to the figure's side. */
 const thinkingGaze: Gaze = { yaw: -18, pitch: 13 };
+/** The gaze at the edge of the half viewport, in degrees: the speaker's offset reaches it at a share of 1 and no further. */
+const speakerGazeReach: Gaze = { yaw: 40, pitch: 18 };
 /** The head's extra turn at the full thinking look, in radians, and the blink's weight then, as a share of its idle weight. */
 const thinkingLook = { posture: { yaw: -0.2, pitch: -0.1, roll: 0.16 }, blinkWeight: 0.8 };
-/** The easing rates per second: the gaze's yaw and pitch, and the thinking look's weight. */
-const easing = { yaw: 7, pitch: 6, thinking: 4 };
-/** The head turns half the gaze's yaw and tilts 0.55 of its pitch; the look-at turns 2.4 times the gaze. */
-const headShare = { yaw: 0.5, pitch: 0.55 };
+/** The lean at its full weight, in radians: the head's pitch, and the spine's and the chest's each. */
+const listeningLean = { head: 0.04, trunk: 0.02 };
+/** The easing rates per second: the gaze's yaw and pitch, the thinking look's weight and the lean's, and the yaw while listening. */
+const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3 };
+/** The head turns half the gaze's yaw, three quarters of it while listening, and tilts 0.55 of its pitch; the look-at turns 2.4 times the gaze. */
+const headShare = { yaw: 0.5, listeningYaw: 0.75, pitch: 0.55 };
+/** The look-at turns 2.4 times the gaze and no further than 90 degrees either way, as the picture clamps it. */
 const lookGain = 2.4;
+const lookReachDegrees = 90;
 
 const radiansPerDegree = Math.PI / 180;
 
@@ -102,30 +119,41 @@ export function spreadPosture(posture: Turn, has: PostureBones): { head: Turn; n
 	};
 }
 
-/** The gaze the facts ask for: the thinking gaze while thinking, else the idle glance. */
-function gazeFor(facts: FigureFacts, idleGlance: Gaze): Gaze {
-	return facts.thinking ? thinkingGaze : idleGlance;
+const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value));
+
+/** The gaze toward a speaker, up being positive: the offset's share of the half viewport, clamped to 1, times the gaze's reach. */
+function gazeToward(speaker: SpeakerOffset): Gaze {
+	return { yaw: clamp(speaker.across, 1) * speakerGazeReach.yaw, pitch: clamp(-speaker.down, 1) * speakerGazeReach.pitch };
+}
+
+/** The gaze the facts ask for: the thinking gaze while thinking, else the one toward the speaker, else the idle glance. */
+function gazeFor(facts: FigureFacts, speaker: SpeakerOffset | null, idleGlance: Gaze): Gaze {
+	if (facts.thinking) return thinkingGaze;
+	return speaker === null ? idleGlance : gazeToward(speaker);
 }
 
 export function createFigureMotion(random: () => number): FigureMotion {
 	const idle = createIdleMotion(random);
 	let gaze: Gaze = { yaw: 0, pitch: 0 };
 	let thinkingWeight = 0;
+	let leanWeight = 0;
 
 	return {
-		advance(facts, elapsedSeconds, reducedMotion) {
+		advance(facts, elapsedSeconds, reducedMotion, speaker) {
 			const step = Math.min(elapsedSeconds, longestStepSeconds);
 			const base = idle.advance(elapsedSeconds, reducedMotion);
 			const ease = (value: number, goal: number, rate: number) => value + (goal - value) * (reducedMotion ? 1 : 1 - Math.exp(-rate * step));
-			const goal = gazeFor(facts, base.glance);
-			gaze = { yaw: ease(gaze.yaw, goal.yaw, easing.yaw), pitch: ease(gaze.pitch, goal.pitch, easing.pitch) };
+			const listening = !facts.thinking && speaker !== null;
+			const goal = gazeFor(facts, speaker, base.glance);
+			gaze = { yaw: ease(gaze.yaw, goal.yaw, listening ? easing.listeningYaw : easing.yaw), pitch: ease(gaze.pitch, goal.pitch, easing.pitch) };
 			thinkingWeight = ease(thinkingWeight, facts.thinking ? 1 : 0, easing.thinking);
+			leanWeight = ease(leanWeight, listening ? 1 : 0, easing.lean);
 			return {
 				blink: facts.thinking ? base.blink * thinkingLook.blinkWeight : base.blink,
 				breath: base.breath,
 				head: {
-					yaw: gaze.yaw * radiansPerDegree * headShare.yaw + base.sway.yaw,
-					pitch: -gaze.pitch * radiansPerDegree * headShare.pitch + base.sway.pitch,
+					yaw: gaze.yaw * radiansPerDegree * (listening ? headShare.listeningYaw : headShare.yaw) + base.sway.yaw,
+					pitch: -gaze.pitch * radiansPerDegree * headShare.pitch + leanWeight * listeningLean.head + base.sway.pitch,
 					roll: base.sway.roll
 				},
 				posture: {
@@ -133,7 +161,8 @@ export function createFigureMotion(random: () => number): FigureMotion {
 					pitch: thinkingWeight * thinkingLook.posture.pitch,
 					roll: thinkingWeight * thinkingLook.posture.roll
 				},
-				look: { yaw: gaze.yaw * lookGain, pitch: gaze.pitch * lookGain },
+				trunkLean: leanWeight * listeningLean.trunk,
+				look: { yaw: clamp(gaze.yaw * lookGain, lookReachDegrees), pitch: clamp(gaze.pitch * lookGain, lookReachDegrees) },
 				arms: restingArms(base.breath)
 			};
 		}
