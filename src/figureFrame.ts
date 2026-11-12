@@ -53,6 +53,16 @@ function turnBone(bone: Object3D | null, turn: Turn): void {
 	bone?.rotation.set(turn.pitch, turn.yaw, turn.roll);
 }
 
+/**
+ * Starts the spring bones from the posture the figure is set to now. A loader records their start in the file's bind pose, so without
+ * this the sleeves and the hair would swing from that pose to the posture over the first frames; `vrm.update` poses the raw bones only
+ * after the springs have moved, so they take the pose first.
+ */
+function startSpringBonesAtPose(vrm: VRM): void {
+	vrm.humanoid.update();
+	vrm.springBoneManager?.reset();
+}
+
 /** A figure's lights and camera, built once, and the frame that draws it. */
 export interface FigureStage {
 	/** Sets the figure to `pose` and draws it, the drawing buffer first following the canvas when its size or the pixel ratio changed. */
@@ -79,6 +89,7 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;
 	let view: PerspectiveCamera;
+	let posed = false;
 	return {
 		draw(pose, elapsedSeconds) {
 			const size = currentSize(canvas);
@@ -100,6 +111,10 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 			vrm.expressionManager!.setValue('blink', pose.blink);
 			vrm.lookAt!.yaw = pose.look.yaw;
 			vrm.lookAt!.pitch = pose.look.pitch;
+			if (!posed) {
+				startSpringBonesAtPose(vrm);
+				posed = true;
+			}
 			vrm.update(elapsedSeconds);
 			renderer.render(scene, view);
 		}

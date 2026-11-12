@@ -8,12 +8,15 @@ export interface Bone {
 	readonly parent: number | undefined;
 	/** Metres from the parent, with +Y up and the figure facing +Z. */
 	readonly translation: Vector3;
+	/** Whether the bone is one of VRM's humanoid bones; a sleeve's is not. */
+	readonly humanoid: boolean;
 }
 
 interface BoneSpec {
 	readonly name: string;
 	readonly parentName: string | undefined;
 	readonly translation: Vector3;
+	readonly humanoid?: boolean;
 }
 
 const SIDES = [
@@ -68,6 +71,18 @@ function limbSpecs(): BoneSpec[] {
 	);
 }
 
+/** Where a sleeve bone sits from its upper arm, and the bone that ends its spring chain from the sleeve bone, for the left side; the right side mirrors X. */
+const SLEEVE_TRANSLATION: Vector3 = [0.08, 0, 0];
+const SLEEVE_TIP_TRANSLATION: Vector3 = [0.1, 0, 0];
+
+/** A sleeve's spring chain: the sleeve bone, which swings, and the tip bone beyond it, which only gives the chain its length. */
+function sleeveSpecs(): BoneSpec[] {
+	return SIDES.flatMap(({ prefix, direction }) => [
+		{ name: prefix + 'Sleeve', parentName: prefix + 'UpperArm', translation: [SLEEVE_TRANSLATION[0] * direction, 0, 0] as Vector3, humanoid: false },
+		{ name: prefix + 'SleeveTip', parentName: prefix + 'Sleeve', translation: [SLEEVE_TIP_TRANSLATION[0] * direction, 0, 0] as Vector3, humanoid: false }
+	]);
+}
+
 function eyeSpecs(): BoneSpec[] {
 	return SIDES.map(({ prefix, direction }) => ({
 		name: prefix + 'Eye',
@@ -76,14 +91,15 @@ function eyeSpecs(): BoneSpec[] {
 	}));
 }
 
-/** The bones from the hips down, each after its parent: the trunk with chest and neck, then both shoulders, both arms, both legs and both eyes. */
+/** The bones from the hips down, each after its parent: the trunk with chest and neck, then both shoulders, both arms, both legs, both eyes and both sleeves with their tips. */
 export function figureSkeleton(): Bone[] {
-	const specs = [...TRUNK, ...shoulderSpecs(), ...limbSpecs(), ...eyeSpecs()];
+	const specs = [...TRUNK, ...shoulderSpecs(), ...limbSpecs(), ...eyeSpecs(), ...sleeveSpecs()];
 	const indexOfName = new Map(specs.map((spec, index) => [spec.name, index]));
-	return specs.map(({ name, parentName, translation }) => ({
+	return specs.map(({ name, parentName, translation, humanoid = true }) => ({
 		name,
 		parent: parentName === undefined ? undefined : indexOfName.get(parentName),
-		translation
+		translation,
+		humanoid
 	}));
 }
 
@@ -107,8 +123,8 @@ export interface MeshData {
 	readonly indices: readonly number[];
 }
 
-/** The figure's materials: the skin's textured one, then the untextured ones of the face, each a colour of its own. */
-export const FIGURE_MATERIALS = ['skin', 'eye', 'nose', 'feature', 'arm'] as const;
+/** The figure's materials: the skin's textured one, then the untextured ones of the face, the arms and the sleeves, each a colour of its own. */
+export const FIGURE_MATERIALS = ['skin', 'eye', 'nose', 'feature', 'arm', 'sleeve'] as const;
 export type FigureMaterial = (typeof FIGURE_MATERIALS)[number];
 
 /** One primitive of a skinned mesh; `morphs` holds, per morph target, the offset of every vertex as flat X, Y, Z values. */

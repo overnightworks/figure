@@ -1,4 +1,5 @@
-// The synthetic figure's arms: a box on each upper arm and each lower arm, skinned to the bone it hangs from, in one colour of its own.
+// The synthetic figure's arms: a box on each upper arm and each lower arm, skinned to the bone it hangs from, in one colour of its own,
+// and a sleeve on each upper arm, a box in a colour of its own skinned to a spring bone that is no humanoid bone.
 import { figureSkeleton, skinnedBox, worldPositions, type SkinnedMesh, type Vector3 } from './figureModel.ts';
 
 /** Half the width and the depth of an arm, in metres. */
@@ -34,6 +35,31 @@ export function armMeshes(jointOf: (bone: string) => number): SkinnedMesh[] {
 				const centre: Vector3 = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
 				const halfSize: Vector3 = [Math.abs(end[0] - start[0]) / 2, ARM_HALF_THICKNESS, ARM_HALF_THICKNESS];
 				return { data: skinnedBox(centre, halfSize, () => jointOf(bone)), material: 'arm', morphs: [] };
+			})
+		}
+	];
+}
+
+/** The settings of a sleeve's spring joint, slack enough to show a stale start for a few frames and stiff enough to settle after, with no gravity, so a sleeve's rest shape is its bone's own. */
+export const SLEEVE_SPRING_JOINT = { hitRadius: 0.02, stiffness: 1, gravityPower: 0, dragForce: 0.4 } as const;
+
+/** Half the size of a sleeve, in metres: it wraps its upper arm and reaches a little past the bone it hangs from, along X. */
+const SLEEVE_HALF_SIZE: Vector3 = [0.06, 0.07, 0.07];
+
+/** The names of the sleeves' bones, one per side, and of the tip bone that ends each one's spring chain. */
+export const SLEEVE_BONES = SIDE_PREFIXES.map((prefix) => prefix + 'Sleeve');
+export const SLEEVE_TIP_BONES = SIDE_PREFIXES.map((prefix) => prefix + 'SleeveTip');
+
+/** The sleeve meshes, skinned by the joint `jointOf` names: one box on each sleeve bone, in the sleeve material. */
+export function sleeveMeshes(jointOf: (bone: string) => number): SkinnedMesh[] {
+	return [
+		{
+			name: 'sleeves',
+			primitives: SLEEVE_BONES.map((bone) => {
+				const start = positionOf(bone);
+				const direction = Math.sign(start[0]);
+				const centre: Vector3 = [start[0] + direction * SLEEVE_HALF_SIZE[0], start[1], start[2]];
+				return { data: skinnedBox(centre, SLEEVE_HALF_SIZE, () => jointOf(bone)), material: 'sleeve', morphs: [] };
 			})
 		}
 	];

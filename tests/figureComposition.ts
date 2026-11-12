@@ -19,7 +19,7 @@ import {
 	type SkinnedPrimitive,
 	type Vector3
 } from './figureModel.ts';
-import { armMeshes } from './figureArms.ts';
+import { SLEEVE_BONES, SLEEVE_SPRING_JOINT, SLEEVE_TIP_BONES, armMeshes, sleeveMeshes } from './figureArms.ts';
 import { faceLookAt, faceMeshes, FACE_MORPH_TARGETS, untexturedColours } from './figureFace.ts';
 
 /** The values a conformant VRM carries; the caller reads them from the profile so the builder restates none. */
@@ -77,7 +77,7 @@ function heavyMesh(triangles: number): MeshData {
 	};
 }
 
-/** The joints of the skin, in the order of its `joints`: the torso is skinned to the first two, the head, the eyes and the arms to the rest. */
+/** The joints of the skin, in the order of its `joints`: the torso is skinned to the first two, the head, the eyes, the arms and the sleeves to the rest. */
 const SKIN_JOINT_NAMES: readonly string[] = [
 	'spine',
 	'chest',
@@ -87,7 +87,8 @@ const SKIN_JOINT_NAMES: readonly string[] = [
 	'leftUpperArm',
 	'leftLowerArm',
 	'rightUpperArm',
-	'rightLowerArm'
+	'rightLowerArm',
+	...SLEEVE_BONES
 ];
 
 function jointIndexOf(bone: string): number {
@@ -105,7 +106,8 @@ function skinnedMeshes(chestHeight: number, heavy?: HeavyFigure): SkinnedMesh[] 
 		{ name: 'torso', primitives: [{ data: torso, material: 'skin', morphs: [] }] },
 		{ name: 'head', primitives: [{ data: head, material: 'skin', morphs: [morphDeltas(head.positions.length / 3, upperFront, BLINK_OFFSET)] }] },
 		...faceMeshes(jointIndexOf),
-		...armMeshes(jointIndexOf)
+		...armMeshes(jointIndexOf),
+		...sleeveMeshes(jointIndexOf)
 	];
 	if (heavy === undefined) return meshes;
 	const lightTriangles = meshes.reduce((sum, mesh) => sum + mesh.primitives.reduce((primitiveSum, { data }) => primitiveSum + data.indices.length / 3, 0), 0);
@@ -182,8 +184,9 @@ function expressionOf(name: string, headNode: number, faceNode: number): Record<
 
 /**
  * The conformant synthetic VRM's JSON and binary chunk: a skeleton with chest, neck and eyes, the skinned torso and head, the face (eyes,
- * nose, mouth with its corners and brows) with the morph targets its presets bind, a blink, and one material per figure material: the skin's
- * with a base colour texture and `images` as the texture sources, the face's untextured, each a colour of its own.
+ * nose, mouth with its corners and brows) with the morph targets its presets bind, a blink, the arms, a sleeve on each upper arm that is a
+ * spring bone, and one material per figure material: the skin's with a base colour texture and `images` as the texture sources, the
+ * others untextured, each a colour of its own.
  * With `heavy`, a further mesh of grid triangles carries the morph targets, and the meshes together hold the triangles it names.
  */
 export function buildConformantVrmParts(
@@ -211,16 +214,20 @@ export function buildConformantVrmParts(
 	return {
 		json: {
 			asset: { version: '2.0' },
-			extensionsUsed: ['VRMC_vrm'],
+			extensionsUsed: ['VRMC_vrm', 'VRMC_springBone'],
 			extensions: {
 				VRMC_vrm: {
 					specVersion: values.vrmSpecVersion,
 					meta: { name: 'synthetic', authors: ['synthetic'], licenseUrl: 'https://example.invalid/licence', ...values.licence },
-					humanoid: { humanBones: Object.fromEntries(skeleton.map(({ name }, node) => [name, { node }])) },
+					humanoid: { humanBones: Object.fromEntries(skeleton.flatMap(({ name, humanoid }, node) => (humanoid ? [[name, { node }]] : []))) },
 					expressions: {
 						preset: Object.fromEntries(values.presets.map((name) => [name, expressionOf(name, meshNode('head'), meshNode('face'))]))
 					},
 					lookAt: faceLookAt
+				},
+				VRMC_springBone: {
+					specVersion: '1.0',
+					springs: SLEEVE_BONES.map((name, side) => ({ name, joints: [{ node: boneIndex(name), ...SLEEVE_SPRING_JOINT }, { node: boneIndex(SLEEVE_TIP_BONES[side]!) }] }))
 				}
 			},
 			scene: 0,
