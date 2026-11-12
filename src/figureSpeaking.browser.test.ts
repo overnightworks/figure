@@ -7,9 +7,10 @@ import { mouthShape, type MouthShape } from './expressions.js';
 import type { FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 
-/** The rows by which an open vowel's mouth has to exceed the closed one, and by which the flat vowel's has to fall short of it, at a canvas 200 wide. */
-const openedRows = 6;
+/** The rows by which an open vowel's mouth has to exceed the closed one, and by which the flat vowel's has to fall short of it, at a canvas 200 wide; the sway of the head moves a closed mouth by a row. */
+const openedRows = 4;
 const flattenedRows = 3;
+const swayRows = 1;
 /** The page's own frame request, which the tests wait on without the watch counting it. */
 const requestFrameOwn = window.requestAnimationFrame;
 /** How far a speaker at the far side of the page turns the nose, in pixels at a canvas 200 wide, and how far the thinking look turns it the other way. */
@@ -83,9 +84,9 @@ describe('a figure whose agent speaks', () => {
 		await vi.waitFor(async () => expect(test(await mouthNow(canvas))).toBe(true), { timeout: 15000 });
 	}
 
-	/** Reads `stillPictures` pictures and expects the mouth to cover `rows` in each. */
+	/** Reads `stillPictures` pictures and expects the mouth to cover `rows` in each, give or take the sway of the head. */
 	async function expectMouthStays(canvas: HTMLCanvasElement, rows: number): Promise<void> {
-		for (let picture = 0; picture < stillPictures; picture++) expect(await mouthNow(canvas)).toBe(rows);
+		for (let picture = 0; picture < stillPictures; picture++) expect(Math.abs((await mouthNow(canvas)) - rows)).toBeLessThanOrEqual(swayRows);
 	}
 
 	/** Puts a small element of the page at `x` and `y` CSS pixels from the viewport's top left. */
@@ -126,7 +127,7 @@ describe('a figure whose agent speaks', () => {
 			await waitForMouth(canvas, (rows) => rows >= resting + openedRows);
 			handle.speak(null);
 
-			await waitForMouth(canvas, (rows) => rows <= resting + 1);
+			await waitForMouth(canvas, (rows) => rows <= resting + swayRows);
 		});
 
 		it('gives two mouth shapes for two vowels', async () => {
@@ -298,7 +299,7 @@ describe('a figure whose agent speaks', () => {
 			await emulateReducedMotion();
 			const { canvas, handle, context } = await figureWithContext();
 			const resting = await mouthNow(canvas);
-			const realCreate = context.createAnalyser.bind(context);
+			const realCreate = AudioContext.prototype.createAnalyser.bind(context);
 			const unreadable: AnalyserNode[] = [];
 			vi.spyOn(context, 'createAnalyser').mockImplementation(() => {
 				const analyser = realCreate();
@@ -329,7 +330,7 @@ describe('a figure whose agent speaks', () => {
 			voice.disconnect();
 
 			expect(() => handle.speak(null)).not.toThrow();
-			await waitForMouth(canvas, (rows) => rows <= resting + 1);
+			await waitForMouth(canvas, (rows) => rows <= resting + swayRows);
 		});
 
 		it('throws nothing and creates no node when the context closes while speaking, then on speak(null), speak again and dispose', async () => {

@@ -31,12 +31,12 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 	const handles: FigureHandle[] = [];
 	const shown = new Map<HTMLCanvasElement, { width: number; height: number; pixels: Uint8Array }>();
 	let frames = 0;
-	let frameTime = performance.now();
-	vi.spyOn(Math, 'random').mockReturnValue(0.5);
+	let slowTime: number | undefined;
+	vi.spyOn(Math, 'random').mockImplementation(seededRandom(7));
 	window.requestAnimationFrame = (callback) =>
 		requestFrameOwn.call(window, (time) => {
-			frameTime += slowFrameMilliseconds;
-			callback(slowFrames ? frameTime : time);
+			slowTime = (slowTime ?? time) + slowFrameMilliseconds;
+			callback(slowFrames ? slowTime : time);
 			frames++;
 			canvases.forEach(readIfDrawn);
 		});
@@ -72,5 +72,16 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 			handles.splice(0).forEach((handle) => handle.dispose());
 			canvases.splice(0).forEach((canvas) => canvas.remove());
 		}
+	};
+}
+
+/** A small seeded source of numbers in [0, 1) (mulberry32): a run draws the same idle glances and blinks every time, and three still gets distinct identifiers. */
+function seededRandom(seed: number): () => number {
+	let state = seed;
+	return () => {
+		state = (state + 0x6d2b79f5) | 0;
+		let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
+		mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+		return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
 	};
 }
