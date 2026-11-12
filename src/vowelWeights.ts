@@ -190,7 +190,7 @@ function weightsOfFormants(firstHz: number, secondHz: number, level: number): Vo
 export function vowelWeights(samples: Float32Array, sampleRate: number): VowelWeights {
 	const decimation = Math.floor(sampleRate / analysisRateHz);
 	const start = samples.length - frameLength * decimation;
-	if (!(decimation >= 1 && start >= 0)) return silence;
+	if (!Number.isFinite(decimation) || decimation < 1 || start < 0) return silence;
 	const level = loudness(samples, start);
 	if (level === 0) return silence;
 	fillFrame(samples, start, decimation);
