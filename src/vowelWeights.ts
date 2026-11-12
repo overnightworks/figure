@@ -195,7 +195,7 @@ export function vowelWeights(samples: Float32Array, sampleRate: number): VowelWe
 	if (level === 0) return silence;
 	fillFrame(samples, start, decimation);
 	fillCorrelation();
-	if (!(correlation[0] > 0)) return silence;
+	if (correlation[0] <= 0) return silence;
 	fillPredictor();
 	fillRoots();
 	fillLowestFormants(sampleRate / decimation);
