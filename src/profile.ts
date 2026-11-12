@@ -1,3 +1,5 @@
+import { figureMood, mouthShape } from './expressions.js';
+
 /** The values the rules read; the rules of later slices add theirs here. */
 export const figureProfile = {
 	allowedExtensions: [
@@ -12,7 +14,7 @@ export const figureProfile = {
 	],
 	fileBudgetBytes: 12 * 1024 * 1024,
 	vrmSpecVersion: '1.0',
-	presets: ['aa', 'ih', 'ou', 'ee', 'oh', 'blink', 'happy', 'angry', 'sad', 'relaxed', 'surprised'],
+	presets: [...Object.values(mouthShape), 'blink', ...Object.values(figureMood)],
 	/** The bones VRM 1.0 requires in `humanoid.humanBones`; each entry names a node. */
 	requiredHumanBones: [
 		'hips',
