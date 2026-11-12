@@ -545,13 +545,7 @@ describe('the figure motion while the agent speaks a mood', () => {
 	/** The weight a mood reaches, read from the pose that reduced motion gives at once: the peak the easing goes toward. */
 	const peakOf = (mood: FigureMood): number => watch(1, () => speakingMood(mood), true)[0]!.mood[mood];
 	/** What a pose adds to the posture over the same frame of a figure speaking with no mood: the head's pitch and roll, the chest's trunk and the left shoulder's roll. */
-	const leanOf = (pose: FigurePose, plain: FigurePose) => ({
-		pitch: pose.posture.pitch - plain.posture.pitch,
-		roll: pose.posture.roll - plain.posture.roll,
-		spine: pose.moodTrunk.spine,
-		chest: pose.moodTrunk.chest,
-		shoulder: pose.arms.leftShoulder.roll - plain.arms.leftShoulder.roll
-	});
+	const leanOf = (pose: FigurePose, plain: FigurePose) => ({ pitch: pose.posture.pitch - plain.posture.pitch, roll: pose.posture.roll - plain.posture.roll, spine: pose.moodTrunk.spine, chest: pose.moodTrunk.chest, shoulder: pose.arms.leftShoulder.roll - plain.arms.leftShoulder.roll });
 	/** What a mood at its peak leans the posture by, as reduced motion reaches it at once. */
 	const fullLean = (mood: FigureMood) => leanOf(watch(1, () => speakingMood(mood), true)[0]!, watch(1, () => speaking, true)[0]!);
 	const noMood: Record<FigureMood, number> = { happy: 0, angry: 0, sad: 0, relaxed: 0, surprised: 0 };
@@ -565,7 +559,6 @@ describe('the figure motion while the agent speaks a mood', () => {
 
 		expect(peak).toBeGreaterThan(0.5);
 		expect(peak).toBeLessThanOrEqual(1);
-
 		[0.01, 0.05, 0.2].forEach((seconds) => {
 			expect(poses[atSecond(seconds)]!.mood[mood]).toBeCloseTo(peak * (1 - Math.exp(-9 * seconds)), 9);
 		});
@@ -582,20 +575,12 @@ describe('the figure motion while the agent speaks a mood', () => {
 		});
 	});
 
-	it('shows no mood while the agent does not speak, though a mood is given', () => {
-		const poses = watch(300, () => ({ ...idle, mood: 'happy' }));
-
-		poses.forEach((pose) => expect(pose.mood).toEqual(noMood));
+	it('shows no mood while the agent does not speak, though a mood is given, and none for a sentence without one', () => {
+		[watch(300, () => ({ ...idle, mood: 'happy' })), watch(300, () => speaking)].forEach((poses) => poses.forEach((pose) => expect(pose.mood).toEqual(noMood)));
 	});
 
 	it('shows a mood while it thinks, since speaking wins', () => {
-		const poses = watch(300, () => ({ ...thinkingAndSpeaking, mood: 'sad' }));
-
-		expect(poses[299]!.mood.sad).toBeCloseTo(peakOf('sad'), 9);
-	});
-
-	it('shows no mood for a sentence without one', () => {
-		watch(300, () => speaking).forEach((pose) => expect(pose.mood).toEqual(noMood));
+		expect(watch(300, () => ({ ...thinkingAndSpeaking, mood: 'sad' }))[299]!.mood.sad).toBeCloseTo(peakOf('sad'), 9);
 	});
 
 	it('cross-fades to another mood: the first falls at 4 a second while the second rises at 9', () => {
@@ -643,8 +628,7 @@ describe('the figure motion while the agent speaks a mood', () => {
 	});
 
 	it.each(moods)('leans the posture at once under reduced motion by the whole lean of %s: the trunk forward with the chest taking the larger part, the shoulders mirrored, no turn', (mood) => {
-		const [pose] = watch(1, () => speakingMood(mood), true);
-		const [plain] = watch(1, () => speaking, true);
+		const [[pose], [plain]] = [watch(1, () => speakingMood(mood), true), watch(1, () => speaking, true)];
 		const lean = leanOf(pose!, plain!);
 
 		expect(pose!.mood[mood]).toBe(peakOf(mood));
@@ -655,37 +639,27 @@ describe('the figure motion while the agent speaks a mood', () => {
 	});
 
 	it('leans the posture differently for each mood', () => {
-		moods.forEach((mood, index) => {
-			const lean = Object.values(fullLean(mood));
+		const leans = moods.map((mood) => Object.values(fullLean(mood)));
 
-			expect(Math.max(...lean.map(Math.abs))).toBeGreaterThan(0.01);
-			moods.slice(index + 1).forEach((other) => {
-				const otherLean = Object.values(fullLean(other));
-				expect(Math.max(...lean.map((part, at) => Math.abs(part - otherLean[at]!)))).toBeGreaterThan(0.01);
-			});
-		});
+		leans.forEach((lean, index) => leans.slice(index + 1).forEach((other) => expect(Math.max(...lean.map((part, at) => Math.abs(part - other[at]!)))).toBeGreaterThan(0.01)));
 	});
 
 	it.each(moods)('leans the posture by the share of the weight of %s over its peak while it rises', (mood) => {
-		const plain = watch(10, () => speaking);
 		const pose = watch(10, () => speakingMood(mood))[9]!;
 		const share = pose.mood[mood] / peakOf(mood);
-		const full = fullLean(mood);
-		const lean = leanOf(pose, plain[9]!);
+		const [full, lean] = [fullLean(mood), leanOf(pose, watch(10, () => speaking)[9]!)];
 
 		expect(share).toBeCloseTo(1 - Math.exp(-9 * 0.1), 9);
 		(Object.keys(full) as (keyof typeof full)[]).forEach((part) => expect(lean[part]).toBeCloseTo(full[part] * share, 9));
 	});
 
 	it('adds the lean of two moods by their shares while one replaces the other', () => {
-		const plain = watch(210, () => speaking)[209]!;
-		const pose = watch(210, (frame) => speakingMood(frame < 200 ? 'happy' : 'angry'))[209]!;
+		const [plain, pose] = [watch(210, () => speaking)[209]!, watch(210, (frame) => speakingMood(frame < 200 ? 'happy' : 'angry'))[209]!];
 		const [happyShare, angryShare] = [pose.mood.happy / peakOf('happy'), pose.mood.angry / peakOf('angry')];
 		const [happy, angry] = [fullLean('happy'), fullLean('angry')];
 		const lean = leanOf(pose, plain);
 
-		expect(happyShare).toBeGreaterThan(0.1);
-		expect(angryShare).toBeGreaterThan(0.1);
+		expect(Math.min(happyShare, angryShare)).toBeGreaterThan(0.1);
 		(Object.keys(lean) as (keyof typeof lean)[]).forEach((part) => expect(lean[part]).toBeCloseTo(happy[part] * happyShare + angry[part] * angryShare, 9));
 	});
 
