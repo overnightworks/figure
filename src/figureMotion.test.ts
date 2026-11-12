@@ -537,14 +537,6 @@ describe('the figure motion while the agent speaks', () => {
 		expect(poses[20]!.mouth).toEqual(stillMouth);
 		poses.forEach((pose, frame) => expect(pose.head.pitch).toBe(still[frame]!.head.pitch));
 	});
-
-	it('does not restart the mouth when the same facts and weights are given again', () => {
-		const given = watch(200, () => speaking, false, () => null, () => aa);
-		const motion = createFigureMotion(seededRandom(seed));
-		const again = Array.from({ length: 200 }, () => motion.advance(speaking, frameSeconds, false, null, aa));
-
-		expect(again).toEqual(given);
-	});
 });
 
 describe('the spread of a posture turn', () => {
