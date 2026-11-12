@@ -47,22 +47,25 @@ interface Loop {
 	readonly listen: (speaker: Element | null) => void;
 }
 
+/** The browser's own rectangle read: it throws for anything that is not an element, whatever properties that value supplies, of any realm. */
+const elementRectangle = Element.prototype.getBoundingClientRect;
+
 /**
  * Where the speaker's centre lies from the canvas's centre, in shares of half the viewport's width and height, or null when nobody counts
- * as speaking: no element, one that is not connected, or one of another document than the canvas's, whose rectangle is not in the canvas's
- * viewport. The viewport is the canvas's document's, at least a pixel wide and high. Whatever `listen` was given is judged here, each
- * frame, by what it answers, not by the realm it was made in; a value whose reads throw counts as nobody, so a frame never fails for it.
+ * as speaking: no element, one that is not connected, one of another document than the canvas's, or one whose rectangle gives no finite
+ * share. The viewport is the canvas's document's, at least a pixel wide and high. Whatever `listen` was given is judged here, each frame,
+ * by what it answers, not by the realm it was made in; a value whose reads throw counts as nobody, so a frame never fails for it.
  */
 function speakerOffset(canvas: HTMLCanvasElement, speaker: Element | null): SpeakerOffset | null {
 	try {
-		if (speaker === null || speaker.nodeType !== Node.ELEMENT_NODE || !speaker.isConnected || speaker.ownerDocument !== canvas.ownerDocument) return null;
+		if (speaker === null) return null;
+		const to = elementRectangle.call(speaker);
+		if (!speaker.isConnected || speaker.ownerDocument !== canvas.ownerDocument) return null;
 		const viewport = canvas.ownerDocument.documentElement;
 		const from = canvas.getBoundingClientRect();
-		const to = speaker.getBoundingClientRect();
-		return {
-			across: (to.left + to.width / 2 - (from.left + from.width / 2)) / (Math.max(1, viewport.clientWidth) / 2),
-			down: (to.top + to.height / 2 - (from.top + from.height / 2)) / (Math.max(1, viewport.clientHeight) / 2)
-		};
+		const across = (to.left + to.width / 2 - (from.left + from.width / 2)) / (Math.max(1, viewport.clientWidth) / 2);
+		const down = (to.top + to.height / 2 - (from.top + from.height / 2)) / (Math.max(1, viewport.clientHeight) / 2);
+		return Number.isFinite(across) && Number.isFinite(down) ? { across, down } : null;
 	} catch {
 		return null;
 	}

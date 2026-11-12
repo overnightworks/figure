@@ -371,7 +371,9 @@ describe('a figure driven by the host', () => {
 		['the document', document],
 		['a proxy that throws when judged', new Proxy({}, { getPrototypeOf: () => { throw new Error('refused'); } })],
 		['a proxy of an element, whose reads are refused', new Proxy(document.createElement('div'), {})],
-		['an object that only inherits from Element', Object.create(Element.prototype)]
+		['an object that only inherits from Element', Object.create(Element.prototype)],
+		['a plain object that reports being a connected element of the document', { nodeType: 1, isConnected: true, ownerDocument: document, getBoundingClientRect: () => ({ left: -5000, top: 100, width: 20, height: 20 }) }],
+		['a plain object that reports an empty rectangle', { nodeType: 1, isConnected: true, ownerDocument: document, getBoundingClientRect: () => ({}) }]
 	])('throws nothing for %s, counts it as nobody and goes on drawing', async (_, speaker) => {
 		await emulateReducedMotion();
 		const { canvas, handle } = await mountFigure();
