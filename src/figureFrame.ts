@@ -99,11 +99,11 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 				view = headAndShouldersCamera(eyes, size.width / size.height);
 				drawn = size;
 			}
-			spine.rotation.x = pose.breath;
+			spine.rotation.x = pose.breath + pose.trunkLean;
 			const spread = spreadPosture(pose.posture, bones);
 			head.rotation.set(pose.head.pitch + spread.head.pitch, pose.head.yaw + spread.head.yaw, pose.head.roll + spread.head.roll);
 			neck?.rotation.set(spread.neck.pitch, spread.neck.yaw, spread.neck.roll);
-			chest?.rotation.set(spread.chest.pitch, spread.chest.yaw, spread.chest.roll);
+			chest?.rotation.set(spread.chest.pitch + pose.trunkLean, spread.chest.yaw, spread.chest.roll);
 			turnBone(leftShoulder, pose.arms.leftShoulder);
 			turnBone(rightShoulder, pose.arms.rightShoulder);
 			turnBone(leftUpperArm, pose.arms.leftUpperArm);

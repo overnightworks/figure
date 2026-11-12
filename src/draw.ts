@@ -3,7 +3,7 @@ import { VRMUtils, type VRM } from '@pixiv/three-vrm';
 import { checkFigure } from './check.js';
 import { createFigureStage, type FigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
-import { createFigureMotion, type FigureFacts } from './figureMotion.js';
+import { createFigureMotion, type FigureFacts, type SpeakerOffset } from './figureMotion.js';
 import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 
@@ -21,6 +21,8 @@ export interface FigureHandle {
 	dispose(): void;
 	/** Whether the agent's model is working. The host reports the fact and the figure decides its motion; the same value again changes nothing, and a figure that ended or was disposed ignores it. */
 	think(working: boolean): void;
+	/** Someone speaks at `speaker`, an element of the page; null: nobody does. The figure turns toward the element's centre and follows it as it moves, while it does not think. Each call replaces the last value and the same element again changes nothing. Anything that is not an element counts as nobody, and so does an element that is not connected or that belongs to another document, until it returns. The figure reads the element's bounding rectangle each frame and holds it no longer than until `listen(null)`, another element, `dispose` or the figure's end; a figure that ended or was disposed ignores the call. */
+	listen(speaker: Element | null): void;
 }
 
 /** What the mount's work gave: the signal, what to free when the app is done with it, and how the facts the host reports reach the figure. */
@@ -28,19 +30,46 @@ interface Outcome {
 	readonly signal: FigureSignal;
 	readonly release: () => void;
 	readonly think: (working: boolean) => void;
+	readonly listen: (speaker: Element | null) => void;
 }
 
 /** The facts of a figure that is not drawn: nothing reads them. */
 const ignoreFacts = () => {};
 
 function ended(signal: FigureSignal): Outcome {
-	return { signal, release: () => {}, think: ignoreFacts };
+	return { signal, release: () => {}, think: ignoreFacts, listen: ignoreFacts };
 }
 
 /** A loop's stop, and the way to give it the facts it draws from. */
 interface Loop {
 	readonly stop: () => void;
 	readonly think: (working: boolean) => void;
+	readonly listen: (speaker: Element | null) => void;
+}
+
+/** What `listen` was given as the element it counts, or null: a value that is no element, or that cannot be judged, counts as nobody. */
+function asSpeaker(value: unknown): Element | null {
+	try {
+		return value instanceof Element ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Where the speaker's centre lies from the canvas's centre, in shares of half the viewport's width and height, or null when nobody counts
+ * as speaking: no element, one that is not connected, or one of another document than the canvas's, whose rectangle is not in the canvas's
+ * viewport. The viewport is the canvas's document's, at least a pixel wide and high.
+ */
+function speakerOffset(canvas: HTMLCanvasElement, speaker: Element | null): SpeakerOffset | null {
+	if (speaker === null || !speaker.isConnected || speaker.ownerDocument !== canvas.ownerDocument) return null;
+	const viewport = canvas.ownerDocument.documentElement;
+	const from = canvas.getBoundingClientRect();
+	const to = speaker.getBoundingClientRect();
+	return {
+		across: (to.left + to.width / 2 - (from.left + from.width / 2)) / (Math.max(1, viewport.clientWidth) / 2),
+		down: (to.top + to.height / 2 - (from.top + from.height / 2)) / (Math.max(1, viewport.clientHeight) / 2)
+	};
 }
 
 /** The renderer on the canvas's WebGL 2 context, or the signal for why there is none; a canvas that cannot give a context throws. */
@@ -70,6 +99,7 @@ type LoopEnding = typeof figureSignal.lost | typeof figureSignal.slow;
 function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: LoopEnding) => void): Loop {
 	const motion = createFigureMotion(Math.random);
 	let facts: FigureFacts = { thinking: false };
+	let speaker: Element | null = null;
 	const reducedMotion = matchMedia(reducedMotionQuery);
 	let previousTime = performance.now();
 	/** The last frame intervals the guard judges, in milliseconds; a pause starts them anew. */
@@ -77,7 +107,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const drawAt = (time: number) => {
 		const elapsedSeconds = (time - previousTime) / 1000;
 		previousTime = time;
-		stage.draw(motion.advance(facts, elapsedSeconds, reducedMotion.matches), elapsedSeconds);
+		stage.draw(motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker)), elapsedSeconds);
 	};
 	let pendingFrame: number | undefined;
 	let stopped = false;
@@ -113,6 +143,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const onContextLost = () => end(figureSignal.lost);
 	const stop = () => {
 		stopped = true;
+		speaker = null;
 		syncWithPage();
 		document.removeEventListener('visibilitychange', syncWithPage);
 		viewport.disconnect();
@@ -125,7 +156,10 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const think = (working: boolean) => {
 		facts = { thinking: working === true };
 	};
-	return { stop, think };
+	const listen = (element: Element | null) => {
+		if (!stopped) speaker = asSpeaker(element);
+	};
+	return { stop, think, listen };
 }
 
 async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal: FigureSignal) => void): Promise<Outcome> {
@@ -145,9 +179,9 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 		vrm = await loadFigure(bytes);
 		const figure = vrm;
 		// A loss during the load fired its event before the loop listens for it, so the state is read here.
-		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release, think: ignoreFacts };
+		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release, think: ignoreFacts, listen: ignoreFacts };
 		loop = runLoop(createFigureStage(renderer, canvas, figure), canvas, give);
-		return { signal: figureSignal.drawn, release, think: loop.think };
+		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen };
 	} catch {
 		release();
 		return ended(figureSignal.refused);
@@ -157,7 +191,7 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 /**
  * Draws the VRM in `bytes` into `canvas`, whose CSS size the host owns, and keeps it alive: the figure breathes, sways, blinks and
  * glances, or only blinks while the page asks for reduced motion, shows that its agent thinks while the host reports it through
- * `think`, and is drawn each animation frame at the canvas's size and the device pixel ratio, until `dispose`. While the page is hidden or the canvas is out of the viewport it is not drawn, and it goes on
+ * `think`, turns toward whoever speaks while the host names the speaker's element through `listen`, and is drawn each animation frame at the canvas's size and the device pixel ratio, until `dispose`. While the page is hidden or the canvas is out of the viewport it is not drawn, and it goes on
  * without a jump when both are back. A context lost while the figure loads or lives gives `lost`, and a figure its frame-time guard finds too
  * slow to keep gives `slow`; either ends it for good, with no restore: a remount needs a fresh canvas.
  * It resolves to a handle holding the first signal, which `onSignal` has had by then. It never rejects: an error `onSignal` throws is reported to the window's error handlers.
@@ -172,7 +206,7 @@ export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, option
 			reportError(error);
 		}
 	};
-	const { signal, release, think } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
+	const { signal, release, think, listen } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
 	give(signal);
 	let disposed = false;
 	return {
@@ -184,6 +218,7 @@ export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, option
 			disposed = true;
 			release();
 		},
-		think
+		think,
+		listen
 	};
 }
