@@ -6,6 +6,7 @@ import { syntheticVoice, type SyntheticVoice } from '../tests/syntheticVoice.js'
 import { mouthShape, type MouthShape } from './expressions.js';
 import type { FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
+import { analysisWindowLength } from './vowelWeights.js';
 
 /** The rows by which an open vowel's mouth has to exceed the closed one, and by which the flat vowel's has to fall short of it, at a canvas 200 wide; the sway of the head moves a closed mouth by a row. */
 const openedRows = 4;
@@ -154,6 +155,16 @@ describe('a figure whose agent speaks', () => {
 	});
 
 	describe('the tap', () => {
+		it('gives its analyser the smallest block that covers the window the analysis reads', async () => {
+			const { handle, context, analysers } = await figureWithContext();
+
+			handle.speak({ voice: voiceOn(context, mouthShape.aa) });
+
+			const block = analysers()[0]!.fftSize;
+			expect(block).toBeGreaterThanOrEqual(analysisWindowLength(context.sampleRate));
+			expect(block / 2).toBeLessThan(analysisWindowLength(context.sampleRate));
+		});
+
 		it('connects its own analyser to a voice once, keeps it for the same voice and disconnects exactly it once on speak(null)', async () => {
 			const { handle, context, analysers } = await figureWithContext();
 			const voice = voiceOn(context, mouthShape.aa);
