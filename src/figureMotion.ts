@@ -1,4 +1,4 @@
-import { mouthShape } from './expressions.js';
+import { figureMood, mouthShape, type FigureMood } from './expressions.js';
 import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.js';
 import type { VowelWeights } from './vowelWeights.js';
 
@@ -14,14 +14,21 @@ import type { VowelWeights } from './vowelWeights.js';
  * speaker, the head's larger share of its yaw, the slower yaw and the lean, and a nod every 2.5 to 5 seconds, which the picture times
  * and which `spreadPosture` shares between neck and head. Under reduced motion the pose is reached and left at once, and no nod comes.
  * The speaking look is that of its speaking state: the five mouth weights easing at 38 a second up and 22 down, and the head nodding
- * with the voice by the weights' eased level.
+ * with the voice by the weights' eased level. A mood the sentence names shows while the agent speaks: its weight eases toward its peak at 9
+ * a second and away at 4, the mouth's weights shrink to 0.72 of themselves while any mood is shown, and each mood leans the head, the
+ * trunk and the shoulders by its share of the picture's offsets.
  */
 
 /** What the host reports about its agent. */
 export interface FigureFacts {
 	readonly thinking: boolean;
 	readonly speaking: boolean;
+	/** The mood of the sentence the agent speaks: it shows only while the agent speaks, and a value that is no key of `figureMood` shows nothing. */
+	readonly mood?: FigureMood;
 }
+
+/** The weight of each of the five mood expressions, 0 to the mood's peak. */
+export type MoodWeights = Readonly<Record<FigureMood, number>>;
 
 /** Where a speaker's centre lies from the canvas's centre, as a share of half the viewport's width to the right and of half its height downward. */
 export interface SpeakerOffset {
@@ -48,11 +55,15 @@ export interface FigurePose {
 	readonly posture: Turn;
 	/** The forward pitch in radians the listening lean adds to the spine and to the chest; the head's share is in `head`. */
 	readonly trunkLean: number;
+	/** The weights of the five mood expressions: each eased toward its peak while the sentence has that mood and the agent speaks, toward zero otherwise. */
+	readonly mood: MoodWeights;
+	/** The forward pitch in radians the moods add to the spine and to the chest, by their shares. */
+	readonly moodTrunk: { readonly spine: number; readonly chest: number };
 	/** The weights of the five mouth shapes, each 0 to 1: the eased share of what the voice asks for. */
 	readonly mouth: VowelWeights;
 	/** The look-at's angles in degrees. */
 	readonly look: { readonly yaw: number; readonly pitch: number };
-	/** The arms' rest posture, the same in every state: the shoulders rise and fall with the breath, the upper arms are lowered. */
+	/** The arms' rest posture: the shoulders rise and fall with the breath and take the moods' lean, the upper arms are lowered. */
 	readonly arms: Arms;
 }
 
@@ -80,10 +91,25 @@ const thinkingLook = { posture: { yaw: -0.2, pitch: -0.1, roll: 0.16 }, blinkWei
 /** The lean at its full weight, in radians: the head's pitch, and the spine's and the chest's each. */
 const listeningLean = { head: 0.04, trunk: 0.02 };
 /** The easing rates per second: the gaze's yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, and the voice's level. */
-const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3, mouthRise: 38, mouthFall: 22, voiceLevel: 12 };
+const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3, mouthRise: 38, mouthFall: 22, voiceLevel: 12, moodRise: 9, moodFall: 4 };
 /** The head's nod with the voice: its forward pitch at a full level in radians, and its angular frequency in radians a second. */
 const voiceNod = { peakRadians: 0.045, radiansPerSecond: 5.1 };
 const mouthShapes = Object.values(mouthShape);
+const moods = Object.values(figureMood);
+/** The weight each mood eases toward while the sentence has it, and the factor the mouth's weights take while any mood's weight is above `shownAbove`. */
+const moodPeak: Readonly<Record<FigureMood, number>> = { happy: 0.9, angry: 0.85, sad: 0.9, relaxed: 0.9, surprised: 0.95 };
+const mouthUnderMood = { factor: 0.72, shownAbove: 0.05 };
+/** What a mood at its peak adds, in radians: to the head's pitch and roll, to the chest's pitch (0.4 on the spine, 0.6 on the chest) and, half of it and mirrored, to the shoulders' roll. */
+const moodLean: Readonly<Record<FigureMood, { head: number; roll: number; chest: number; shoulder: number }>> = {
+	happy: { head: -0.05, roll: 0.04, chest: -0.02, shoulder: 0.03 },
+	angry: { head: 0.1, roll: 0, chest: 0.05, shoulder: 0.05 },
+	sad: { head: 0.17, roll: 0.07, chest: 0.05, shoulder: -0.07 },
+	relaxed: { head: 0, roll: -0.07, chest: 0, shoulder: -0.04 },
+	surprised: { head: -0.1, roll: 0, chest: -0.07, shoulder: 0.07 }
+};
+const trunkShare = { spine: 0.4, chest: 0.6 };
+const shoulderShare = 0.5;
+const noMood: MoodWeights = { happy: 0, angry: 0, sad: 0, relaxed: 0, surprised: 0 };
 const stillMouth: VowelWeights = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
 /** The head turns half the gaze's yaw, three quarters of it while listening, and tilts 0.55 of its pitch; the look-at turns 2.4 times the gaze. */
 const headShare = { yaw: 0.5, listeningYaw: 0.75, pitch: 0.55 };
@@ -101,12 +127,13 @@ const radiansPerDegree = Math.PI / 180;
  */
 const restingArm = { upperArmRoll: 1.38, shoulderRise: 0.012, upperArmSwing: 0.01 };
 
-/** The arms at rest for a breath of `breath` radians: the breath as a share of its largest lean sets the shoulders' and the swing's share. */
-function restingArms(breath: number): Arms {
+/** The arms at rest for a breath of `breath` radians: the breath as a share of its largest lean sets the shoulders' and the swing's share, and `moodShoulder` radians more lift the left shoulder and lower the right one. */
+function restingArms(breath: number, moodShoulder: number): Arms {
 	const share = breath / breathLean;
+	const lift = restingArm.shoulderRise * share + moodShoulder;
 	return {
-		leftShoulder: { yaw: 0, pitch: 0, roll: restingArm.shoulderRise * share },
-		rightShoulder: { yaw: 0, pitch: 0, roll: -restingArm.shoulderRise * share },
+		leftShoulder: { yaw: 0, pitch: 0, roll: lift },
+		rightShoulder: { yaw: 0, pitch: 0, roll: -lift },
 		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * share, roll: -restingArm.upperArmRoll },
 		rightUpperArm: { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll }
 	};
@@ -182,6 +209,11 @@ function easeToward(value: number, goal: number, rate: number, step: number, red
 	return value + (goal - value) * (reducedMotion ? 1 : 1 - Math.exp(-rate * step));
 }
 
+/** The mouth's weights, each multiplied by `factor`. */
+function scaled(weights: VowelWeights, factor: number): VowelWeights {
+	return { aa: weights.aa * factor, ih: weights.ih * factor, ou: weights.ou * factor, ee: weights.ee * factor, oh: weights.oh * factor };
+}
+
 /** What the voice does to the figure in one frame: the eased mouth weights and the head's pitch the voice adds. */
 interface MouthMotion {
 	advance(step: number, goal: VowelWeights | null, reducedMotion: boolean): { readonly weights: VowelWeights; readonly headPitch: number };
@@ -214,10 +246,38 @@ function createMouth(): MouthMotion {
 	};
 }
 
+/** The mood weights of one frame, and what they add to the posture in radians. */
+interface MoodMotion {
+	advance(step: number, goal: FigureMood | undefined, reducedMotion: boolean): { readonly weights: MoodWeights; readonly head: number; readonly roll: number; readonly chest: number; readonly shoulder: number };
+}
+
+/**
+ * The moods as the picture eases them: each weight toward its peak at 9 a second while the sentence has that mood and toward zero at 4
+ * otherwise, and the posture each adds by its weight's share of its peak. A goal that is no key of `figureMood` matches none.
+ */
+function createMood(): MoodMotion {
+	let weights = noMood;
+	return {
+		advance(step, goal, reducedMotion) {
+			const eased = { ...weights };
+			const lean = { head: 0, roll: 0, chest: 0, shoulder: 0 };
+			for (const mood of moods) {
+				const shown = goal === mood;
+				eased[mood] = easeToward(weights[mood], shown ? moodPeak[mood] : 0, shown ? easing.moodRise : easing.moodFall, step, reducedMotion);
+				const share = eased[mood] / moodPeak[mood];
+				for (const part of Object.keys(lean) as (keyof typeof lean)[]) lean[part] += moodLean[mood][part] * share;
+			}
+			weights = eased;
+			return { weights, ...lean };
+		}
+	};
+}
+
 export function createFigureMotion(random: () => number): FigureMotion {
 	const idle = createIdleMotion(random);
 	const nodding = createNod(random);
 	const mouthMotion = createMouth();
+	const moodMotion = createMood();
 	let gaze: Gaze = { yaw: 0, pitch: 0 };
 	let thinkingWeight = 0;
 	let leanWeight = 0;
@@ -232,6 +292,8 @@ export function createFigureMotion(random: () => number): FigureMotion {
 			const listening = heard !== null;
 			const nodPitch = nodding.advance(step, listening, reducedMotion);
 			const voice = mouthMotion.advance(step, facts.speaking ? mouth : null, reducedMotion);
+			const mood = moodMotion.advance(step, facts.speaking ? facts.mood : undefined, reducedMotion);
+			const moodShown = moods.some((name) => mood.weights[name] > mouthUnderMood.shownAbove);
 			const goal = gazeFor(thinking, heard, base.glance);
 			gaze = { yaw: ease(gaze.yaw, goal.yaw, listening ? easing.listeningYaw : easing.yaw), pitch: ease(gaze.pitch, goal.pitch, easing.pitch) };
 			thinkingWeight = ease(thinkingWeight, thinking ? 1 : 0, easing.thinking);
@@ -246,13 +308,15 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				},
 				posture: {
 					yaw: thinkingWeight * thinkingLook.posture.yaw,
-					pitch: thinkingWeight * thinkingLook.posture.pitch + nodPitch,
-					roll: thinkingWeight * thinkingLook.posture.roll
+					pitch: thinkingWeight * thinkingLook.posture.pitch + nodPitch + mood.head,
+					roll: thinkingWeight * thinkingLook.posture.roll + mood.roll
 				},
 				trunkLean: leanWeight * listeningLean.trunk,
-				mouth: voice.weights,
+				mood: mood.weights,
+				moodTrunk: { spine: mood.chest * trunkShare.spine, chest: mood.chest * trunkShare.chest },
+				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
 				look: { yaw: clamp(gaze.yaw * lookGain, lookReachDegrees), pitch: clamp(gaze.pitch * lookGain, lookReachDegrees) },
-				arms: restingArms(base.breath)
+				arms: restingArms(base.breath, mood.shoulder * shoulderShare)
 			};
 		}
 	};

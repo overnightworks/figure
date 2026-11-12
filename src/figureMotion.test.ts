@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mouthShape, type MouthShape } from './expressions.js';
+import { figureMood, mouthShape, type FigureMood, type MouthShape } from './expressions.js';
 import { createFigureMotion, spreadPosture, type FigureFacts, type FigurePose, type SpeakerOffset } from './figureMotion.js';
 import type { VowelWeights } from './vowelWeights.js';
 
@@ -537,6 +537,175 @@ describe('the figure motion while the agent speaks', () => {
 		expect(poses[20]!.mouth).toEqual(stillMouth);
 		poses.forEach((pose, frame) => expect(pose.head.pitch).toBe(still[frame]!.head.pitch));
 	});
+});
+
+describe('the figure motion while the agent speaks a mood', () => {
+	const moods = Object.values(figureMood);
+	const speakingMood = (mood: FigureMood): FigureFacts => ({ ...speaking, mood });
+	/** The peak each mood's weight eases toward, and what a mood leans the posture by at that peak, in radians: head pitch, head roll, chest pitch and shoulder, as the picture states them. */
+	const peaks: Record<FigureMood, number> = { happy: 0.9, angry: 0.85, sad: 0.9, relaxed: 0.9, surprised: 0.95 };
+	const offsets: Record<FigureMood, { headPitch: number; headRoll: number; chest: number; shoulder: number }> = {
+		happy: { headPitch: -0.05, headRoll: 0.04, chest: -0.02, shoulder: 0.03 },
+		angry: { headPitch: 0.1, headRoll: 0, chest: 0.05, shoulder: 0.05 },
+		sad: { headPitch: 0.17, headRoll: 0.07, chest: 0.05, shoulder: -0.07 },
+		relaxed: { headPitch: 0, headRoll: -0.07, chest: 0, shoulder: -0.04 },
+		surprised: { headPitch: -0.1, headRoll: 0, chest: -0.07, shoulder: 0.07 }
+	};
+	const noMood: Record<FigureMood, number> = { happy: 0, angry: 0, sad: 0, relaxed: 0, surprised: 0 };
+	const aa: VowelWeights = { aa: 1, ih: 0, ou: 0, ee: 0, oh: 0 };
+	const stillMouthWeights: VowelWeights = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+
+	it.each(moods)('eases the weight of %s up to its peak at 9 a second: a share of 1 - e^(-9 t) of the peak after t seconds', (mood) => {
+		const poses = watch(100, () => speakingMood(mood));
+
+		[0.01, 0.05, 0.2].forEach((seconds) => {
+			expect(poses[atSecond(seconds)]!.mood[mood]).toBeCloseTo(peaks[mood] * (1 - Math.exp(-9 * seconds)), 9);
+		});
+		moods.filter((other) => other !== mood).forEach((other) => expect(poses[99]!.mood[other]).toBe(0));
+	});
+
+	it.each(moods)('eases the weight of %s down at 4 a second once the agent stops: a share of e^(-4 t) is left after t seconds', (mood) => {
+		const poses = watch(600, (frame) => (frame < 300 ? speakingMood(mood) : { ...idle, mood }));
+		const peak = poses[299]!.mood[mood];
+
+		expect(peak).toBeCloseTo(peaks[mood], 1);
+		[0.1, 0.5, 1].forEach((seconds) => {
+			expect(poses[299 + Math.round(seconds / frameSeconds)]!.mood[mood]).toBeCloseTo(peak * Math.exp(-4 * seconds), 9);
+		});
+	});
+
+	it('shows no mood while the agent does not speak, though a mood is given', () => {
+		const poses = watch(300, () => ({ ...idle, mood: 'happy' }));
+
+		poses.forEach((pose) => expect(pose.mood).toEqual(noMood));
+	});
+
+	it('shows a mood while it thinks, since speaking wins', () => {
+		const poses = watch(300, () => ({ ...thinkingAndSpeaking, mood: 'sad' }));
+
+		expect(poses[299]!.mood.sad).toBeCloseTo(peaks.sad, 1);
+	});
+
+	it('shows no mood for a sentence without one', () => {
+		watch(300, () => speaking).forEach((pose) => expect(pose.mood).toEqual(noMood));
+	});
+
+	it('cross-fades to another mood: the first falls at 4 a second while the second rises at 9', () => {
+		const poses = watch(400, (frame) => speakingMood(frame < 200 ? 'happy' : 'angry'));
+		const settled = poses[199]!.mood.happy;
+
+		[0.05, 0.2].forEach((seconds) => {
+			const pose = poses[199 + Math.round(seconds / frameSeconds)]!;
+			expect(pose.mood.happy).toBeCloseTo(settled * Math.exp(-4 * seconds), 9);
+			expect(pose.mood.angry).toBeCloseTo(peaks.angry * (1 - Math.exp(-9 * seconds)), 3);
+		});
+	});
+
+	it('fades a mood the next sentence leaves out', () => {
+		const poses = watch(400, (frame) => (frame < 200 ? speakingMood('happy') : speaking));
+
+		expect(poses[399]!.mood.happy).toBeCloseTo(poses[199]!.mood.happy * Math.exp(-4 * 2), 9);
+	});
+
+	it('multiplies every mouth weight by 0.72 while a mood is above 0.05 and by 1 while none is', () => {
+		const withMood = watch(500, (frame) => (frame < 100 ? speakingMood('happy') : speaking), false, () => null, () => aa);
+		const plain = watch(500, () => speaking, false, () => null, () => aa);
+		const shown = withMood.map((pose) => Math.max(...Object.values(pose.mood)) > 0.05);
+
+		expect(shown).toContain(true);
+		expect(shown).toContain(false);
+		withMood.forEach((pose, frame) => expect(pose.mouth.aa).toBeCloseTo(plain[frame]!.mouth.aa * (shown[frame] ? 0.72 : 1), 12));
+		expect(withMood[99]!.mouth.aa).toBeCloseTo(0.72, 3);
+		expect(withMood[499]!.mouth.aa).toBeCloseTo(1, 9);
+	});
+
+	it('keeps the mouth still when a mood has no voice', () => {
+		const poses = watch(200, () => speakingMood('happy'));
+
+		poses.forEach((pose) => expect(pose.mouth).toEqual(stillMouthWeights));
+		expect(poses[199]!.mood.happy).toBeGreaterThan(0.8);
+	});
+
+	it('leaves the voice\'s nod as the eased weights give it, whatever the mood', () => {
+		const plain = watch(300, () => speaking, false, () => null, () => aa);
+		const withMood = watch(300, () => speakingMood('sad'), false, () => null, () => aa);
+
+		withMood.forEach((pose, frame) => expect(pose.head.pitch).toBe(plain[frame]!.head.pitch));
+	});
+
+	it.each(moods)('leans the posture under reduced motion at once by the offsets of %s, in radians', (mood) => {
+		const [pose] = watch(1, () => speakingMood(mood), true);
+		const { headPitch, headRoll, chest, shoulder } = offsets[mood];
+
+		expect(pose!.mood[mood]).toBe(peaks[mood]);
+		expect(pose!.posture.pitch).toBeCloseTo(headPitch, 12);
+		expect(pose!.posture.roll).toBeCloseTo(headRoll, 12);
+		expect(pose!.posture.yaw).toBeCloseTo(0, 12);
+		expect(pose!.moodTrunk.spine).toBeCloseTo(0.4 * chest, 12);
+		expect(pose!.moodTrunk.chest).toBeCloseTo(0.6 * chest, 12);
+		expect(pose!.arms.leftShoulder.roll).toBeCloseTo(0.5 * shoulder, 12);
+		expect(pose!.arms.rightShoulder.roll).toBeCloseTo(-0.5 * shoulder, 12);
+	});
+
+	it('leans the posture by the share of the weight over its peak while the mood rises', () => {
+		const pose = watch(10, () => speakingMood('sad'))[9]!;
+		const share = 1 - Math.exp(-9 * 0.1);
+
+		expect(pose.posture.pitch).toBeCloseTo(0.17 * share, 9);
+		expect(pose.posture.roll).toBeCloseTo(0.07 * share, 9);
+		expect(pose.moodTrunk.chest).toBeCloseTo(0.6 * 0.05 * share, 9);
+	});
+
+	it('adds the offsets of two moods by their shares while one replaces the other', () => {
+		const pose = watch(210, (frame) => speakingMood(frame < 200 ? 'happy' : 'angry'))[209]!;
+		const [happyShare, angryShare] = [pose.mood.happy / peaks.happy, pose.mood.angry / peaks.angry];
+
+		expect(happyShare).toBeGreaterThan(0.1);
+		expect(angryShare).toBeGreaterThan(0.1);
+		expect(pose.posture.pitch).toBeCloseTo(-0.05 * happyShare + 0.1 * angryShare, 9);
+		expect(pose.moodTrunk.spine).toBeCloseTo(0.4 * (-0.02 * happyShare + 0.05 * angryShare), 9);
+	});
+
+	it('leaves the posture and the shoulders as they are with no mood', () => {
+		const idling = watch(300, () => idle);
+
+		watch(300, () => speaking).forEach((pose, frame) => {
+			expect(pose.posture).toEqual(idling[frame]!.posture);
+			expect(pose.arms).toEqual(idling[frame]!.arms);
+			expect(pose.moodTrunk).toEqual({ spine: 0, chest: 0 });
+		});
+	});
+
+	it('reaches a mood at once under reduced motion, holds it, swaps it at once and leaves at once', () => {
+		const poses = watch(40, (frame) => (frame < 10 ? speaking : frame < 20 ? speakingMood('happy') : frame < 30 ? speakingMood('angry') : { ...idle, mood: 'angry' }), true);
+
+		expect(poses[9]!.mood).toEqual(noMood);
+		[10, 19].forEach((frame) => expect(poses[frame]!.mood).toEqual({ ...noMood, happy: 0.9 }));
+		[20, 29].forEach((frame) => expect(poses[frame]!.mood).toEqual({ ...noMood, angry: 0.85 }));
+		expect(poses[30]!.mood).toEqual(noMood);
+	});
+
+	it('multiplies the mouth by 0.72 from the first frame of a mood under reduced motion and by 1 once it is gone', () => {
+		const poses = watch(30, (frame) => (frame < 10 || frame >= 20 ? speaking : speakingMood('happy')), true, () => null, () => aa);
+
+		expect(poses[9]!.mouth.aa).toBe(1);
+		expect(poses[10]!.mouth.aa).toBeCloseTo(0.72, 12);
+		expect(poses[20]!.mouth.aa).toBe(1);
+	});
+
+	it.each([['a name that is no mood', 'furious'], ['a name from the prototype chain', 'toString'], ['a number', 7], ['an object', { happy: true }], ['null', null]])(
+		'shows no mood and leaves the mouth whole for %s',
+		(_, unknown) => {
+			const facts = { ...speaking, mood: unknown } as unknown as FigureFacts;
+			const unknownMood = watch(300, () => facts, false, () => null, () => aa);
+			const plain = watch(300, () => speaking, false, () => null, () => aa);
+
+			unknownMood.forEach((pose, frame) => {
+				expect(pose.mood).toEqual(noMood);
+				expect(pose.mouth).toEqual(plain[frame]!.mouth);
+			});
+		}
+	);
 });
 
 describe('the spread of a posture turn', () => {
