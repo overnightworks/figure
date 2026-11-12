@@ -43,8 +43,8 @@ signal given. `handle.think(working)` tells the figure whether the agent's model
 and the figure decides its motion, so it looks up and aside while `working` is true and goes back to its idle motion
 when it is false. The same value again changes nothing, and on a figure that ended or was disposed the call does nothing.
 `handle.listen(speaker)` hands the figure the element of the page at which someone speaks, or `null` when nobody does: the figure
-turns toward the element's centre, leans in a little and follows the element as it moves, with no further call, unless it is
-thinking. Anything that is not an element, and an element that is not connected or belongs to another document, counts as nobody until
+turns toward the element's centre, leans in a little, nods now and then and follows the element as it moves, with no further call,
+unless it is thinking. Anything that is not an element, and an element that is not connected or belongs to another document, counts as nobody until
 it returns; the package only reads the element's bounding rectangle each frame and lets it go on `listen(null)`, on another element, on
 `dispose` and when the figure ends.
 `mount` never rejects, and the first signal has reached `onSignal` before it resolves.
@@ -64,8 +64,8 @@ freed cannot give another.
 **The app owns** the canvas and its CSS size, the fetch of the bytes, its symbol and `dispose`. **The package does** the
 rest: it sizes the drawing buffer to the canvas's client size times the device pixel ratio (at most 2) in every frame,
 so a resized canvas is followed with no call; it poses the figure at rest with its arms lowered at its sides, and gives the figure its idle
-motion (breathing, blinking, glancing), its thinking look and its look toward a speaker; while the page asks for reduced motion it blinks, slower, holds the arms
-down with no idle motion, and takes and leaves those looks at once; and it draws only
+motion (breathing, blinking, glancing), its thinking look, its look toward a speaker and the nods it makes while one speaks; while the page asks for reduced motion it blinks, slower, holds the arms
+down with no idle motion, takes and leaves those looks at once and does not nod; and it draws only
 while the page is visible and the canvas is in the viewport. It never writes the canvas's `style` and adds no element to the page.
 
 The page may run under a strict script policy. The package's browser tests run it under
