@@ -47,6 +47,17 @@ turns toward the element's centre, leans in a little, nods now and then and foll
 unless it is thinking. Anything that is not an element, and an element that is not connected, belongs to another document or has no box (its bounding
 rectangle has neither width nor height, as under `display: none`), counts as nobody until it returns; the package only reads the element's bounding rectangle each frame and lets it go on `listen(null)`, on another element, on
 `dispose` and when the figure ends.
+`handle.speak(sentence)` tells the figure that the agent speaks, with `{ voice }` where `voice` is the audio node that carries the agent's
+voice in the app's Web Audio graph (the output of the player), and `null` when it stops. While the agent speaks the figure neither thinks nor
+listens and its gaze is the idle glance; when it stops, thinking shows before listening. The figure only taps the voice: it makes one analyser
+with the voice's own context, connects the voice to it and nothing else, and disconnects, and only, that analyser when another voice, `speak({})`,
+`speak(null)`, `dispose` or the figure's end releases it; the same node again keeps its tap. It creates no `AudioContext`, plays nothing and
+fetches nothing, so the app's sound is its own. `speak({})` is a speaking figure with a still mouth, what an app calls for a person who muted the
+agent. A voice the figure cannot tap speaks with a still mouth and throws nothing: a value that is no audio node, a closed context, a `connect` or
+`createAnalyser` that throws; a suspended context reads silence, and the mouth follows once the context runs. A field of the sentence the package
+does not know is ignored, and on a figure that ended or was disposed the call does nothing. The mouth has five vowel shapes (`aa`, `ih`, `ou`, `ee`,
+`oh`) chosen from the voice's first two formants and opened by its loudness; consonants show only as dips in loudness, and it lags the sound by 30
+to 40 ms.
 `mount` never rejects, and the first signal has reached `onSignal` before it resolves.
 
 | Signal | Means | The app |
@@ -64,8 +75,8 @@ freed cannot give another.
 **The app owns** the canvas and its CSS size, the fetch of the bytes, its symbol and `dispose`. **The package does** the
 rest: it sizes the drawing buffer to the canvas's client size times the device pixel ratio (at most 2) in every frame,
 so a resized canvas is followed with no call; it poses the figure at rest with its arms lowered at its sides, and gives the figure its idle
-motion (breathing, blinking, glancing), its thinking look, its look toward a speaker and the nods it makes while one speaks; while the page asks for reduced motion it blinks, slower, holds the arms
-down with no idle motion, takes and leaves those looks at once and does not nod; and it draws only
+motion (breathing, blinking, glancing), its thinking look, its look toward a speaker and the nods it makes while one speaks, and the mouth and the nod of the head that follow the agent's voice; while the page asks for reduced motion it blinks, slower, holds the arms
+down with no idle motion, takes and leaves those looks and the mouth's shape at once and does not nod; and it draws only
 while the page is visible and the canvas is in the viewport. It never writes the canvas's `style` and adds no element to the page.
 
 The page may run under a strict script policy. The package's browser tests run it under

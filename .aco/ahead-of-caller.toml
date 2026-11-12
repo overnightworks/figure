@@ -1,4 +1,0 @@
-[[code]]
-path = "src/vowelWeights.ts"
-item = "#2"
-reason = "Slice 15 of #2, speak with the voice tap, calls it to move the mouth with the agent's voice."
