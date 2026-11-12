@@ -153,6 +153,15 @@ function tell(next: Sentence, status: string): void {
 	slots.forEach((slot) => slot.handle?.speak(sentence));
 }
 
+/** The number of the control that took the stage last. */
+let lastControl = 0;
+
+/** Takes the stage for a control and returns whether it still holds it: a control that waits checks after each wait before it starts audio. */
+function takeControl(): () => boolean {
+	const mine = ++lastControl;
+	return () => mine === lastControl;
+}
+
 function endSentence(): void {
 	silence();
 	silence = () => {};
@@ -176,7 +185,9 @@ function pickedVowel(): MouthShape {
 }
 
 document.querySelector<HTMLButtonElement>('#speak')!.addEventListener('click', async () => {
+	const stillMine = takeControl();
 	const { context, speakers } = await runningAudio();
+	if (!stillMine()) return;
 	endSentence();
 	const vowel = pickedVowel();
 	const voice = syntheticVoice(context, vowel);
@@ -191,14 +202,20 @@ document.querySelector<HTMLButtonElement>('#speak')!.addEventListener('click', a
 voicePicker.addEventListener('change', async () => {
 	const picked = voicePicker.files?.[0];
 	if (picked === undefined) return;
+	const stillMine = takeControl();
 	const bytes = await picked.arrayBuffer();
 	voicePicker.value = '';
 	const { context, speakers } = await runningAudio();
+	if (!stillMine()) return;
 	endSentence();
-	let recording: AudioBuffer;
+	let recording: AudioBuffer | undefined;
 	try {
 		recording = await context.decodeAudioData(bytes);
 	} catch {
+		recording = undefined;
+	}
+	if (!stillMine()) return;
+	if (recording === undefined) {
 		tell(null, 'not audio');
 		return;
 	}
@@ -221,11 +238,13 @@ voicePicker.addEventListener('change', async () => {
 });
 
 document.querySelector<HTMLButtonElement>('#speak-without-voice')!.addEventListener('click', () => {
+	takeControl();
 	endSentence();
 	tell({}, 'speaking without a voice');
 });
 
 document.querySelector<HTMLButtonElement>('#stop')!.addEventListener('click', () => {
+	takeControl();
 	endSentence();
 	tell(null, 'quiet');
 });

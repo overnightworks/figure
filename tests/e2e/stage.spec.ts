@@ -153,6 +153,41 @@ test.describe('the demo stage under the script policy', () => {
 		await expectNoViolations(page, pageErrors);
 	});
 
+	for (const [control, expected] of [
+		['stop', 'quiet'],
+		['speak without a voice', 'speaking without a voice']
+	] as const) {
+		test(`a picked audio file that is still decoding does not speak after ${control}`, async ({ page }) => {
+			await page.addInitScript(() => {
+				const held = window as unknown as { releaseDecode: () => void; decodeStarted: boolean; decodeFinished: boolean };
+				const gate = new Promise<void>((release) => (held.releaseDecode = release));
+				const decode = AudioContext.prototype.decodeAudioData;
+				AudioContext.prototype.decodeAudioData = async function (this: AudioContext, bytes: ArrayBuffer) {
+					held.decodeStarted = true;
+					const recording = await decode.call(this, bytes);
+					await gate;
+					held.decodeFinished = true;
+					return recording;
+				};
+			});
+			const pageErrors = await openStage(page, stage);
+			await expectTwoDrawings(page);
+			const status = page.locator('#voice-status');
+
+			await page.locator('#voice-picker').setInputFiles({ name: 'tone.wav', mimeType: 'audio/wav', buffer: toneRecording(30) });
+			await page.waitForFunction(() => (window as unknown as { decodeStarted?: boolean }).decodeStarted === true);
+			await page.getByRole('button', { name: control, exact: true }).click();
+			await expect(status).toHaveText(expected);
+			await page.evaluate(() => (window as unknown as { releaseDecode: () => void }).releaseDecode());
+			await page.waitForFunction(() => (window as unknown as { decodeFinished?: boolean }).decodeFinished === true);
+			await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+			await expect(status).toHaveText(expected);
+			await expectTwoDrawings(page);
+			await expectNoViolations(page, pageErrors);
+		});
+	}
+
 	test('figures picked while the agent speaks are drawn and the stage still holds the sentence', async ({ page }) => {
 		const pageErrors = await openStage(page, stage);
 		await expectTwoDrawings(page);
