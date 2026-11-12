@@ -8,7 +8,7 @@ import { analysisWindowLength, vowelWeights, type VowelWeights } from './vowelWe
 export interface VoiceTap {
 	/** Follows `voice` until the next call: the same node again keeps its tap, another one or none releases the last one first. */
 	follow(voice: AudioNode | undefined): void;
-	/** The mouth weights of the voice's latest samples, or null when no voice is tapped or the analyser cannot be read. */
+	/** The mouth weights of the voice's latest samples, or null when no voice is tapped, its context does not run or the analyser cannot be read. */
 	weights(): VowelWeights | null;
 }
 
@@ -63,6 +63,8 @@ export function createVoiceTap(): VoiceTap {
 		weights() {
 			if (tapped === undefined) return null;
 			try {
+				// A context that does not run leaves its analyser the last samples it captured, which are no voice.
+				if (tapped.analyser.context.state !== 'running') return null;
 				tapped.analyser.getFloatTimeDomainData(tapped.samples);
 				return vowelWeights(tapped.samples, tapped.sampleRate);
 			} catch {

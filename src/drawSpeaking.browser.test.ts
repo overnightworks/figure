@@ -254,6 +254,20 @@ describe('a figure whose agent speaks', () => {
 
 			await waitForMouth(canvas, (rows) => rows >= resting + openedRows);
 		});
+
+		it('closes the mouth while a context that was running is suspended, and opens it again once the context runs', async () => {
+			const { canvas, handle, context } = await figureWithContext();
+			const resting = await mouthNow(canvas);
+			handle.speak({ voice: voiceOn(context, mouthShape.aa) });
+			await waitForMouth(canvas, (rows) => rows >= resting + openedRows);
+
+			await context.suspend();
+			await waitForMouth(canvas, (rows) => rows <= resting + swayRows);
+			await expectMouthStays(canvas, resting);
+			await context.resume();
+
+			await waitForMouth(canvas, (rows) => rows >= resting + openedRows);
+		});
 	});
 
 	describe('a voice that cannot be tapped', () => {
