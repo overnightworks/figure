@@ -18,9 +18,15 @@ const requestFrameOwn = window.requestAnimationFrame;
 const turnedPixels = 10;
 /** How far the sway moves the nose, in pixels at a canvas 200 wide; the idle glance turns it by far more, and the glance moves a closed mouth's rows by more than the sway does. */
 const swayPixels = 2;
-/** The pictures in which a mouth that should not move is judged, each at the head's resting pose, and the most pictures read to find them while the head glances away. */
+/** The pictures in which a mouth that should not move is judged, every one of them, and over which the head's resting pose is read. */
 const stillPictures = 15;
-const mostPictures = 150;
+/**
+ * The nose's lift, in pixels at a canvas 200 wide, below which a glance leaves a closed mouth's rows as they are, and the rows the mouth's window gains
+ * for each pixel of lift past it: a head turned up shows more of the mouth below the nose. A closed mouth stays within these of its resting rows at
+ * every pose the idle glance reaches, and an open vowel's mouth lies beyond them at every one.
+ */
+const unmovedLift = 1;
+const rowsPerLiftedPixel = 1.25;
 const farRight = 5000;
 const level = 100;
 
@@ -115,16 +121,13 @@ describe('a figure whose agent speaks', () => {
 		return { rows: rows[Math.floor(rows.length / 2)]!, nose: commonest.nose };
 	}
 
-	/** Expects the mouth to stay within the flat vowel's distance from `resting` in each of the next `stillPictures` pictures that show the head at its resting pose. */
+	/** Expects the mouth to lie, in each of the next `stillPictures` pictures, within the flat vowel's distance of `resting` plus what the head's lift adds to a closed mouth's rows. */
 	async function expectMouthStays(canvas: HTMLCanvasElement, resting: Picture): Promise<void> {
-		let judged = 0;
-		for (let read = 0; read < mostPictures && judged < stillPictures; read++) {
+		for (let read = 0; read < stillPictures; read++) {
 			const picture = await pictureNow(canvas);
-			if (!atRest(picture, resting)) continue;
-			expect(Math.abs(picture.rows - resting.rows)).toBeLessThan(flattenedRows);
-			judged++;
+			const lift = Math.max(0, resting.nose.y - picture.nose.y - unmovedLift);
+			expect(Math.abs(picture.rows - resting.rows)).toBeLessThan(flattenedRows + rowsPerLiftedPixel * lift);
 		}
-		expect(judged).toBe(stillPictures);
 	}
 
 	/** Puts a small element of the page at `x` and `y` CSS pixels from the viewport's top left. */
