@@ -297,7 +297,6 @@ describe('a figure whose agent speaks', () => {
 		];
 
 		it.each(faults)('speaks with a still mouth and throws nothing for %s', async (_, arrange) => {
-			await emulateReducedMotion();
 			const { canvas, handle, context } = await figureWithContext();
 			const resting = await mouthNow(canvas);
 			const voice = arrange(context);
@@ -309,7 +308,6 @@ describe('a figure whose agent speaks', () => {
 		});
 
 		it('speaks with a still mouth and makes no analyser on a closed context', async () => {
-			await emulateReducedMotion();
 			const { canvas, handle, context, analysers } = await figureWithContext();
 			const resting = await mouthNow(canvas);
 			const voice = voiceOn(context, mouthShape.aa);
@@ -321,7 +319,6 @@ describe('a figure whose agent speaks', () => {
 		});
 
 		it('releases a voice whose analyser cannot be read, with a still mouth and the figure still drawn', async () => {
-			await emulateReducedMotion();
 			const { canvas, handle, context } = await figureWithContext();
 			const resting = await mouthNow(canvas);
 			const realCreate = AudioContext.prototype.createAnalyser.bind(context);

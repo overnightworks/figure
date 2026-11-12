@@ -5,7 +5,7 @@ import { mouthShape, type MouthShape } from '../src/expressions.js';
  * The first two formants in Hz of the vowel each mouth shape opens for (Peterson and Barney, 1952, table V, the men's averages):
  * aa is /ɑ/ (hot), ih is /i/ (heed), ou is /u/ (who'd), ee is /ɛ/ (head) and oh is /ɔ/ (hawed).
  */
-export const vowelFormants: Record<MouthShape, readonly [number, number]> = {
+const synthesizedFormants: Record<MouthShape, readonly [number, number]> = {
 	[mouthShape.aa]: [730, 1090],
 	[mouthShape.ih]: [270, 2290],
 	[mouthShape.ou]: [300, 870],
@@ -41,7 +41,7 @@ export function syntheticVoice(context: AudioContext, vowel: MouthShape, gain = 
 	source.frequency.value = pitchHz;
 	const output = context.createGain();
 	output.gain.value = gain;
-	vowelFormants[vowel]
+	synthesizedFormants[vowel]
 		.map((formantHz, index) => formantResonator(context, formantHz, formantBandwidthsHz[index]!))
 		.reduce<AudioNode>((previous, resonator) => previous.connect(resonator), source)
 		.connect(output);
