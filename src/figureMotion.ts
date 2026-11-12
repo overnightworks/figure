@@ -76,7 +76,9 @@ const listeningLean = { head: 0.04, trunk: 0.02 };
 const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3 };
 /** The head turns half the gaze's yaw, three quarters of it while listening, and tilts 0.55 of its pitch; the look-at turns 2.4 times the gaze. */
 const headShare = { yaw: 0.5, listeningYaw: 0.75, pitch: 0.55 };
+/** The look-at turns 2.4 times the gaze and no further than 90 degrees either way, as the picture clamps it. */
 const lookGain = 2.4;
+const lookReachDegrees = 90;
 
 const radiansPerDegree = Math.PI / 180;
 
@@ -160,7 +162,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 					roll: thinkingWeight * thinkingLook.posture.roll
 				},
 				trunkLean: leanWeight * listeningLean.trunk,
-				look: { yaw: gaze.yaw * lookGain, pitch: gaze.pitch * lookGain },
+				look: { yaw: clamp(gaze.yaw * lookGain, lookReachDegrees), pitch: clamp(gaze.pitch * lookGain, lookReachDegrees) },
 				arms: restingArms(base.breath)
 			};
 		}

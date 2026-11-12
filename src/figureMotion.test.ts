@@ -184,9 +184,9 @@ describe('the figure motion while someone speaks', () => {
 		['right', { across: 0.25, down: 0 }, { yaw: 24, pitch: 0 }],
 		['above', { across: 0, down: -0.5 }, { yaw: 0, pitch: 21.6 }],
 		['below', { across: 0, down: 0.25 }, { yaw: 0, pitch: -10.8 }],
-		['beyond the clamp to the right and below', { across: 7, down: 3 }, { yaw: 96, pitch: -43.2 }],
-		['beyond the clamp to the left and above', { across: -2, down: -9 }, { yaw: -96, pitch: 43.2 }]
-	])('turns the gaze toward a speaker %s by 40 degrees of yaw and 18 of pitch for the whole half viewport, and the look-at 2.4 times that', (_, speaker, look) => {
+		['beyond the clamp to the right and below', { across: 7, down: 3 }, { yaw: 90, pitch: -43.2 }],
+		['beyond the clamp to the left and above', { across: -2, down: -9 }, { yaw: -90, pitch: 43.2 }]
+	])('turns the gaze toward a speaker %s by 40 degrees of yaw and 18 of pitch for the whole half viewport, and the look-at 2.4 times that up to 90 degrees', (_, speaker, look) => {
 		const { look: settled } = watch(10, () => idle, true, () => speaker).at(-1)!;
 
 		expect(settled.yaw).toBeCloseTo(look.yaw, 9);
