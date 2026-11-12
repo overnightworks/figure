@@ -557,42 +557,38 @@ describe('a figure whose agent speaks', () => {
 		});
 
 		describe('with a voice', () => {
-			it('opens the mouth beyond what the mood alone gives', async () => {
-				const { canvas, handle, context } = await figureWithContext();
-				const moodOnly = await moodMouth(canvas, handle);
-
-				handle.speak({ voice: voiceOn(context, mouthShape.aa), mood: figureMood.angry });
-
-				await waitForMouth(canvas, (rows) => rows >= moodOnly.rows + openedRows);
-			});
-
-			it('opens the mouth of a figure whose mood expressions block it', async () => {
-				const blocking = buildGlb(
-					vrmParts(undefined, (json) => {
-						for (const mood of Object.values(figureMood)) json.extensions.VRMC_vrm.expressions.preset[mood].overrideMouth = 'block';
-					})
-				);
+			it.each([
+				['a figure whose mood expressions leave the mouth to its own default', undefined],
+				[
+					'a figure whose mood expressions block it',
+					buildGlb(
+						vrmParts(undefined, (json) => {
+							for (const mood of Object.values(figureMood)) json.extensions.VRMC_vrm.expressions.preset[mood].overrideMouth = 'block';
+						})
+					)
+				]
+			])('opens the mouth beyond what the mood alone gives, for %s', async (_, bytes) => {
 				const context = await runningContext();
-				const { canvas, handle } = await watch.mountFigure(blocking);
+				const { canvas, handle } = await watch.mountFigure(bytes);
 				const moodOnly = await moodMouth(canvas, handle);
 
 				handle.speak({ voice: voiceOn(context, mouthShape.aa), mood: figureMood.angry });
 
 				await waitForMouth(canvas, (rows) => rows >= moodOnly.rows + openedRows);
-			});
-
-			it('keeps the tap of the same voice when the mood changes', async () => {
-				const { handle, context, analysers } = await figureWithContext();
-				const voice = voiceOn(context, mouthShape.aa);
-				const disconnect = vi.spyOn(voice, 'disconnect');
-
-				handle.speak({ voice, mood: figureMood.happy });
-				handle.speak({ voice, mood: figureMood.sad });
-
-				expect(analysers()).toHaveLength(1);
-				expect(disconnect).not.toHaveBeenCalled();
 			});
 		});
+	});
+
+	it('keeps the tap of the same voice when the mood changes', async () => {
+		const { handle, context, analysers } = await figureWithContext();
+		const voice = voiceOn(context, mouthShape.aa);
+		const disconnect = vi.spyOn(voice, 'disconnect');
+
+		handle.speak({ voice, mood: figureMood.happy });
+		handle.speak({ voice, mood: figureMood.sad });
+
+		expect(analysers()).toHaveLength(1);
+		expect(disconnect).not.toHaveBeenCalled();
 	});
 
 	describe('a figure that ended', () => {

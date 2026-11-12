@@ -182,6 +182,7 @@ test.describe('the demo stage under the script policy', () => {
 		await page.getByLabel('none', { exact: true }).check();
 
 		await expect.poll(async () => differs(surprised, await pictures())).toBeGreaterThan(shownPixels);
+		await expect.poll(async () => differs(neutral, await pictures())).toBeLessThan(shownPixels);
 		await expectTwoDrawings(page);
 		await expectNoViolations(page, pageErrors);
 	});
