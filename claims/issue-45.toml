@@ -1,0 +1,8 @@
+claim_id = "3f7a639d35534b8493210c93ab94ac1d"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "1cfae25d2ddaeebd6ea43da984724fc8cf05c65e"
+branch = "claude/issue-45-a-figure-turns-toward-whoever-speaks"
+scope = ["README.md", "docs/ARCHITECTURE.md", "src/draw.browser.test.ts", "src/draw.ts", "src/figureDriving.browser.test.ts", "src/figureFrame.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "src/idleMotion.ts", "tests"]
+opened_commit = "0e1526fc45372ec5349dd29f16eb1c52c8862229"
+whole_reason = "The method on the handle, the driver's listening state, the frame that applies the lean and the stage control and tests that prove it are one behaviour; a method without its motion or its proof is not releasable."
