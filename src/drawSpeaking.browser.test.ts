@@ -497,7 +497,8 @@ describe('a figure whose agent speaks', () => {
 
 			handle.speak({ mood });
 
-			await waitForFace(canvas, baseline, shown);
+			if (reduced) expect(shown(faceDifference(baseline, await watch.featuresOfNextFrame(canvas)))).toBe(true);
+			else await waitForFace(canvas, baseline, shown);
 		});
 
 		it('shows two moods differently', async () => {

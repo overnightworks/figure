@@ -21,6 +21,8 @@ export interface FigureWatch {
 	mountFigure(bytes?: Uint8Array): Promise<WatchedFigure>;
 	/** The face features of the next picture `canvas` shows after the frames the watch has seen by now, read in the task that drew it. */
 	featuresNow(canvas: HTMLCanvasElement): Promise<Record<FaceFeature, Spot[]>>;
+	/** The face features of the picture the first frame drawn after this call shows on `canvas`, with no frames waited for beyond it. */
+	featuresOfNextFrame(canvas: HTMLCanvasElement): Promise<Record<FaceFeature, Spot[]>>;
 	/** Stops reading, disposes the figures and removes their canvases. */
 	end(): void;
 }
@@ -63,6 +65,12 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 		async featuresNow(canvas) {
 			const after = frames + 2;
 			await vi.waitFor(() => expect(frames).toBeGreaterThan(after), { timeout: 5000 });
+			const picture = shown.get(canvas)!;
+			return spotsOf(picture.pixels, picture.width, picture.height);
+		},
+		async featuresOfNextFrame(canvas) {
+			// The figure's own frame request is older than this one, so its frame draws and is read before this callback runs.
+			await new Promise<void>((resolve) => requestFrameOwn.call(window, () => resolve()));
 			const picture = shown.get(canvas)!;
 			return spotsOf(picture.pixels, picture.width, picture.height);
 		},
