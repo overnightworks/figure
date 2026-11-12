@@ -21,7 +21,7 @@ export interface FigureHandle {
 	dispose(): void;
 	/** Whether the agent's model is working. The host reports the fact and the figure decides its motion; the same value again changes nothing, and a figure that ended or was disposed ignores it. */
 	think(working: boolean): void;
-	/** Someone speaks at `speaker`, an element of the page; null: nobody does. The figure turns toward the element's centre and follows it as it moves, while it does not think. Each call replaces the last value and the same element again changes nothing. Anything that is not an element counts as nobody, and so does an element that is not connected or that belongs to another document, until it returns. The figure reads the element's bounding rectangle each frame and holds it no longer than until `listen(null)`, another element, `dispose` or the figure's end; a figure that ended or was disposed ignores the call. */
+	/** Someone speaks at `speaker`, an element of the page; null: nobody does. The figure turns toward the element's centre and follows it as it moves, while it does not think. Each call replaces the last value and the same element again changes nothing. Anything that is not an element counts as nobody, and so does an element that is not connected, that belongs to another document or that has no box (a bounding rectangle with neither width nor height, as under `display: none`), until it returns. The figure reads the element's bounding rectangle each frame and holds it no longer than until `listen(null)`, another element, `dispose` or the figure's end; a figure that ended or was disposed ignores the call. */
 	listen(speaker: Element | null): void;
 }
 
@@ -52,15 +52,15 @@ const elementRectangle = Element.prototype.getBoundingClientRect;
 
 /**
  * Where the speaker's centre lies from the canvas's centre, in shares of half the viewport's width and height, or null when nobody counts
- * as speaking: no element, one that is not connected, one of another document than the canvas's, or one whose rectangle gives no finite
- * share. The viewport is the canvas's document's, at least a pixel wide and high. Whatever `listen` was given is judged here, each frame,
+ * as speaking: no element, one that is not connected, one of another document than the canvas's, one without a box (neither width nor
+ * height), or one whose rectangle gives no finite share. The viewport is the canvas's document's, at least a pixel wide and high. Whatever `listen` was given is judged here, each frame,
  * by what it answers, not by the realm it was made in; a value whose reads throw counts as nobody, so a frame never fails for it.
  */
 function speakerOffset(canvas: HTMLCanvasElement, speaker: Element | null): SpeakerOffset | null {
 	try {
 		if (speaker === null) return null;
 		const to = elementRectangle.call(speaker);
-		if (!speaker.isConnected || speaker.ownerDocument !== canvas.ownerDocument) return null;
+		if (!speaker.isConnected || speaker.ownerDocument !== canvas.ownerDocument || (to.width <= 0 && to.height <= 0)) return null;
 		const viewport = canvas.ownerDocument.documentElement;
 		const from = canvas.getBoundingClientRect();
 		const across = (to.left + to.width / 2 - (from.left + from.width / 2)) / (Math.max(1, viewport.clientWidth) / 2);

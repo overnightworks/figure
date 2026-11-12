@@ -333,6 +333,92 @@ describe('a figure driven by the host', () => {
 		expect((await noseNow(canvas)).x).toBeGreaterThan(resting.x + turnedPixels.side);
 	});
 
+	/** A speaker at the far left, and the two means of taking its box away and giving it back: its own `display`, or that of an ancestor it sits in. */
+	const boxlessSpeakers = [
+		['display: none', () => {
+			const speaker = speakerAt(farLeft, level);
+			return { speaker, hide: () => { speaker.style.display = 'none'; }, show: () => { speaker.style.display = ''; } };
+		}],
+		['a hidden ancestor', () => {
+			const speaker = speakerAt(farLeft, level);
+			const ancestor = document.createElement('section');
+			document.body.append(ancestor);
+			ancestor.append(speaker);
+			speakers.push(ancestor);
+			return { speaker, hide: () => { ancestor.style.display = 'none'; }, show: () => { ancestor.style.display = ''; } };
+		}]
+	] as const;
+	const motions = [
+		['normal motion', false],
+		['reduced motion', true]
+	] as const;
+
+	/** The nose once the figure has had time to settle: at the next frame under reduced motion, a second of frames later otherwise. */
+	async function noseSettled(canvas: HTMLCanvasElement, reduced: boolean): Promise<Spot> {
+		return reduced ? noseNow(canvas) : noseAfter(canvas, frames + settlingFrames);
+	}
+
+	describe.each(boxlessSpeakers)('a speaker made boxless by %s', (_, makeSpeaker) => {
+		it.each(motions)('counts it as nobody and follows it once it has a box, with no call, in %s', async (__, reduced) => {
+			if (reduced) await emulateReducedMotion();
+			const { canvas, handle } = await mountFigure();
+			const resting = await noseNow(canvas);
+			const { speaker, hide, show } = makeSpeaker();
+			hide();
+
+			handle.listen(speaker);
+			expect(Math.abs((await noseSettled(canvas, reduced)).x - resting.x)).toBeLessThan(backPixels);
+			show();
+			await vi.waitFor(async () => expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side), { timeout: 10000 });
+		});
+
+		it.each(motions)('lets a figure that listens go idle when the box goes, in %s', async (__, reduced) => {
+			if (reduced) await emulateReducedMotion();
+			const { canvas, handle } = await mountFigure();
+			const resting = await noseNow(canvas);
+			const { speaker, hide } = makeSpeaker();
+			handle.listen(speaker);
+			await vi.waitFor(async () => expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side), { timeout: 10000 });
+
+			hide();
+
+			expect(Math.abs((await noseSettled(canvas, reduced)).x - resting.x)).toBeLessThan(backPixels);
+		});
+
+		it('keeps the thinking look over a boxless speaker, goes idle when the thinking ends, and turns to it once the box is back', async () => {
+			await emulateReducedMotion();
+			const { canvas, handle } = await mountFigure();
+			const resting = await noseNow(canvas);
+			const { speaker, hide, show } = makeSpeaker();
+			hide();
+			handle.think(true);
+			const thinking = await noseNow(canvas);
+
+			handle.listen(speaker);
+			expect(await noseNow(canvas)).toEqual(thinking);
+			handle.think(false);
+			expect(await noseNow(canvas)).toEqual(resting);
+			show();
+
+			expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side);
+		});
+	});
+
+	it.each(motions)('keeps an element that has a box a speaker, also with visibility hidden, one side empty or one pixel, in %s', async (_, reduced) => {
+		if (reduced) await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+
+		for (const style of ['visibility: hidden', 'width: 0', 'height: 0', 'width: 1px; height: 1px']) {
+			const speaker = speakerAt(farLeft, level);
+			speaker.style.cssText += `; ${style}`;
+			handle.listen(speaker);
+			await vi.waitFor(async () => expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side), { timeout: 10000 });
+			handle.listen(null);
+			await vi.waitFor(async () => expect(Math.abs((await noseNow(canvas)).x - resting.x)).toBeLessThan(backPixels), { timeout: 10000 });
+		}
+	});
+
 	it.each([
 		['across', new DOMRect(Number.NaN, 0, 200, 250)],
 		['down', new DOMRect(0, Number.POSITIVE_INFINITY, 200, 250)]
