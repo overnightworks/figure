@@ -1,0 +1,7 @@
+claim_id = "ab4d7966438b4c1eb967424fcb76796f"
+agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
+role = "builder"
+base = "0ecf29874b9bc70683039893238b1fecabb779dd"
+branch = "claude/issue-52-r-move-the-quality-pins-to-v0-11-1"
+scope = [".github/workflows/ci.yml", ".github/workflows/code-scanning.yml", ".github/workflows/release.yml"]
+opened_commit = "a82b8ff228359e5a217d48bf59ddf2a11acae0ad"
