@@ -36,9 +36,12 @@ describe('a figure driven by the host', () => {
 	/** What each watched canvas held when the figure last drew it, read in the frame's own task, where the buffer still holds the picture. */
 	const shown = new Map<HTMLCanvasElement, Picture>();
 	let frames = 0;
+	/** The canvas whose next drawn picture a test waits for, and that picture once the figure drew it. */
+	let firstFrameWaited: { canvas: HTMLCanvasElement; picture?: Picture } | undefined;
 
 	beforeEach(() => {
 		frames = 0;
+		firstFrameWaited = undefined;
 		shown.clear();
 		shownEarly.clear();
 		// A seeded source of chance keeps the idle glance and the blink the same in every run.
@@ -67,6 +70,7 @@ describe('a figure driven by the host', () => {
 		if (!coversSomething(pixels)) return;
 		const picture = { width: canvas.width, height: canvas.height, pixels };
 		shown.set(canvas, picture);
+		if (firstFrameWaited?.canvas === canvas) firstFrameWaited.picture ??= picture;
 		const early = shownEarly.get(canvas) ?? [];
 		if (early.length < earlyFrames) shownEarly.set(canvas, [...early, picture]);
 	}
@@ -155,6 +159,16 @@ describe('a figure driven by the host', () => {
 
 	async function noseNow(canvas: HTMLCanvasElement): Promise<Spot> {
 		return noseAfter(canvas, frames + 2);
+	}
+
+	/** The nose in the first picture `canvas` shows after `act` ran, which is the frame the figure draws next. */
+	async function firstFrameAfter(canvas: HTMLCanvasElement, act: () => void): Promise<Spot> {
+		const awaited: { canvas: HTMLCanvasElement; picture?: Picture } = { canvas };
+		firstFrameWaited = awaited;
+		act();
+		await vi.waitFor(() => expect(awaited.picture).toBeDefined(), { timeout: 5000 });
+		const { pixels, width, height } = awaited.picture!;
+		return centreOf(spotsOf(pixels, width, height).nose);
 	}
 
 	it('turns toward the side and up on think(true) and comes back on think(false)', async () => {
@@ -261,19 +275,20 @@ describe('a figure driven by the host', () => {
 		expect(listening.y).toBeLessThan(resting.y - turnedPixels.up);
 	});
 
-	it('turns at the next frame under reduced motion and holds the turn, and a repeated call changes nothing', async () => {
+	it('turns at the first frame after the call under reduced motion, follows a moved speaker at its first frame, and a repeated call changes nothing', async () => {
 		await emulateReducedMotion();
 		const { canvas, handle } = await mountFigure();
 		const resting = await noseNow(canvas);
 		const speaker = speakerAt(farLeft, level);
 
-		handle.listen(speaker);
-		const listening = await noseNow(canvas);
+		const listening = await firstFrameAfter(canvas, () => handle.listen(speaker));
+		const moved = await firstFrameAfter(canvas, () => (speaker.style.left = `${farRight}px`));
 		handle.listen(speaker);
 		const repeated = await noseNow(canvas);
 
 		expect(listening.x).toBeLessThan(resting.x - turnedPixels.side);
-		expect(repeated).toEqual(listening);
+		expect(moved.x).toBeGreaterThan(resting.x + turnedPixels.side);
+		expect(repeated).toEqual(moved);
 	});
 
 	it('counts a detached element and one of another document as nobody, and follows each once it returns', async () => {
