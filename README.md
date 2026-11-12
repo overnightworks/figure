@@ -44,8 +44,8 @@ and the figure decides its motion, so it looks up and aside while `working` is t
 when it is false. The same value again changes nothing, and on a figure that ended or was disposed the call does nothing.
 `handle.listen(speaker)` hands the figure the element of the page at which someone speaks, or `null` when nobody does: the figure
 turns toward the element's centre, leans in a little, nods now and then and follows the element as it moves, with no further call,
-unless it is thinking. Anything that is not an element, and an element that is not connected or belongs to another document, counts as nobody until
-it returns; the package only reads the element's bounding rectangle each frame and lets it go on `listen(null)`, on another element, on
+unless it is thinking. Anything that is not an element, and an element that is not connected, belongs to another document or has no box (its bounding
+rectangle has neither width nor height, as under `display: none`), counts as nobody until it returns; the package only reads the element's bounding rectangle each frame and lets it go on `listen(null)`, on another element, on
 `dispose` and when the figure ends.
 `mount` never rejects, and the first signal has reached `onSignal` before it resolves.
 

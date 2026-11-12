@@ -259,6 +259,15 @@ describe('mount in a browser', () => {
 			return canvas;
 		}
 
+		/** Waits until a page frame passes in which the figure neither asks for nor runs a frame: the viewport observer reports the move out of view in a frame of its own, so one frame later is too early. */
+		async function untilNoFrameComes(): Promise<void> {
+			let before;
+			do {
+				before = { ...frames };
+				await nextFrame();
+			} while (frames.requested !== before.requested || frames.ran !== before.ran);
+		}
+
 		/** The canvas as the last frame left it, once there is one. */
 		async function pictureNow(): Promise<Uint8Array> {
 			await vi.waitFor(() => expect(shown).toBeDefined());
@@ -450,7 +459,7 @@ describe('mount in a browser', () => {
 			await pictureNow();
 			canvas.className = 'small away';
 			await vi.waitFor(() => expect(canvas.getBoundingClientRect().top).toBeGreaterThan(window.innerHeight));
-			await nextFrame();
+			await untilNoFrameComes();
 			const { requested, ran } = frames;
 
 			await nextFrame();

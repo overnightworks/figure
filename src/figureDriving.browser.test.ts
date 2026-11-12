@@ -333,6 +333,108 @@ describe('a figure driven by the host', () => {
 		expect((await noseNow(canvas)).x).toBeGreaterThan(resting.x + turnedPixels.side);
 	});
 
+	/** A speaker at the far left, and the two means of taking its box away and giving it back: its own `display`, or that of an ancestor it sits in. */
+	const boxlessSpeakers = [
+		['display: none', () => {
+			const speaker = speakerAt(farLeft, level);
+			return { speaker, hide: () => { speaker.style.display = 'none'; }, show: () => { speaker.style.display = ''; } };
+		}],
+		['a hidden ancestor', () => {
+			const speaker = speakerAt(farLeft, level);
+			const ancestor = document.createElement('section');
+			document.body.append(ancestor);
+			ancestor.append(speaker);
+			speakers.push(ancestor);
+			return { speaker, hide: () => { ancestor.style.display = 'none'; }, show: () => { ancestor.style.display = ''; } };
+		}]
+	] as const;
+	const motions = [
+		['normal motion', false],
+		['reduced motion', true]
+	] as const;
+
+	/** The nose once `act` took effect: in the first picture after it under reduced motion, a second of frames after it otherwise. */
+	async function noseAfterChange(canvas: HTMLCanvasElement, reduced: boolean, act: () => void): Promise<Spot> {
+		if (reduced) return firstFrameAfter(canvas, act);
+		act();
+		return noseAfter(canvas, frames + settlingFrames);
+	}
+
+	function expectTurnedTo(nose: Spot, resting: Spot, side: -1 | 1): void {
+		expect((nose.x - resting.x) * side).toBeGreaterThan(turnedPixels.side);
+	}
+
+	function expectNear(nose: Spot, expected: Spot): void {
+		expect(Math.abs(nose.x - expected.x)).toBeLessThan(backPixels);
+		expect(Math.abs(nose.y - expected.y)).toBeLessThan(backPixels);
+	}
+
+	describe.each(boxlessSpeakers)('a speaker made boxless by %s', (_, makeSpeaker) => {
+		it.each(motions)('counts it as nobody and follows it once it has a box, with no call, in %s', async (__, reduced) => {
+			if (reduced) await emulateReducedMotion();
+			const { canvas, handle } = await mountFigure();
+			const resting = await noseNow(canvas);
+			const { speaker, hide, show } = makeSpeaker();
+			hide();
+
+			expectNear(await noseAfterChange(canvas, reduced, () => handle.listen(speaker)), resting);
+			expectTurnedTo(await noseAfterChange(canvas, reduced, show), resting, -1);
+		});
+
+		it.each(motions)('lets a figure that listens go idle when the box goes, in %s', async (__, reduced) => {
+			if (reduced) await emulateReducedMotion();
+			const { canvas, handle } = await mountFigure();
+			const resting = await noseNow(canvas);
+			const { speaker, hide, show } = makeSpeaker();
+			expectTurnedTo(await noseAfterChange(canvas, reduced, () => handle.listen(speaker)), resting, -1);
+
+			expectNear(await noseAfterChange(canvas, reduced, hide), resting);
+			expectTurnedTo(await noseAfterChange(canvas, reduced, show), resting, -1);
+		});
+
+		it.each(motions)('turns to a speaker with a box that replaces a boxless one through listen, in %s', async (__, reduced) => {
+			if (reduced) await emulateReducedMotion();
+			const { canvas, handle } = await mountFigure();
+			const resting = await noseNow(canvas);
+			const { speaker, hide } = makeSpeaker();
+			hide();
+			const boxed = speakerAt(farRight, level);
+
+			expectNear(await noseAfterChange(canvas, reduced, () => handle.listen(speaker)), resting);
+			expectTurnedTo(await noseAfterChange(canvas, reduced, () => handle.listen(boxed)), resting, 1);
+		});
+
+		it.each(motions)('keeps the thinking look over a boxless speaker, goes idle when the thinking ends, and turns to it once the box is back, in %s', async (__, reduced) => {
+			if (reduced) await emulateReducedMotion();
+			const { canvas, handle } = await mountFigure();
+			const resting = await noseNow(canvas);
+			const { speaker, hide, show } = makeSpeaker();
+			const thinking = await noseAfterChange(canvas, reduced, () => handle.think(true));
+			expectTurnedTo(thinking, resting, -1);
+
+			expectNear(await noseAfterChange(canvas, reduced, () => { hide(); handle.listen(speaker); }), thinking);
+			expectNear(await noseAfterChange(canvas, reduced, () => handle.think(false)), resting);
+			expectTurnedTo(await noseAfterChange(canvas, reduced, show), resting, -1);
+		});
+	});
+
+	describe.each(motions)('an element that has a box, in %s', (_, reduced) => {
+		it.each([
+			['visibility hidden', 'visibility: hidden'],
+			['no width', 'width: 0'],
+			['no height', 'height: 0'],
+			['one pixel', 'width: 1px; height: 1px']
+		])('is a speaker with %s', async (__, style) => {
+			if (reduced) await emulateReducedMotion();
+			const { canvas, handle } = await mountFigure();
+			const resting = await noseNow(canvas);
+			const speaker = speakerAt(farLeft, level);
+			speaker.style.cssText += `; ${style}`;
+
+			expectTurnedTo(await noseAfterChange(canvas, reduced, () => handle.listen(speaker)), resting, -1);
+		});
+	});
+
 	it.each([
 		['across', new DOMRect(Number.NaN, 0, 200, 250)],
 		['down', new DOMRect(0, Number.POSITIVE_INFINITY, 200, 250)]
