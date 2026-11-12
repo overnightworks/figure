@@ -1,0 +1,7 @@
+claim_id = "d610137c212e430893a6daa273ff8932"
+agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
+role = "builder"
+base = "2a0d6db3809cabf138641e28bf1c2028af7f4328"
+branch = "claude/issue-61-move-to-quality-v0-12-0"
+scope = [".github/workflows/ci.yml", ".github/workflows/code-scanning.yml", ".github/workflows/release.yml"]
+opened_commit = "60f2ec3be1b91dae9ad6b676897d72ca92927f3a"
