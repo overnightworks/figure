@@ -18,6 +18,12 @@ const armHangPixels = 60;
 const settlingFrames = 60;
 /** How many of a figure's first drawn frames the sleeve test compares with the settled one. */
 const earlyFrames = 3;
+/** A nod lifts the nose about 7 px at a canvas 200 wide and brings it back within a few pictures: the test asks for a dip and a return of `nodPixels` each, the return within `nodReturnSamples` pictures. */
+const nodPixels = 3;
+const nodTraceSamples = 60;
+const nodReturnSamples = 20;
+/** The pictures a listening figure takes to reach its pose under reduced motion, after which its nose holds still. */
+const settledFromSample = 2;
 
 /** A canvas's drawing buffer as it was read, with its size. */
 interface Picture {
@@ -159,6 +165,19 @@ describe('a figure driven by the host', () => {
 
 	async function noseNow(canvas: HTMLCanvasElement): Promise<Spot> {
 		return noseAfter(canvas, frames + 2);
+	}
+
+	/** The nose's height in each of the next `count` pictures `canvas` shows, read in turn. */
+	async function noseTrace(canvas: HTMLCanvasElement, count: number): Promise<number[]> {
+		const trace: number[] = [];
+		for (let sample = 0; sample < count; sample++) trace.push((await noseNow(canvas)).y);
+		return trace;
+	}
+
+	/** A speaker whose centre lies on the canvas's centre, so the gaze rests straight ahead and what moves the nose is the nod. */
+	function speakerOnCentre(canvas: HTMLCanvasElement): HTMLElement {
+		const box = canvas.getBoundingClientRect();
+		return speakerAt(box.left + box.width / 2 - 10, box.top + box.height / 2 - 10);
 	}
 
 	/** The nose in the first picture `canvas` shows after `act` ran, which is the frame the figure draws next. */
@@ -487,6 +506,27 @@ describe('a figure driven by the host', () => {
 
 		expect(handle.signal).toBe(ending);
 		expect(frames).toBe(framesAtEnd);
+	});
+
+	it('nods while a speaker is set: the nose dips and comes back within a nod', async () => {
+		const { canvas, handle } = await mountFigure();
+		handle.listen(speakerOnCentre(canvas));
+		const trace = await noseTrace(canvas, nodTraceSamples);
+
+		const peak = trace.indexOf(Math.max(...trace));
+		expect(trace[peak]! - trace[0]!).toBeGreaterThanOrEqual(nodPixels);
+		expect(trace[peak]! - Math.min(...trace.slice(peak, peak + nodReturnSamples))).toBeGreaterThanOrEqual(nodPixels);
+	});
+
+	it('does not nod under reduced motion, with no speaker or with one', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseTrace(canvas, nodTraceSamples);
+		handle.listen(speakerOnCentre(canvas));
+		const listening = await noseTrace(canvas, nodTraceSamples);
+
+		expect(Math.max(...resting) - Math.min(...resting)).toBeLessThan(0.5);
+		expect(Math.max(...listening.slice(settledFromSample)) - Math.min(...listening.slice(settledFromSample))).toBeLessThan(0.5);
 	});
 });
 
