@@ -10,8 +10,8 @@ export function readPixels(canvas: HTMLCanvasElement): Uint8Array {
 	return pixels;
 }
 
-/** A face feature as the screen paints it: the eyes, the nose, or a dark feature, which is the mouth or a brow. */
-export type FaceFeature = 'eye' | 'nose' | 'dark';
+/** A feature as the screen paints it: the eyes, the nose, a dark feature (the mouth or a brow), an arm, or a sleeve. */
+export type FaceFeature = 'eye' | 'nose' | 'dark' | 'arm' | 'sleeve';
 
 /** A pixel's position on the canvas, measured from its top left corner. */
 export interface Spot {
@@ -25,8 +25,8 @@ const DARK_LIMIT = 120;
 const OPAQUE_ALPHA = 200;
 
 /**
- * The face feature a pixel paints, or undefined for the skin and the background. The eyes are blue, the nose yellow, both far from the
- * skin's colour under the light, and a dark pixel is a mouth or a brow.
+ * The feature a pixel paints, or undefined for the skin and the background. The eyes are blue, the nose yellow, the arms green and the sleeves magenta, all far
+ * from the skin's colour under the light, and a dark pixel is a mouth or a brow.
  */
 export function faceFeatureOf(pixel: readonly number[]): FaceFeature | undefined {
 	const [red, green, blue, alpha] = pixel as [number, number, number, number];
@@ -34,12 +34,14 @@ export function faceFeatureOf(pixel: readonly number[]): FaceFeature | undefined
 	if (Math.max(red, green, blue) < DARK_LIMIT) return 'dark';
 	if (blue > 180 && red < 150) return 'eye';
 	if (red > 200 && green > 190 && blue < 150) return 'nose';
+	if (green > red + 60 && green > blue + 60) return 'arm';
+	if (red > 150 && blue > 120 && green < red - 80 && green < blue - 40) return 'sleeve';
 	return undefined;
 }
 
 /** The spots of each face feature in a drawing buffer read from the bottom row up, measured from the top left. */
 export function spotsOf(pixels: Uint8Array, width: number, height: number): Record<FaceFeature, Spot[]> {
-	const spots: Record<FaceFeature, Spot[]> = { eye: [], nose: [], dark: [] };
+	const spots: Record<FaceFeature, Spot[]> = { eye: [], nose: [], dark: [], arm: [], sleeve: [] };
 	for (let row = 0; row < height; row++) {
 		for (let column = 0; column < width; column++) {
 			const offset = 4 * (row * width + column);

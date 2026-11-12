@@ -142,10 +142,10 @@ describe('the conformant synthetic VRM as glTF 2.0 meshes and skin (sections 3.7
 		expect(jointNodes(1)).toEqual([boneNode('head')]);
 	});
 
-	it('reads its texture from an image through a core material and no extension but VRMC_vrm', () => {
+	it('reads its texture from an image through a core material and uses no extension but VRMC_vrm and the VRMC_springBone of its sleeves', () => {
 		const texture = json.textures[json.materials[0].pbrMetallicRoughness.baseColorTexture.index];
 		expect(json.images[texture.source].mimeType).toBe('image/png');
-		expect(json.extensionsUsed).toEqual(['VRMC_vrm']);
+		expect(json.extensionsUsed).toEqual(['VRMC_vrm', 'VRMC_springBone']);
 		expect(json.materials[0].extensions).toBeUndefined();
 	});
 
@@ -161,6 +161,33 @@ describe('the conformant synthetic VRM as glTF 2.0 meshes and skin (sections 3.7
 		const colours = untextured.map((index) => JSON.stringify(json.materials[index].pbrMetallicRoughness.baseColorFactor));
 		expect(untextured.length).toBeGreaterThanOrEqual(3);
 		expect(new Set(colours).size).toBe(colours.length);
+	});
+});
+
+describe('the sleeves (schema: VRMC_springBone.spring.schema.json)', () => {
+	const springNodes: number[] = json.extensions.VRMC_springBone.springs.flatMap((spring: Json) => spring.joints.map((joint: Json) => joint.node));
+	const humanoidNodes = Object.values<Json>(vrm.humanoid.humanBones).map(({ node }) => node);
+
+	it.each([
+		['leftUpperArm', 'leftSleeve'],
+		['rightUpperArm', 'rightSleeve']
+	])('hangs a sleeve from %s that is a spring joint and no humanoid bone', (upperArm, sleeve) => {
+		const sleeveNode = nodes.findIndex((node) => node.name === sleeve);
+		expect(parentOf(sleeveNode)).toBe(boneNode(upperArm));
+		expect(springNodes).toContain(sleeveNode);
+		expect(humanoidNodes).not.toContain(sleeveNode);
+	});
+
+	it('skins the two sleeves to their spring joints', () => {
+		const sleevePrimitives = primitives.filter((primitive) => springNodes.includes(jointNodesOf(primitive)[0]!));
+		expect(sleevePrimitives).toHaveLength(2);
+	});
+
+	it('gives the sleeves an untextured material no other part of the figure shares', () => {
+		const sleevePrimitives = primitives.filter((primitive) => springNodes.includes(jointNodesOf(primitive)[0]!));
+		const otherColours = primitives.filter((primitive) => !sleevePrimitives.includes(primitive)).map((primitive) => JSON.stringify(materialOf(primitive).pbrMetallicRoughness));
+		expect(sleevePrimitives.every((primitive) => !isTextured(materialOf(primitive)))).toBe(true);
+		expect(otherColours).not.toContain(JSON.stringify(materialOf(sleevePrimitives[0]!).pbrMetallicRoughness));
 	});
 });
 
