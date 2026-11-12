@@ -30,6 +30,7 @@ describe('a figure driven by the host', () => {
 	const canvases: HTMLCanvasElement[] = [];
 	const handles: FigureHandle[] = [];
 	const speakers: HTMLElement[] = [];
+	const iframes: HTMLIFrameElement[] = [];
 	/** What each watched canvas held when the figure drew it for the first `earlyFrames` times. */
 	const shownEarly = new Map<HTMLCanvasElement, Picture[]>();
 	/** What each watched canvas held when the figure last drew it, read in the frame's own task, where the buffer still holds the picture. */
@@ -56,6 +57,7 @@ describe('a figure driven by the host', () => {
 		handles.splice(0).forEach((handle) => handle.dispose());
 		canvases.splice(0).forEach((canvas) => canvas.remove());
 		speakers.splice(0).forEach((speaker) => speaker.remove());
+		iframes.splice(0).forEach((frame) => frame.remove());
 		await cdp().send('Emulation.setEmulatedMedia', { features: [] });
 	});
 
@@ -297,6 +299,26 @@ describe('a figure driven by the host', () => {
 		expect((await noseNow(canvas)).x).toBeGreaterThan(resting.x + turnedPixels.side);
 	});
 
+	it('follows an element made by an iframe once it is moved into the canvas\'s document, with no call', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await noseNow(canvas);
+		const frame = document.createElement('iframe');
+		document.body.append(frame);
+		iframes.push(frame);
+		const foreign = frame.contentDocument!.createElement('div');
+		foreign.style.cssText = `position: fixed; left: ${farLeft}px; top: ${level}px; width: 20px; height: 20px`;
+		frame.contentDocument!.body.append(foreign);
+		speakers.push(foreign);
+
+		expect(foreign instanceof Element).toBe(false);
+		handle.listen(foreign);
+		expect(await noseNow(canvas)).toEqual(resting);
+		document.body.append(foreign);
+
+		expect((await noseNow(canvas)).x).toBeLessThan(resting.x - turnedPixels.side);
+	});
+
 	it('shows the thinking look over a speaker, and the speaker once the thinking ends', async () => {
 		await emulateReducedMotion();
 		const { canvas, handle } = await mountFigure();
@@ -332,8 +354,10 @@ describe('a figure driven by the host', () => {
 		['a string', 'speaker'],
 		['a plain object', { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1, height: 1 }) }],
 		['the document', document],
-		['a proxy that throws when judged', new Proxy({}, { getPrototypeOf: () => { throw new Error('refused'); } })]
-	])('throws nothing for %s and counts it as nobody', async (_, speaker) => {
+		['a proxy that throws when judged', new Proxy({}, { getPrototypeOf: () => { throw new Error('refused'); } })],
+		['a proxy of an element, whose reads are refused', new Proxy(document.createElement('div'), {})],
+		['an object that only inherits from Element', Object.create(Element.prototype)]
+	])('throws nothing for %s, counts it as nobody and goes on drawing', async (_, speaker) => {
 		await emulateReducedMotion();
 		const { canvas, handle } = await mountFigure();
 		const resting = await noseNow(canvas);
@@ -341,6 +365,7 @@ describe('a figure driven by the host', () => {
 		expect(() => handle.listen(speaker as Element)).not.toThrow();
 
 		expect(await noseNow(canvas)).toEqual(resting);
+		expect(handle.signal).toBe(figureSignal.drawn);
 	});
 
 	it('does nothing on a disposed figure and throws nothing when told of a speaker', async () => {

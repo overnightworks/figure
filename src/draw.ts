@@ -47,29 +47,25 @@ interface Loop {
 	readonly listen: (speaker: Element | null) => void;
 }
 
-/** What `listen` was given as the element it counts, or null: a value that is no element, or that cannot be judged, counts as nobody. */
-function asSpeaker(value: unknown): Element | null {
-	try {
-		return value instanceof Element ? value : null;
-	} catch {
-		return null;
-	}
-}
-
 /**
  * Where the speaker's centre lies from the canvas's centre, in shares of half the viewport's width and height, or null when nobody counts
  * as speaking: no element, one that is not connected, or one of another document than the canvas's, whose rectangle is not in the canvas's
- * viewport. The viewport is the canvas's document's, at least a pixel wide and high.
+ * viewport. The viewport is the canvas's document's, at least a pixel wide and high. Whatever `listen` was given is judged here, each
+ * frame, by what it answers, not by the realm it was made in; a value whose reads throw counts as nobody, so a frame never fails for it.
  */
 function speakerOffset(canvas: HTMLCanvasElement, speaker: Element | null): SpeakerOffset | null {
-	if (speaker === null || !speaker.isConnected || speaker.ownerDocument !== canvas.ownerDocument) return null;
-	const viewport = canvas.ownerDocument.documentElement;
-	const from = canvas.getBoundingClientRect();
-	const to = speaker.getBoundingClientRect();
-	return {
-		across: (to.left + to.width / 2 - (from.left + from.width / 2)) / (Math.max(1, viewport.clientWidth) / 2),
-		down: (to.top + to.height / 2 - (from.top + from.height / 2)) / (Math.max(1, viewport.clientHeight) / 2)
-	};
+	try {
+		if (speaker === null || speaker.nodeType !== Node.ELEMENT_NODE || !speaker.isConnected || speaker.ownerDocument !== canvas.ownerDocument) return null;
+		const viewport = canvas.ownerDocument.documentElement;
+		const from = canvas.getBoundingClientRect();
+		const to = speaker.getBoundingClientRect();
+		return {
+			across: (to.left + to.width / 2 - (from.left + from.width / 2)) / (Math.max(1, viewport.clientWidth) / 2),
+			down: (to.top + to.height / 2 - (from.top + from.height / 2)) / (Math.max(1, viewport.clientHeight) / 2)
+		};
+	} catch {
+		return null;
+	}
 }
 
 /** The renderer on the canvas's WebGL 2 context, or the signal for why there is none; a canvas that cannot give a context throws. */
@@ -157,7 +153,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 		facts = { thinking: working === true };
 	};
 	const listen = (element: Element | null) => {
-		if (!stopped) speaker = asSpeaker(element);
+		if (!stopped) speaker = element;
 	};
 	return { stop, think, listen };
 }
