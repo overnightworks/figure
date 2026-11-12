@@ -168,7 +168,9 @@ describe('the window vowelWeights analyses', () => {
 		const window = voicedBlock({ ...defaultVoice, rate }).slice(-analysisWindowLength(rate));
 
 		expect(window).toHaveLength(analysisWindowLength(rate));
-		expect(strongest(vowelWeights(window, rate))).toBe('aa');
+		const weights = vowelWeights(window, rate);
+		expect(strongest(weights)).toBe('aa');
+		expect(weights.aa).toBeGreaterThan(0);
 	});
 
 	it('gives the weights of the window alone, whatever the block holds before it', () => {
