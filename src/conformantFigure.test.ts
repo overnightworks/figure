@@ -178,10 +178,14 @@ describe('the sleeves (schema: VRMC_springBone.spring.schema.json)', () => {
 		expect(humanoidNodes).not.toContain(sleeveNode);
 	});
 
-	it('skins a sleeve to its spring joint with a material of its own', () => {
+	it('skins the two sleeves to their spring joints', () => {
+		const sleevePrimitives = primitives.filter((primitive) => springNodes.includes(jointNodesOf(primitive)[0]!));
+		expect(sleevePrimitives).toHaveLength(2);
+	});
+
+	it('gives the sleeves an untextured material no other part of the figure shares', () => {
 		const sleevePrimitives = primitives.filter((primitive) => springNodes.includes(jointNodesOf(primitive)[0]!));
 		const otherColours = primitives.filter((primitive) => !sleevePrimitives.includes(primitive)).map((primitive) => JSON.stringify(materialOf(primitive).pbrMetallicRoughness));
-		expect(sleevePrimitives).toHaveLength(2);
 		expect(sleevePrimitives.every((primitive) => !isTextured(materialOf(primitive)))).toBe(true);
 		expect(otherColours).not.toContain(JSON.stringify(materialOf(sleevePrimitives[0]!).pbrMetallicRoughness));
 	});

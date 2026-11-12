@@ -55,8 +55,8 @@ function turnBone(bone: Object3D | null, turn: Turn): void {
 
 /**
  * Starts the spring bones from the posture the figure is set to now. A loader records their start in the file's bind pose, so without
- * this the sleeves and the hair would swing from that pose to the posture over the first frames; `vrm.update` poses the raw bones only
- * after the springs have moved, so they take the pose first.
+ * this the sleeves and the hair would swing from that pose to the posture over the first frames. `reset()` runs before the first
+ * `vrm.update`, which poses the humanoid only as its first step, so the humanoid is posed here first.
  */
 function startSpringBonesAtPose(vrm: VRM): void {
 	vrm.humanoid.update();
