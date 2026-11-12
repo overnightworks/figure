@@ -1,8 +1,0 @@
-claim_id = "301e43b6aa7a43b3883b5a2b0b14cdad"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "82ba9cbda42920f890db03d0b10c7db539f5a279"
-branch = "claude/issue-51-five-vowel-weights-come-from-a-voice-s-s"
-scope = [".aco/ahead-of-caller.toml", "docs/ARCHITECTURE.md", "src/expressions.test.ts", "src/expressions.ts", "src/profile.test.ts", "src/profile.ts", "src/vowelWeights.test.ts", "src/vowelWeights.ts"]
-opened_commit = "11a6d156eadd574f67142a5cf99dbd4d024be90a"
-whole_reason = "The closed sets, the profile that composes them and the vowel weights with their tests are the mouth's pure half; each file is small and none is reachable without the others' names."
