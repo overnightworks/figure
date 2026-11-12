@@ -398,9 +398,9 @@ describe('a figure driven by the host', () => {
 			const resting = await noseNow(canvas);
 			const { speaker, hide } = makeSpeaker();
 			hide();
-			handle.listen(speaker);
 			const boxed = speakerAt(farRight, level);
 
+			expectNear(await noseAfterChange(canvas, reduced, () => handle.listen(speaker)), resting);
 			expectTurnedTo(await noseAfterChange(canvas, reduced, () => handle.listen(boxed)), resting, 1);
 		});
 
