@@ -125,19 +125,9 @@ function strongest(weights: Readonly<Record<MouthShape, number>>): MouthShape | 
 }
 
 describe('vowelWeights of a voiced vowel', () => {
-	// A woman's /u/ at 220 Hz and above is read as oh: the harmonics at 220 and 440 Hz pull the first formant from 370 to about 440 Hz,
-	// which the vowel map of the mouth, with ou at 330 Hz, puts nearer oh.
-	const isBeyondReach = (vowel: MouthShape, speaker: Speaker, pitchHz: number) => speaker === 'woman' && vowel === 'ou' && pitchHz >= 220;
 	const cases = speakers.flatMap((speaker) => vowels.flatMap((vowel) => pitches.map((pitchHz) => ({ speaker, vowel, pitchHz }))));
-	const reached = cases.filter(({ vowel, speaker, pitchHz }) => !isBeyondReach(vowel, speaker, pitchHz));
-	const beyond = cases.filter(({ vowel, speaker, pitchHz }) => isBeyondReach(vowel, speaker, pitchHz));
 
-	it.each(reached)('weighs the mouth shape of $vowel highest for a $speaker at $pitchHz Hz', ({ speaker, vowel, pitchHz }) => {
-		const block = voicedBlock({ ...defaultVoice, speaker, vowel, pitchHz, seed: pitchHz });
-		expect(strongest(vowelWeights(block, sampleRate))).toBe(vowel);
-	});
-
-	it.fails.each(beyond)('still reads the mouth shape of $vowel of a $speaker at $pitchHz Hz as another', ({ speaker, vowel, pitchHz }) => {
+	it.each(cases)('weighs the mouth shape of $vowel highest for a $speaker at $pitchHz Hz', ({ speaker, vowel, pitchHz }) => {
 		const block = voicedBlock({ ...defaultVoice, speaker, vowel, pitchHz, seed: pitchHz });
 		expect(strongest(vowelWeights(block, sampleRate))).toBe(vowel);
 	});

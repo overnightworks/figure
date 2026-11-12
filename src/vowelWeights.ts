@@ -21,7 +21,8 @@ const levelPower = 0.6;
 const analysisRateHz = 8000;
 const frameLength = 320;
 const predictorOrder = 8;
-const preEmphasis = 0.97;
+// Milder than the usual 0.97: a stronger tilt compensation lets the harmonics at 220 and 440 Hz pull a woman's first formant near 370 Hz upward.
+const preEmphasis = 0.8;
 const whiteNoiseCorrection = 1 + 1e-6;
 const lowestFormantHz = 200;
 const highestFormantHz = 3500;
