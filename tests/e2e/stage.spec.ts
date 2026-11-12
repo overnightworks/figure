@@ -170,19 +170,33 @@ test.describe('the demo stage under the script policy', () => {
 		const figure = page.locator('canvas').nth(0);
 		const pictures = () => figure.screenshot();
 		const differs = (first: Buffer, second: Buffer) => differingPixels(page, first, second);
+		const pickFigure = () => page.locator('#picker').setInputFiles({ name: 'figure.vrm', mimeType: 'model/gltf-binary', buffer: Buffer.from(buildConformantVrm()) });
+		// Both figures are the picked one, so every picture is of the same model in the same state: speaking, held still.
+		await pickFigure();
+		await expectTwoDrawings(page);
 		await page.getByRole('button', { name: 'speak without a voice' }).click();
-		const neutral = await pictures();
+		// The speaking pose eases in, so the reference is the picture that two successive ones no longer differ from.
+		let neutral = await pictures();
+		await expect
+			.poll(async () => {
+				const next = await pictures();
+				const moved = await differs(neutral, next);
+				neutral = next;
+				return moved;
+			})
+			.toBeLessThan(shownPixels / 10);
 
 		await page.getByLabel('surprised', { exact: true }).check();
 		await expect.poll(async () => differs(neutral, await pictures())).toBeGreaterThan(shownPixels);
 		const surprised = await pictures();
-		await page.locator('#picker').setInputFiles({ name: 'figure.vrm', mimeType: 'model/gltf-binary', buffer: Buffer.from(buildConformantVrm()) });
-		await expectTwoDrawings(page);
-		await expect.poll(async () => differs(neutral, await pictures())).toBeGreaterThan(shownPixels);
 		await page.getByLabel('none', { exact: true }).check();
-
 		await expect.poll(async () => differs(surprised, await pictures())).toBeGreaterThan(shownPixels);
 		await expect.poll(async () => differs(neutral, await pictures())).toBeLessThan(shownPixels);
+
+		await page.getByLabel('surprised', { exact: true }).check();
+		await pickFigure();
+		await expectTwoDrawings(page);
+		await expect.poll(async () => differs(neutral, await pictures())).toBeGreaterThan(shownPixels);
 		await expectTwoDrawings(page);
 		await expectNoViolations(page, pageErrors);
 	});
