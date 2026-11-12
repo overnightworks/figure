@@ -276,7 +276,7 @@ describe('a figure whose agent speaks', () => {
 			const hiddenAt = reads.mock.calls.length;
 			await new Promise<void>((resolve) => requestFrameOwn.call(window, () => resolve()));
 			await new Promise<void>((resolve) => requestFrameOwn.call(window, () => resolve()));
-			expect(reads.mock.calls.length).toBe(hiddenAt);
+			expect(reads.mock.calls).toHaveLength(hiddenAt);
 
 			setPageVisibility('visible');
 			await vi.waitFor(() => expect(reads.mock.calls.length).toBeGreaterThan(hiddenAt));
