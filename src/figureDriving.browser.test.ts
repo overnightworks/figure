@@ -342,7 +342,7 @@ describe('a figure driven by the host', () => {
 		frame.contentDocument!.body.append(foreign);
 		speakers.push(foreign);
 
-		expect(foreign instanceof Element).toBe(false);
+		expect(foreign).not.toBeInstanceOf(Element);
 		handle.listen(foreign);
 		expect(await noseNow(canvas)).toEqual(resting);
 		document.body.append(foreign);
