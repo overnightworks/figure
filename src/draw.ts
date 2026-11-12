@@ -97,7 +97,7 @@ type LoopEnding = typeof figureSignal.lost | typeof figureSignal.slow;
  */
 function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: LoopEnding) => void): Loop {
 	const motion = createFigureMotion(Math.random);
-	let facts: FigureFacts = { thinking: false };
+	let facts: FigureFacts = { thinking: false, speaking: false };
 	let speaker: Element | null = null;
 	const reducedMotion = matchMedia(reducedMotionQuery);
 	let previousTime = performance.now();
@@ -106,7 +106,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const drawAt = (time: number) => {
 		const elapsedSeconds = (time - previousTime) / 1000;
 		previousTime = time;
-		stage.draw(motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker)), elapsedSeconds);
+		stage.draw(motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker), null), elapsedSeconds);
 	};
 	let pendingFrame: number | undefined;
 	let stopped = false;
@@ -153,7 +153,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	canvas.addEventListener('webglcontextlost', onContextLost);
 	viewport.observe(canvas);
 	const think = (working: boolean) => {
-		facts = { thinking: working === true };
+		facts = { ...facts, thinking: working === true };
 	};
 	const listen = (element: Element | null) => {
 		if (!stopped) speaker = element;

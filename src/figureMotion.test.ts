@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mouthShape, type MouthShape } from './expressions.js';
 import { createFigureMotion, spreadPosture, type FigureFacts, type FigurePose, type SpeakerOffset } from './figureMotion.js';
+import type { VowelWeights } from './vowelWeights.js';
 
 /** A small seeded source of numbers in [0, 1) (mulberry32), so a run is the same every time. */
 function seededRandom(seed: number): () => number {
@@ -14,8 +16,10 @@ function seededRandom(seed: number): () => number {
 
 const seed = 7;
 const frameSeconds = 0.01;
-const idle: FigureFacts = { thinking: false };
-const thinking: FigureFacts = { thinking: true };
+const idle: FigureFacts = { thinking: false, speaking: false };
+const thinking: FigureFacts = { thinking: true, speaking: false };
+const speaking: FigureFacts = { thinking: false, speaking: true };
+const thinkingAndSpeaking: FigureFacts = { thinking: true, speaking: true };
 
 /** The picture's thinking look, in the units the pose uses: the gaze 18 degrees to the side and 13 up, the look-at turning 2.4 times that. */
 const thinkingLook = { yaw: -43.2, pitch: 31.2 };
@@ -26,10 +30,16 @@ const thinkingPosture = { yaw: -0.2, pitch: -0.1, roll: 0.16 };
 /** The idle glance reaches 14 degrees of yaw and the look-at turns 2.4 times the gaze, so no glance looks further than this. */
 const widestIdleLookYaw = 14 * 2.4;
 
-/** The poses of a figure given `factsAt(frame)` and the speaker `speakerAt(frame)` for `frames` frames of 10 ms, while the page asks for reduced motion or not. */
-function watch(frames: number, factsAt: (frame: number) => FigureFacts, reducedMotion = false, speakerAt: (frame: number) => SpeakerOffset | null = () => null): FigurePose[] {
+/** The poses of a figure given `factsAt(frame)`, the speaker `speakerAt(frame)` and the mouth weights `mouthAt(frame)` for `frames` frames of 10 ms, while the page asks for reduced motion or not. */
+function watch(
+	frames: number,
+	factsAt: (frame: number) => FigureFacts,
+	reducedMotion = false,
+	speakerAt: (frame: number) => SpeakerOffset | null = () => null,
+	mouthAt: (frame: number) => VowelWeights | null = () => null
+): FigurePose[] {
 	const motion = createFigureMotion(seededRandom(seed));
-	return Array.from({ length: frames }, (_, frame) => motion.advance(factsAt(frame), frameSeconds, reducedMotion, speakerAt(frame)));
+	return Array.from({ length: frames }, (_, frame) => motion.advance(factsAt(frame), frameSeconds, reducedMotion, speakerAt(frame), mouthAt(frame)));
 }
 
 /** The longest stretch, in seconds, the eyes stay closing in `poses`. */
@@ -156,7 +166,7 @@ describe('the figure motion', () => {
 	it('does not restart the ease when the same fact is given again', () => {
 		const given = watch(200, () => thinking);
 		const motion = createFigureMotion(seededRandom(seed));
-		const again = Array.from({ length: 200 }, () => motion.advance({ thinking: true }, frameSeconds, false, null));
+		const again = Array.from({ length: 200 }, () => motion.advance(thinking, frameSeconds, false, null, null));
 
 		expect(again).toEqual(given);
 	});
@@ -165,7 +175,7 @@ describe('the figure motion', () => {
 		const stepped = createFigureMotion(seededRandom(seed));
 		const returned = createFigureMotion(seededRandom(seed));
 
-		expect(returned.advance(thinking, 30, false, null)).toEqual(stepped.advance(thinking, 0.1, false, null));
+		expect(returned.advance(thinking, 30, false, null, null)).toEqual(stepped.advance(thinking, 0.1, false, null, null));
 	});
 
 	it('keeps the idle look of release 0.2.0 when the agent never thinks: its breath, head turn, gaze and blink at the same moments', () => {
@@ -314,7 +324,7 @@ describe('the figure motion while someone speaks', () => {
 	it('does not restart the ease when the same speaker is given again', () => {
 		const given = watch(200, () => idle, false, () => speakerLeft);
 		const motion = createFigureMotion(seededRandom(seed));
-		const again = Array.from({ length: 200 }, () => motion.advance(idle, frameSeconds, false, { across: -0.5, down: 0 }));
+		const again = Array.from({ length: 200 }, () => motion.advance(idle, frameSeconds, false, { across: -0.5, down: 0 }, null));
 
 		expect(again).toEqual(given);
 	});
@@ -380,9 +390,160 @@ describe('the figure motion while someone speaks', () => {
 		[0.999999, 5]
 	])('takes the gap between nods from the source of chance: a source giving %s gaps of %s seconds', (share, gap) => {
 		const motion = createFigureMotion(() => share);
-		const starts = nodStartsOf(Array.from({ length: 6000 }, () => motion.advance(idle, frameSeconds, false, speakerLeft).posture.pitch));
+		const starts = nodStartsOf(Array.from({ length: 6000 }, () => motion.advance(idle, frameSeconds, false, speakerLeft, null).posture.pitch));
 
 		expect(starts[1]! - starts[0]!).toBeCloseTo(gap, 1);
+	});
+});
+
+describe('the figure motion while the agent speaks', () => {
+	const stillMouth: VowelWeights = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+	const shapes = Object.values(mouthShape);
+	/** Full weight on one shape, and nothing on the others. */
+	const only = (shape: MouthShape): VowelWeights => ({ ...stillMouth, [shape]: 1 });
+	const aa = only(mouthShape.aa);
+	/** The head's forward pitch the voice adds: the pose of the mouth followed minus that of the same facts with a still mouth. */
+	const voiceNod = (followed: FigurePose[], still: FigurePose[]) => followed.map((pose, frame) => pose.head.pitch - still[frame]!.head.pitch);
+
+	it('shows the idle glance and no thinking look, lean or nod while it speaks, though it thinks and someone speaks to it', () => {
+		const idling = watch(3000, () => idle);
+		const speakingOverAll = watch(3000, () => thinkingAndSpeaking, false, () => speakerLeft);
+
+		speakingOverAll.forEach((pose, frame) => {
+			expect(pose.look).toEqual(idling[frame]!.look);
+			expect(pose.posture).toEqual(idling[frame]!.posture);
+			expect(pose.trunkLean).toBe(0);
+			expect(pose.blink).toBe(idling[frame]!.blink);
+			expect(pose.head).toEqual(idling[frame]!.head);
+		});
+	});
+
+	it('shows thinking over listening when the speaking ends, and listening once the thinking ends, in that order and at once under reduced motion', () => {
+		const bothFacts = (frame: number) => (frame < 10 ? thinkingAndSpeaking : frame < 20 ? thinking : idle);
+		const poses = watch(30, bothFacts, true, () => speakerLeft);
+
+		expect(poses[9]!.look.yaw).toBe(0);
+		expect(poses[9]!.posture.roll).toBe(0);
+		expect(poses[10]!.look.yaw).toBeCloseTo(thinkingLook.yaw, 6);
+		expect(poses[10]!.posture.roll).toBeCloseTo(thinkingPosture.roll, 6);
+		expect(poses[20]!.look.yaw).toBeCloseTo(-48, 6);
+		expect(poses[20]!.posture.roll).toBe(0);
+		expect(poses[20]!.trunkLean).toBeCloseTo(0.02, 9);
+	});
+
+	it('shows a listening figure back after the speaking ends, with its nods', () => {
+		const pitches = pitchesOf(watch(400, (frame) => (frame < 100 ? speaking : idle), false, () => speakerLeft));
+
+		expect(new Set(pitches.slice(0, 100))).toEqual(new Set([0]));
+		expect(pitches.slice(100).some((pitch) => pitch > 0)).toBe(true);
+	});
+
+	it.each(shapes)('eases the weight of %s up at 38 a second: a share of 1 - e^(-38 t) after t seconds', (shape) => {
+		const poses = watch(100, () => speaking, false, () => null, () => only(shape));
+
+		[0.01, 0.03, 0.1].forEach((seconds) => {
+			expect(poses[atSecond(seconds)]!.mouth[shape]).toBeCloseTo(1 - Math.exp(-38 * seconds), 9);
+		});
+		shapes.filter((other) => other !== shape).forEach((other) => expect(poses[50]!.mouth[other]).toBe(0));
+	});
+
+	it.each(shapes)('eases the weight of %s down at 22 a second once the voice falls silent: a share of e^(-22 t) is left after t seconds', (shape) => {
+		const poses = watch(300, () => speaking, false, () => null, (frame) => (frame < 100 ? only(shape) : null));
+
+		expect(poses[99]!.mouth[shape]).toBeCloseTo(1, 9);
+		[0.01, 0.05, 0.2].forEach((seconds) => {
+			expect(poses[99 + Math.round(seconds / frameSeconds)]!.mouth[shape]).toBeCloseTo(Math.exp(-22 * seconds), 9);
+		});
+	});
+
+	it('lets all five weights fall to zero at the falling rate when the speaking stops, though weights are still given', () => {
+		const everything: VowelWeights = { aa: 0.4, ih: 0.3, ou: 0.1, ee: 0.1, oh: 0.1 };
+		const poses = watch(300, (frame) => (frame < 100 ? speaking : idle), false, () => null, () => everything);
+
+		shapes.forEach((shape) => {
+			expect(poses[99]!.mouth[shape]).toBeCloseTo(everything[shape], 9);
+			expect(poses[109]!.mouth[shape]).toBeCloseTo(everything[shape] * Math.exp(-22 * 0.1), 9);
+		});
+		expect(Math.max(...Object.values(poses[299]!.mouth))).toBeLessThan(1e-9);
+	});
+
+	it('eases a weight up and another down in one frame, each at its own rate', () => {
+		const poses = watch(200, () => speaking, false, () => null, (frame) => (frame < 100 ? only(mouthShape.aa) : only(mouthShape.oh)));
+
+		expect(poses[99]!.mouth.aa).toBeCloseTo(1, 9);
+		expect(poses[109]!.mouth.aa).toBeCloseTo(Math.exp(-22 * 0.1), 9);
+		expect(poses[109]!.mouth.oh).toBeCloseTo(1 - Math.exp(-38 * 0.1), 9);
+	});
+
+	it('keeps the mouth still while it speaks with no weights, and for weights given while it does not speak', () => {
+		const withoutWeights = watch(200, () => speaking);
+		const notSpeaking = watch(200, () => idle, false, () => null, () => aa);
+
+		[...withoutWeights, ...notSpeaking].forEach((pose) => expect(pose.mouth).toEqual(stillMouth));
+	});
+
+	it('does not nod with the voice while the mouth is still', () => {
+		const still = watch(500, () => speaking);
+		const silentWeights = watch(500, () => speaking, false, () => null, () => stillMouth);
+
+		expect(silentWeights).toEqual(still);
+	});
+
+	it('nods the head with the voice by the level times 0.045 rad times sin(5.1 t) on its pitch, the level being the weights\' sum up to 1', () => {
+		const still = watch(500, () => speaking);
+		const followed = watch(500, () => speaking, false, () => null, () => aa);
+		const nod = voiceNod(followed, still);
+
+		nod.slice(atSecond(2)).forEach((pitch, index) => {
+			const second = (atSecond(2) + index + 1) * frameSeconds;
+			expect(pitch).toBeCloseTo(0.045 * Math.sin(5.1 * second), 6);
+		});
+	});
+
+	it('scales the nod by the sum of the weights, and caps the level at 1', () => {
+		const still = watch(500, () => speaking);
+		const half = voiceNod(watch(500, () => speaking, false, () => null, () => ({ ...stillMouth, aa: 0.3, ih: 0.2 })), still);
+		const beyond = voiceNod(watch(500, () => speaking, false, () => null, () => ({ ...stillMouth, aa: 1, ih: 1, oh: 1 })), still);
+
+		expect(Math.max(...half.slice(atSecond(2)))).toBeCloseTo(0.5 * 0.045, 3);
+		expect(Math.max(...beyond.slice(atSecond(2)))).toBeCloseTo(0.045, 3);
+	});
+
+	it('eases the level at 12 a second toward the sum of the eased weights', () => {
+		const still = watch(30, () => speaking);
+		const followed = watch(30, () => speaking, false, () => null, () => aa);
+		const second = 0.1;
+		const level = voiceNod(followed, still)[atSecond(second)]! / (0.045 * Math.sin(5.1 * second));
+		const expected = 1 - (38 * Math.exp(-12 * second) - 12 * Math.exp(-38 * second)) / 26;
+
+		expect(level).toBeCloseTo(expected, 1);
+	});
+
+	it('lets the nod die away once the voice falls silent', () => {
+		const still = watch(600, () => speaking);
+		const nod = voiceNod(watch(600, () => speaking, false, () => null, (frame) => (frame < 300 ? aa : null)), still);
+
+		expect(Math.max(...nod.slice(250, 300).map(Math.abs))).toBeGreaterThan(0.04);
+		expect(Math.max(...nod.slice(500).map(Math.abs))).toBeLessThan(1e-6);
+	});
+
+	it('reaches the weights at once under reduced motion and leaves them at once, with no nod', () => {
+		const everything: VowelWeights = { aa: 0.4, ih: 0.3, ou: 0.1, ee: 0.1, oh: 0.1 };
+		const still = watch(30, () => speaking, true);
+		const poses = watch(30, () => speaking, true, () => null, (frame) => (frame < 10 || frame >= 20 ? null : everything));
+
+		expect(poses[9]!.mouth).toEqual(stillMouth);
+		[10, 19].forEach((frame) => expect(poses[frame]!.mouth).toEqual(everything));
+		expect(poses[20]!.mouth).toEqual(stillMouth);
+		poses.forEach((pose, frame) => expect(pose.head.pitch).toBe(still[frame]!.head.pitch));
+	});
+
+	it('does not restart the mouth when the same facts and weights are given again', () => {
+		const given = watch(200, () => speaking, false, () => null, () => aa);
+		const motion = createFigureMotion(seededRandom(seed));
+		const again = Array.from({ length: 200 }, () => motion.advance(speaking, frameSeconds, false, null, aa));
+
+		expect(again).toEqual(given);
 	});
 });
 
