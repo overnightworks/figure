@@ -224,7 +224,7 @@ describe('a figure driven by the host', () => {
 		expect(thinking.x).toBeLessThan(resting.x - turnedPixels.side);
 	});
 
-	/** Puts a small element of the page at `x` and `y` CSS pixels from the viewport's top left, in `owner`'s body or detached when `attach` is false. */
+	/** Puts a small element of the page at `x` and `y` CSS pixels from the viewport's top left, in the page's body or detached when `attach` is false. */
 	function speakerAt(x: number, y: number, attach = true): HTMLElement {
 		const speaker = document.createElement('div');
 		speaker.style.cssText = `position: fixed; left: ${x}px; top: ${y}px; width: 20px; height: 20px`;
