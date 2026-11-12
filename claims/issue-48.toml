@@ -3,6 +3,6 @@ agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
 role = "builder"
 base = "82ba9cbda42920f890db03d0b10c7db539f5a279"
 branch = "claude/issue-48-a-speaker-without-a-box-counts-as-nobody"
-scope = ["README.md", "src/draw.ts", "src/figureDriving.browser.test.ts", "tests"]
+scope = ["README.md", "src/draw.browser.test.ts", "src/draw.ts", "src/figureDriving.browser.test.ts", "tests"]
 opened_commit = "d8985e6c873c1bd9259578f48b6512356062a707"
 whole_reason = "The judgement in the loop and the browser cells that prove it are one behaviour."
