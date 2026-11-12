@@ -138,7 +138,7 @@ describe('a figure driven by the host', () => {
 		expectArmsLowered(await armsNow(canvas), nose);
 	});
 
-	it('shows the sleeves of the first drawn frames as they settle, under reduced motion where nothing else moves', async () => {
+	it('draws the sleeves in their first frames where they rest after settling, under reduced motion', async () => {
 		await emulateReducedMotion();
 		const { canvas } = await mountFigure();
 		await vi.waitFor(() => expect(shownEarly.get(canvas)).toHaveLength(earlyFrames));
