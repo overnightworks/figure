@@ -1,4 +1,4 @@
-// What the browser tests share to read a drawn canvas: its pixels, the face's features in them, and the page's reduced-motion setting.
+// What the browser tests share to read a drawn canvas: its pixels, the face's features in them, the mouth's opening, and the page's reduced-motion setting.
 import { cdp } from 'vitest/browser';
 
 /** The canvas's drawing buffer as RGBA bytes; read in the task that drew it, a buffer holds nothing afterwards. */
@@ -56,6 +56,16 @@ export function spotsOf(pixels: Uint8Array, width: number, height: number): Reco
 export function centreOf(spots: readonly Spot[]): { count: number; x: number; y: number } {
 	const sum = spots.reduce((total, { x, y }) => ({ x: total.x + x, y: total.y + y }), { x: 0, y: 0 });
 	return { count: spots.length, x: sum.x / spots.length, y: sum.y / spots.length };
+}
+
+/** How far from the nose's column, in pixels at a canvas 200 wide, a dark pixel still belongs to the mouth rather than to a corner of it. */
+const MOUTH_REACH = 6;
+
+/** How many rows the mouth covers: the dark pixels below the nose and within `MOUTH_REACH` of its column, where the mouth is the only dark feature. */
+export function mouthRows(spots: Record<FaceFeature, Spot[]>): number {
+	const nose = centreOf(spots.nose);
+	const rows = spots.dark.filter(({ x, y }) => y > nose.y && Math.abs(x - nose.x) <= MOUTH_REACH).map(({ y }) => y);
+	return new Set(rows).size;
 }
 
 /** Whether the pixels hold any the figure covers: a buffer nothing was drawn into is transparent everywhere. */

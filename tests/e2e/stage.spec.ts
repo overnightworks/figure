@@ -98,6 +98,107 @@ test.describe('the demo stage under the script policy', () => {
 		await expectNoViolations(page, pageErrors);
 	});
 
+	/** A mono recording of a tone, as the bytes of a PCM WAV file: `seconds` long, at 8000 samples a second. */
+	function toneRecording(seconds: number): Buffer {
+		const rate = 8000;
+		const samples = Math.round(rate * seconds);
+		const bytes = Buffer.alloc(44 + 2 * samples);
+		bytes.write('RIFF', 0);
+		bytes.writeUInt32LE(36 + 2 * samples, 4);
+		bytes.write('WAVEfmt ', 8);
+		bytes.writeUInt32LE(16, 16);
+		bytes.writeUInt16LE(1, 20);
+		bytes.writeUInt16LE(1, 22);
+		bytes.writeUInt32LE(rate, 24);
+		bytes.writeUInt32LE(2 * rate, 28);
+		bytes.writeUInt16LE(2, 32);
+		bytes.writeUInt16LE(16, 34);
+		bytes.write('data', 36);
+		bytes.writeUInt32LE(2 * samples, 40);
+		for (let sample = 0; sample < samples; sample++) bytes.writeInt16LE(Math.round(8000 * Math.sin((2 * Math.PI * 220 * sample) / rate)), 44 + 2 * sample);
+		return bytes;
+	}
+
+	test('the speak controls tell both figures a sentence with a synthesized vowel, without a voice and no more, and the figures stay drawn', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		const status = page.locator('#voice-status');
+		await expect(status).toHaveText('quiet');
+
+		await page.getByLabel('oh', { exact: true }).check();
+		await page.getByRole('button', { name: 'speak', exact: true }).click();
+		await expect(status).toHaveText('speaking oh (audio running)');
+		await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+		await expectTwoDrawings(page);
+
+		await page.getByRole('button', { name: 'speak without a voice' }).click();
+		await expect(status).toHaveText('speaking without a voice');
+		await page.getByRole('button', { name: 'stop' }).click();
+		await expect(status).toHaveText('quiet');
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	test('a picked audio file is played once and the figures are told when it ends', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		const status = page.locator('#voice-status');
+
+		await page.locator('#voice-picker').setInputFiles({ name: 'tone.wav', mimeType: 'audio/wav', buffer: toneRecording(1) });
+		await expect(status).toHaveText('speaking tone.wav (audio running)');
+		await expect(status).toHaveText('quiet', { timeout: drawingTimeout });
+		await page.locator('#voice-picker').setInputFiles({ name: 'not-audio.wav', mimeType: 'audio/wav', buffer: Buffer.from('plain text') });
+		await expect(status).toHaveText('not audio');
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	for (const [control, expected] of [
+		['stop', 'quiet'],
+		['speak without a voice', 'speaking without a voice']
+	] as const) {
+		test(`a picked audio file that is still decoding does not speak after ${control}`, async ({ page }) => {
+			await page.addInitScript(() => {
+				const held = window as unknown as { releaseDecode: () => void; decodeStarted: boolean; decodeFinished: boolean };
+				const gate = new Promise<void>((release) => (held.releaseDecode = release));
+				const decode = AudioContext.prototype.decodeAudioData;
+				AudioContext.prototype.decodeAudioData = async function (this: AudioContext, bytes: ArrayBuffer) {
+					held.decodeStarted = true;
+					const recording = await decode.call(this, bytes);
+					await gate;
+					held.decodeFinished = true;
+					return recording;
+				};
+			});
+			const pageErrors = await openStage(page, stage);
+			await expectTwoDrawings(page);
+			const status = page.locator('#voice-status');
+
+			await page.locator('#voice-picker').setInputFiles({ name: 'tone.wav', mimeType: 'audio/wav', buffer: toneRecording(30) });
+			await page.waitForFunction(() => (window as unknown as { decodeStarted?: boolean }).decodeStarted === true);
+			await page.getByRole('button', { name: control, exact: true }).click();
+			await expect(status).toHaveText(expected);
+			await page.evaluate(() => (window as unknown as { releaseDecode: () => void }).releaseDecode());
+			await page.waitForFunction(() => (window as unknown as { decodeFinished?: boolean }).decodeFinished === true);
+			await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+			await expect(status).toHaveText(expected);
+			await expectTwoDrawings(page);
+			await expectNoViolations(page, pageErrors);
+		});
+	}
+
+	test('figures picked while the agent speaks are drawn and the stage still holds the sentence', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		await page.getByRole('button', { name: 'speak without a voice' }).click();
+
+		await page.locator('#picker').setInputFiles({ name: 'figure.vrm', mimeType: 'model/gltf-binary', buffer: Buffer.from(buildConformantVrm()) });
+		await expectTwoDrawings(page);
+		await expect(page.locator('#voice-status')).toHaveText('speaking without a voice');
+		await expectNoViolations(page, pageErrors);
+	});
+
 	test('a picked figure replaces both drawings on fresh canvases', async ({ page }) => {
 		const pageErrors = await openStage(page, stage);
 		await expectTwoDrawings(page);

@@ -109,6 +109,7 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 			turnBone(leftUpperArm, pose.arms.leftUpperArm);
 			turnBone(rightUpperArm, pose.arms.rightUpperArm);
 			vrm.expressionManager!.setValue('blink', pose.blink);
+			for (const [shape, weight] of Object.entries(pose.mouth)) vrm.expressionManager!.setValue(shape, weight);
 			vrm.lookAt!.yaw = pose.look.yaw;
 			vrm.lookAt!.pitch = pose.look.pitch;
 			if (!posed) {
