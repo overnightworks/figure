@@ -1,8 +1,0 @@
-claim_id = "fbfd527627ab45189c7fac149324d2a3"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "47e111eafaf8d096bf6c3b6444637585ed947960"
-branch = "claude/issue-47-a-listening-figure-nods-now-and-then"
-scope = ["README.md", "docs/ARCHITECTURE.md", "src/draw.ts", "src/figureDriving.browser.test.ts", "src/figureFrame.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "tests"]
-opened_commit = "00c7bc842ae8ffd58d81484e1be886ee2250ec63"
-whole_reason = "The nod in the driver, the frame that applies it and the tests that prove it are one behaviour."
