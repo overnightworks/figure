@@ -1,8 +1,0 @@
-claim_id = "68ef13eacc10418db29036665013e69a"
-agent = "Claude 7819cfea-0a7d-4e06-921b-d3d63fe2a7cf"
-role = "builder"
-base = "e5f3680d14cb8e0a5d83aed3e0806e0eeea6c5e6"
-branch = "claude/issue-55-a-speaking-figure-moves-its-mouth-with-t"
-scope = [".aco/ahead-of-caller.toml", "README.md", "docs/ARCHITECTURE.md", "src/draw.ts", "src/drawSpeaking.browser.test.ts", "src/figureFrame.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "src/voiceTap.ts", "src/vowelWeights.test.ts", "src/vowelWeights.ts", "tests"]
-opened_commit = "6998d8b5a871f99d233e0476ec354bbae7628708"
-whole_reason = "#2 rules that every method lands whole in one slice: the method, its tap, the driver's mouth and the stage control that proves them are one behaviour."
