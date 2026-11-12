@@ -164,12 +164,11 @@ describe('vowelWeights of a voiced vowel', () => {
 });
 
 describe('the window vowelWeights analyses', () => {
-	it.each([
-		[48_000, 1992],
-		[44_100, 1831],
-		[16_000, 664]
-	])('holds %i samples a second in %i samples, which the newest block of that length covers', (rate, length) => {
-		expect(analysisWindowLength(rate)).toBe(length);
+	it.each([48_000, 44_100, 16_000])('finds the vowel in a block of exactly the window at %i samples a second', (rate) => {
+		const window = voicedBlock({ ...defaultVoice, rate }).slice(-analysisWindowLength(rate));
+
+		expect(window).toHaveLength(analysisWindowLength(rate));
+		expect(strongest(vowelWeights(window, rate))).toBe('aa');
 	});
 
 	it('gives the weights of the window alone, whatever the block holds before it', () => {
