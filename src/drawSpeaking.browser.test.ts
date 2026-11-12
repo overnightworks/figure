@@ -16,10 +16,24 @@ const swayRows = 1;
 const requestFrameOwn = window.requestAnimationFrame;
 /** How far a speaker at the far side of the page turns the nose, in pixels at a canvas 200 wide, and how far the thinking look turns it the other way. */
 const turnedPixels = 10;
-/** The pictures after which a mouth that should not move has had every chance to. */
+/** How far the sway moves the nose, in pixels at a canvas 200 wide; the idle glance turns it by far more, and the glance moves a closed mouth's rows by more than the sway does. */
+const swayPixels = 2;
+/** The pictures in which a mouth that should not move is judged, each at the head's resting pose, and the most pictures read to find them while the head glances away. */
 const stillPictures = 15;
+const mostPictures = 150;
 const farRight = 5000;
 const level = 100;
+
+/** The mouth's rows and the nose's centre in one picture. */
+interface Picture {
+	readonly rows: number;
+	readonly nose: { readonly x: number; readonly y: number };
+}
+
+/** Whether `picture` shows the nose where the sway leaves it around `pose`'s. */
+function atRest(picture: Picture, pose: Picture): boolean {
+	return Math.abs(picture.nose.x - pose.nose.x) <= swayPixels && Math.abs(picture.nose.y - pose.nose.y) <= swayPixels;
+}
 
 describe('a figure whose agent speaks', () => {
 	let watch: FigureWatch;
@@ -85,16 +99,32 @@ describe('a figure whose agent speaks', () => {
 		await vi.waitFor(async () => expect(test(await mouthNow(canvas))).toBe(true), { timeout: 15000 });
 	}
 
-	/** The rows the mouth covers in most of the next `stillPictures` pictures: the idle glance moves the head by more than the sway for a moment, so a single picture is no measure of a mouth at rest. */
-	async function mouthMostly(canvas: HTMLCanvasElement): Promise<number> {
-		const rows: number[] = [];
-		for (let picture = 0; picture < stillPictures; picture++) rows.push(await mouthNow(canvas));
-		return rows.sort((first, second) => first - second)[Math.floor(stillPictures / 2)]!;
+	/** The mouth and the nose in the figure's next picture. */
+	async function pictureNow(canvas: HTMLCanvasElement): Promise<Picture> {
+		const features = await watch.featuresNow(canvas);
+		return { rows: mouthRows(features), nose: centreOf(features.nose) };
 	}
 
-	/** Expects the mouth to cover `rows` in most pictures, closer than the flat vowel's mouth lies to a closed one. */
-	async function expectMouthStays(canvas: HTMLCanvasElement, rows: number): Promise<void> {
-		expect(Math.abs((await mouthMostly(canvas)) - rows)).toBeLessThan(flattenedRows);
+	/** The mouth of the head's most common pose in the next `stillPictures` pictures, which the idle glance cannot outvote. */
+	async function restingMouth(canvas: HTMLCanvasElement): Promise<Picture> {
+		const pictures: Picture[] = [];
+		for (let picture = 0; picture < stillPictures; picture++) pictures.push(await pictureNow(canvas));
+		const atPose = (pose: Picture) => pictures.filter((picture) => atRest(picture, pose));
+		const commonest = pictures.reduce((best, picture) => (atPose(picture).length > atPose(best).length ? picture : best));
+		const rows = atPose(commonest).map((picture) => picture.rows).sort((first, second) => first - second);
+		return { rows: rows[Math.floor(rows.length / 2)]!, nose: commonest.nose };
+	}
+
+	/** Expects the mouth to stay within the flat vowel's distance from `resting` in each of the next `stillPictures` pictures that show the head at its resting pose. */
+	async function expectMouthStays(canvas: HTMLCanvasElement, resting: Picture): Promise<void> {
+		let judged = 0;
+		for (let read = 0; read < mostPictures && judged < stillPictures; read++) {
+			const picture = await pictureNow(canvas);
+			if (!atRest(picture, resting)) continue;
+			expect(Math.abs(picture.rows - resting.rows)).toBeLessThan(flattenedRows);
+			judged++;
+		}
+		expect(judged).toBe(stillPictures);
 	}
 
 	/** Puts a small element of the page at `x` and `y` CSS pixels from the viewport's top left. */
@@ -151,7 +181,7 @@ describe('a figure whose agent speaks', () => {
 
 		it('keeps the mouth closed for silence on a tapped voice and for speak({})', async () => {
 			const { canvas, handle, context, analysers } = await figureWithContext();
-			const resting = await mouthMostly(canvas);
+			const resting = await restingMouth(canvas);
 
 			handle.speak({ voice: voiceOn(context, mouthShape.aa, 0) });
 			expect(analysers()).toHaveLength(1);
@@ -252,28 +282,28 @@ describe('a figure whose agent speaks', () => {
 
 		it('does not read a suspended context, and follows the voice once the context runs', async () => {
 			const { canvas, handle, context } = await figureWithContext();
-			const resting = await mouthMostly(canvas);
+			const resting = await restingMouth(canvas);
 			await context.suspend();
 
 			handle.speak({ voice: voiceOn(context, mouthShape.aa) });
 			await expectMouthStays(canvas, resting);
 			await context.resume();
 
-			await waitForMouth(canvas, (rows) => rows >= resting + openedRows);
+			await waitForMouth(canvas, (rows) => rows >= resting.rows + openedRows);
 		});
 
 		it('closes the mouth while a context that was running is suspended, and opens it again once the context runs', async () => {
 			const { canvas, handle, context } = await figureWithContext();
-			const resting = await mouthMostly(canvas);
+			const resting = await restingMouth(canvas);
 			handle.speak({ voice: voiceOn(context, mouthShape.aa) });
-			await waitForMouth(canvas, (rows) => rows >= resting + openedRows);
+			await waitForMouth(canvas, (rows) => rows >= resting.rows + openedRows);
 
 			await context.suspend();
-			await waitForMouth(canvas, (rows) => rows <= resting + swayRows);
+			await waitForMouth(canvas, (rows) => rows <= resting.rows + swayRows);
 			await expectMouthStays(canvas, resting);
 			await context.resume();
 
-			await waitForMouth(canvas, (rows) => rows >= resting + openedRows);
+			await waitForMouth(canvas, (rows) => rows >= resting.rows + openedRows);
 		});
 	});
 
@@ -305,7 +335,7 @@ describe('a figure whose agent speaks', () => {
 
 		it.each(faults)('speaks with a still mouth and throws nothing for %s', async (_, arrange) => {
 			const { canvas, handle, context } = await figureWithContext();
-			const resting = await mouthMostly(canvas);
+			const resting = await restingMouth(canvas);
 			const voice = arrange(context);
 
 			expect(() => handle.speak({ voice } as { voice: AudioNode })).not.toThrow();
@@ -316,7 +346,7 @@ describe('a figure whose agent speaks', () => {
 
 		it('speaks with a still mouth and makes no analyser on a closed context', async () => {
 			const { canvas, handle, context, analysers } = await figureWithContext();
-			const resting = await mouthMostly(canvas);
+			const resting = await restingMouth(canvas);
 			const voice = voiceOn(context, mouthShape.aa);
 			await context.close();
 
@@ -327,7 +357,7 @@ describe('a figure whose agent speaks', () => {
 
 		it('releases a voice whose analyser cannot be read, with a still mouth and the figure still drawn', async () => {
 			const { canvas, handle, context } = await figureWithContext();
-			const resting = await mouthMostly(canvas);
+			const resting = await restingMouth(canvas);
 			const realCreate = AudioContext.prototype.createAnalyser.bind(context);
 			const unreadable: AnalyserNode[] = [];
 			vi.spyOn(context, 'createAnalyser').mockImplementation(() => {
