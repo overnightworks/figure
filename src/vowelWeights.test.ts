@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mouthShape, type MouthShape } from './expressions.js';
-import { vowelWeights } from './vowelWeights.js';
+import { analysisWindowLength, vowelWeights } from './vowelWeights.js';
 
 /** A small seeded source of numbers in [0, 1) (mulberry32), so a run is the same every time. */
 function seededRandom(seed: number): () => number {
@@ -160,6 +160,45 @@ describe('vowelWeights of a voiced vowel', () => {
 		const block = voicedBlock(defaultVoice);
 		const longer = Float32Array.from([...voicedBlock({ ...defaultVoice, vowel: 'ih', seed: 3 }), ...block]);
 		expect(vowelWeights(longer, sampleRate)).toEqual(vowelWeights(block, sampleRate));
+	});
+});
+
+describe('the window vowelWeights analyses', () => {
+	it.each([
+		[48_000, 1992],
+		[44_100, 1831],
+		[16_000, 664]
+	])('holds %i samples a second in %i samples, which the newest block of that length covers', (rate, length) => {
+		expect(analysisWindowLength(rate)).toBe(length);
+	});
+
+	it('gives the weights of the window alone, whatever the block holds before it', () => {
+		const block = voicedBlock(defaultVoice);
+		const newest = block.slice(block.length - analysisWindowLength(sampleRate));
+		const older = Float32Array.from([Number.NaN, ...newest]);
+
+		expect(vowelWeights(older, sampleRate)).toEqual(vowelWeights(block, sampleRate));
+		expect(vowelWeights(newest, sampleRate)).toEqual(vowelWeights(block, sampleRate));
+	});
+
+	it('gives all zeros for a block one sample shorter than the window, and for a window whose oldest sample is not finite', () => {
+		const newest = voicedBlock(defaultVoice).slice(-analysisWindowLength(sampleRate));
+		const bad = Float32Array.from(newest);
+		bad[0] = Number.NaN;
+
+		expect(vowelWeights(newest.slice(1), sampleRate)).toEqual({ aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 });
+		expect(vowelWeights(bad, sampleRate)).toEqual({ aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 });
+	});
+
+	it('gives the same weights for a rate after other rates were analysed in between', () => {
+		const block = voicedBlock(defaultVoice);
+		const other = voicedBlock({ ...defaultVoice, rate: 44_100 });
+		const first = vowelWeights(block, sampleRate);
+
+		vowelWeights(other, 44_100);
+		vowelWeights(other, 44_100);
+
+		expect(vowelWeights(block, sampleRate)).toEqual(first);
 	});
 });
 

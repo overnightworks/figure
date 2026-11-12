@@ -6,6 +6,7 @@ import { loadFigure } from './figureLoader.js';
 import { createFigureMotion, type FigureFacts, type SpeakerOffset } from './figureMotion.js';
 import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
 import { figureSignal, type FigureSignal } from './signals.js';
+import { createVoiceTap } from './voiceTap.js';
 
 export { figureSignal, type FigureSignal } from './signals.js';
 
@@ -23,6 +24,10 @@ export interface FigureHandle {
 	think(working: boolean): void;
 	/** Someone speaks at `speaker`, an element of the page; null: nobody does. The figure turns toward the element's centre and follows it as it moves, while it does not think. Each call replaces the last value and the same element again changes nothing. Anything that is not an element counts as nobody, and so does an element that is not connected, that belongs to another document or that has no box (a bounding rectangle with neither width nor height, as under `display: none`), until it returns. The figure reads the element's bounding rectangle each frame and holds it no longer than until `listen(null)`, another element, `dispose` or the figure's end; a figure that ended or was disposed ignores the call. */
 	listen(speaker: Element | null): void;
+	/**
+	 * The agent speaks a sentence: the mouth follows `voice`, an audio node of the host's graph; null: it stopped. An object means the agent speaks, with a still mouth when it has no `voice`; a field the figure does not know is ignored. While the agent speaks the figure neither thinks nor listens: the gaze is the idle glance, and when it stops the state the other facts name shows, thinking before listening. The figure taps a voice with one analyser of the voice's own context, which it connects to the voice and nothing else, and disconnects, and only it, when another voice, `speak({})`, `speak(null)`, `dispose` or the figure's end releases it; the same node again keeps its tap. It plays nothing and creates no context. A voice it cannot tap (a value that is no audio node, a closed context, a `connect` or `createAnalyser` that throws) speaks with a still mouth and nothing is thrown, and a suspended context reads silence until it runs. A figure that ended or was disposed ignores the call and taps nothing.
+	 */
+	speak(sentence: { readonly voice?: AudioNode } | null): void;
 }
 
 /** What the mount's work gave: the signal, what to free when the app is done with it, and how the facts the host reports reach the figure. */
@@ -31,13 +36,16 @@ interface Outcome {
 	readonly release: () => void;
 	readonly think: (working: boolean) => void;
 	readonly listen: (speaker: Element | null) => void;
+	readonly speak: (sentence: { readonly voice?: AudioNode } | null) => void;
 }
 
 /** The facts of a figure that is not drawn: nothing reads them. */
 const ignoreFacts = () => {};
 
+const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts };
+
 function ended(signal: FigureSignal): Outcome {
-	return { signal, release: () => {}, think: ignoreFacts, listen: ignoreFacts };
+	return { signal, release: () => {}, ...endedFacts };
 }
 
 /** A loop's stop, and the way to give it the facts it draws from. */
@@ -45,6 +53,7 @@ interface Loop {
 	readonly stop: () => void;
 	readonly think: (working: boolean) => void;
 	readonly listen: (speaker: Element | null) => void;
+	readonly speak: (sentence: { readonly voice?: AudioNode } | null) => void;
 }
 
 /** The browser's own rectangle read: it throws for anything that is not an element, whatever properties that value supplies, of any realm. */
@@ -97,6 +106,7 @@ type LoopEnding = typeof figureSignal.lost | typeof figureSignal.slow;
  */
 function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: LoopEnding) => void): Loop {
 	const motion = createFigureMotion(Math.random);
+	const voiceTap = createVoiceTap();
 	let facts: FigureFacts = { thinking: false, speaking: false };
 	let speaker: Element | null = null;
 	const reducedMotion = matchMedia(reducedMotionQuery);
@@ -106,7 +116,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const drawAt = (time: number) => {
 		const elapsedSeconds = (time - previousTime) / 1000;
 		previousTime = time;
-		stage.draw(motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker), null), elapsedSeconds);
+		stage.draw(motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker), voiceTap.weights()), elapsedSeconds);
 	};
 	let pendingFrame: number | undefined;
 	let stopped = false;
@@ -143,6 +153,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const stop = () => {
 		stopped = true;
 		speaker = null;
+		voiceTap.follow(undefined);
 		syncWithPage();
 		document.removeEventListener('visibilitychange', syncWithPage);
 		viewport.disconnect();
@@ -158,7 +169,13 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const listen = (element: Element | null) => {
 		if (!stopped) speaker = element;
 	};
-	return { stop, think, listen };
+	const speak = (sentence: { readonly voice?: AudioNode } | null) => {
+		if (stopped) return;
+		const speaking = typeof sentence === 'object' && sentence !== null;
+		facts = { ...facts, speaking };
+		voiceTap.follow(speaking ? sentence.voice : undefined);
+	};
+	return { stop, think, listen, speak };
 }
 
 async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal: FigureSignal) => void): Promise<Outcome> {
@@ -178,9 +195,9 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 		vrm = await loadFigure(bytes);
 		const figure = vrm;
 		// A loss during the load fired its event before the loop listens for it, so the state is read here.
-		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release, think: ignoreFacts, listen: ignoreFacts };
+		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release, ...endedFacts };
 		loop = runLoop(createFigureStage(renderer, canvas, figure), canvas, give);
-		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen };
+		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen, speak: loop.speak };
 	} catch {
 		release();
 		return ended(figureSignal.refused);
@@ -205,7 +222,7 @@ export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, option
 			reportError(error);
 		}
 	};
-	const { signal, release, think, listen } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
+	const { signal, release, think, listen, speak } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
 	give(signal);
 	let disposed = false;
 	return {
@@ -218,6 +235,7 @@ export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, option
 			release();
 		},
 		think,
-		listen
+		listen,
+		speak
 	};
 }
