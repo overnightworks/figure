@@ -20,13 +20,15 @@ const levelPower = 0.6;
 
 const analysisRateHz = 8000;
 const frameLength = 320;
+const passBand = 0.75;
+const kernelReach = 6;
 const predictorOrder = 8;
 // Milder than the usual 0.97: a stronger tilt compensation lets the harmonics at 220 and 440 Hz pull a woman's first formant near 370 Hz upward.
-const preEmphasis = 0.8;
+const preEmphasis = 0.7;
 const whiteNoiseCorrection = 1 + 1e-6;
 const lowestFormantHz = 200;
 const highestFormantHz = 3500;
-const widestBandwidthHz = 400;
+const widestBandwidthHz = 600;
 const startRadius = 0.9;
 const startAngle = 0.4;
 const maximumRounds = 100;
@@ -59,13 +61,29 @@ function loudness(samples: Float32Array, start: number): number {
 	return Math.min(rms / fullLevelRms, 1) ** levelPower;
 }
 
-/** Fills the frame with the samples decimated by averaging, pre-emphasized and windowed. */
-function fillFrame(samples: Float32Array, start: number, decimation: number): void {
+/** The weight of an input sample at a distance in frame samples: a Hann-windowed sinc that cuts off just below half the analysis rate. */
+function resamplingWeight(distance: number): number {
+	const argument = Math.PI * passBand * distance;
+	const sinc = argument === 0 ? 1 : Math.sin(argument) / argument;
+	return sinc * (0.5 + 0.5 * Math.cos((Math.PI * distance) / kernelReach));
+}
+
+/**
+ * Fills the frame with the samples resampled to the analysis rate, pre-emphasized and windowed. The low-pass in the resampling
+ * keeps the harmonics above half the analysis rate from folding into the formants.
+ */
+function fillFrame(samples: Float32Array, start: number, step: number): void {
 	let earlierMean = 0;
 	for (let index = 0; index < frameLength; index++) {
+		const centre = start + (index + kernelReach) * step;
 		let sum = 0;
-		for (let offset = 0; offset < decimation; offset++) sum += samples[start + index * decimation + offset];
-		const mean = sum / decimation;
+		let weightTotal = 0;
+		for (let position = Math.ceil(centre - kernelReach * step); position < centre + kernelReach * step; position++) {
+			const weight = resamplingWeight((position - centre) / step);
+			sum += samples[position] * weight;
+			weightTotal += weight;
+		}
+		const mean = sum / weightTotal;
 		frame[index] = (mean - preEmphasis * earlierMean) * hammingWindow[index];
 		earlierMean = mean;
 	}
@@ -153,11 +171,11 @@ function fillRoots(): void {
 }
 
 /** Sets `formants` to the two lowest resonances of the roots, in Hz, or leaves infinity where the roots hold fewer. */
-function fillLowestFormants(rateHz: number): void {
+function fillLowestFormants(): void {
 	formants.fill(Infinity);
 	for (let index = 0; index < predictorOrder; index++) {
-		const frequencyHz = (Math.atan2(rootImaginary[index], rootReal[index]) * rateHz) / (2 * Math.PI);
-		const bandwidthHz = (-Math.log(Math.hypot(rootReal[index], rootImaginary[index])) * rateHz) / Math.PI;
+		const frequencyHz = (Math.atan2(rootImaginary[index], rootReal[index]) * analysisRateHz) / (2 * Math.PI);
+		const bandwidthHz = (-Math.log(Math.hypot(rootReal[index], rootImaginary[index])) * analysisRateHz) / Math.PI;
 		if (frequencyHz < lowestFormantHz || frequencyHz > highestFormantHz || bandwidthHz > widestBandwidthHz) continue;
 		if (frequencyHz < formants[0]) [formants[0], formants[1]] = [frequencyHz, formants[0]];
 		else if (frequencyHz < formants[1]) formants[1] = frequencyHz;
@@ -181,24 +199,23 @@ function weightsOfFormants(firstHz: number, secondHz: number, level: number): Vo
 
 /**
  * From one block of time-domain samples at a sample rate, a weight from 0 to 1 for each of the five mouth shapes: the first two
- * formants of the newest samples (the roots of the linear predictor of a decimated, windowed, pre-emphasized frame, found by
+ * formants of the newest samples (the roots of the linear predictor of a low-passed, resampled, windowed, pre-emphasized frame, found by
  * autocorrelation and Levinson-Durbin), the distance of each to the formants of the five vowels, and the block's loudness
  * as the sum of the weights. A block of silence, below the loudness gate, shorter than the frame or holding a sample that is
  * not finite gives all zeros. Its limit is five vowel shapes only: consonants show as dips in loudness, closed lips are not
  * detected and the accuracy falls at a high pitch, where the harmonics are too far apart to trace the first formant.
  */
 export function vowelWeights(samples: Float32Array, sampleRate: number): VowelWeights {
-	const decimation = Math.floor(sampleRate / analysisRateHz);
-	const start = samples.length - frameLength * decimation;
-	if (!Number.isFinite(decimation) || decimation < 1 || start < 0) return silence;
+	const step = sampleRate / analysisRateHz;
+	const start = samples.length - Math.ceil((frameLength + 2 * kernelReach) * step);
+	if (!Number.isFinite(step) || step < 1 || start < 0) return silence;
 	const level = loudness(samples, start);
 	if (level === 0) return silence;
-	fillFrame(samples, start, decimation);
+	fillFrame(samples, start, step);
 	fillCorrelation();
-	if (correlation[0] <= 0) return silence;
 	fillPredictor();
 	fillRoots();
-	fillLowestFormants(sampleRate / decimation);
+	fillLowestFormants();
 	if (formants[1] === Infinity) return silence;
 	return weightsOfFormants(formants[0], formants[1], level);
 }

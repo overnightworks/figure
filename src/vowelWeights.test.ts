@@ -125,11 +125,13 @@ function strongest(weights: Readonly<Record<MouthShape, number>>): MouthShape | 
 }
 
 describe('vowelWeights of a voiced vowel', () => {
-	const cases = speakers.flatMap((speaker) => vowels.flatMap((vowel) => pitches.map((pitchHz) => ({ speaker, vowel, pitchHz }))));
+	const cases = [48_000, 44_100].flatMap((rate) =>
+		speakers.flatMap((speaker) => vowels.flatMap((vowel) => pitches.map((pitchHz) => ({ rate, speaker, vowel, pitchHz }))))
+	);
 
-	it.each(cases)('weighs the mouth shape of $vowel highest for a $speaker at $pitchHz Hz', ({ speaker, vowel, pitchHz }) => {
-		const block = voicedBlock({ ...defaultVoice, speaker, vowel, pitchHz, seed: pitchHz });
-		expect(strongest(vowelWeights(block, sampleRate))).toBe(vowel);
+	it.each(cases)('weighs the mouth shape of $vowel highest for a $speaker at $pitchHz Hz sampled at $rate Hz', ({ rate, speaker, vowel, pitchHz }) => {
+		const block = voicedBlock({ ...defaultVoice, speaker, vowel, pitchHz, rate, seed: pitchHz });
+		expect(strongest(vowelWeights(block, rate))).toBe(vowel);
 	});
 
 	it('weighs every mouth shape between 0 and 1', () => {
@@ -140,8 +142,11 @@ describe('vowelWeights of a voiced vowel', () => {
 		}
 	});
 
-	it.each([44_100, 32_000, 16_000, 11_025])('finds the vowel of a block sampled at %i Hz', (rate) => {
-		expect(strongest(vowelWeights(voicedBlock({ ...defaultVoice, vowel: 'ee', rate }), rate))).toBe('ee');
+	const otherRates = [32_000, 22_050, 16_000, 11_025];
+	const otherRateCases = otherRates.flatMap((rate) => speakers.flatMap((speaker) => vowels.map((vowel) => ({ rate, speaker, vowel }))));
+
+	it.each(otherRateCases)('finds the vowel $vowel of a $speaker in a block sampled at $rate Hz', ({ rate, speaker, vowel }) => {
+		expect(strongest(vowelWeights(voicedBlock({ ...defaultVoice, speaker, vowel, rate }), rate))).toBe(vowel);
 	});
 
 	it('leaves the block unchanged and gives the same weights twice', () => {

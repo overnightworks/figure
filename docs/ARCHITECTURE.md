@@ -66,7 +66,7 @@ flowchart TD
 
 - `codes.ts` owns every refusal code and its description.
 - `profile.ts` owns the values the rules read: allowed extensions, file budget, VRM version, presets, licence values and the two mesh budgets. Its presets are composed from `expressions.ts`, which owns the closed sets of mouth shapes (`aa`, `ih`, `ou`, `ee`, `oh`) and moods and imports nothing, and the blink.
-- `vowelWeights.ts` turns one block of time-domain samples into a weight from 0 to 1 for each mouth shape: the first two formants by linear prediction (autocorrelation, Levinson-Durbin and the roots of the predictor) on a decimated frame, compared with a map of five vowels, scaled by the block's loudness. It is pure and imports neither three nor the DOM.
+- `vowelWeights.ts` turns one block of time-domain samples into a weight from 0 to 1 for each mouth shape: the first two formants by linear prediction (autocorrelation, Levinson-Durbin and the roots of the predictor) on a frame low-passed and resampled to 8 kHz, compared with a map of five vowels, scaled by the block's loudness. It is pure and imports neither three nor the DOM.
 - `check.ts` owns the container rules and the order; it reads bytes. `vrmRules.ts` and `budgetRules.ts` judge the parsed JSON; none imports more than the codes, the profile and `json.ts`. `textureRules.ts` also reads the binary chunk through `imageSize.ts`.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
 - `index.ts` exports `checkFigure`, the codes and the profile; `overnightworks-figure/codes` and `overnightworks-figure/profile` export those alone. No module they reach imports three or three-vrm.
