@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, userEvent } from 'vitest/browser';
-import { centreOf, emulateReducedMotion, mouthRows } from '../tests/browserCanvas.js';
+import { centreOf, emulateReducedMotion, faceDifference, mouthRows } from '../tests/browserCanvas.js';
+import { vrmParts } from '../tests/figureFixtures.js';
+import { buildGlb } from '../tests/glbBuilder.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
 import { syntheticVoice, type SyntheticVoice } from '../tests/syntheticVoice.js';
-import { mouthShape, type MouthShape } from './expressions.js';
+import { figureMood, mouthShape, type FigureMood, type MouthShape } from './expressions.js';
 import type { FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 import { analysisWindowLength } from './vowelWeights.js';
@@ -27,6 +29,14 @@ const stillPictures = 15;
  */
 const unmovedLift = 1;
 const rowsPerLiftedPixel = 1.25;
+/** The dark pixels of the face a neutral picture differs from the neutral baseline by, at most, even with the sway's drift, and the fewest a shown mood's differs by; the least any of the five moods moves is well over the first. */
+const neutralFaceDifference = 60;
+const shownFaceDifference = 100;
+/** What a settled face's consecutive pictures differ by at most, and how many of them in a row show the face has stopped easing. */
+const settledFaceDifference = 30;
+const settledPictures = 3;
+/** The pictures over whose least difference the face is judged. */
+const shownPictures = 7;
 const farRight = 5000;
 const level = 100;
 
@@ -431,6 +441,156 @@ describe('a figure whose agent speaks', () => {
 			expect(speaking).toEqual(resting);
 			expect(thinking.x).toBeLessThan(resting.x - turnedPixels);
 			expect(listening.x).toBeGreaterThan(resting.x + turnedPixels);
+		});
+	});
+
+	describe.each([
+		['normal motion', false],
+		['reduced motion', true]
+	])('the mood of a sentence in %s', (_, reduced) => {
+		beforeEach(async () => {
+			if (reduced) await emulateReducedMotion();
+		});
+
+		type Face = Awaited<ReturnType<FigureWatch['featuresNow']>>;
+
+		/** The least difference of `shownPictures` pictures: a mood that shows differs in every one, and a blink that covers a few of them cannot make a neutral face differ in all. */
+		async function differenceFrom(canvas: HTMLCanvasElement, baseline: Face): Promise<number> {
+			const differences: number[] = [];
+			for (let read = 0; read < shownPictures; read++) differences.push(faceDifference(baseline, await watch.featuresNow(canvas)));
+			return Math.min(...differences);
+		}
+
+		/** Waits until the face differs from `baseline` by a number that `test` accepts. */
+		async function waitForFace(canvas: HTMLCanvasElement, baseline: Face, test: (difference: number) => boolean): Promise<void> {
+			await vi.waitFor(async () => expect(test(await differenceFrom(canvas, baseline))).toBe(true), { timeout: 15000 });
+		}
+
+		/** Waits until the face has stopped easing: three pictures in a row differ from the one before by less than a settled face's difference. */
+		async function waitForSettledFace(canvas: HTMLCanvasElement): Promise<void> {
+			let previous = await watch.featuresNow(canvas);
+			let steady = 0;
+			await vi.waitFor(
+				async () => {
+					const next = await watch.featuresNow(canvas);
+					steady = faceDifference(previous, next) < settledFaceDifference ? steady + 1 : 0;
+					previous = next;
+					expect(steady).toBeGreaterThanOrEqual(settledPictures);
+				},
+				{ timeout: 15000 }
+			);
+		}
+
+		/** The mouth of a figure that speaks `mood` with no voice once the mood has eased in: what a voice has to open further. */
+		async function moodMouth(canvas: HTMLCanvasElement, handle: FigureHandle): Promise<Picture> {
+			handle.speak({ mood: figureMood.angry });
+			await waitForSettledFace(canvas);
+			return restingMouth(canvas);
+		}
+
+		const shown = (difference: number) => difference >= shownFaceDifference;
+		const neutral = (difference: number) => difference < neutralFaceDifference;
+
+		it.each(Object.values(figureMood))('changes the face from the neutral one while the agent speaks %s', async (mood) => {
+			const { canvas, handle } = await watch.mountFigure();
+			const baseline = await watch.featuresNow(canvas);
+
+			handle.speak({ mood });
+
+			await waitForFace(canvas, baseline, shown);
+		});
+
+		it('shows two moods differently', async () => {
+			const { canvas, handle } = await watch.mountFigure();
+			const baseline = await watch.featuresNow(canvas);
+
+			handle.speak({ mood: figureMood.happy });
+			await waitForFace(canvas, baseline, shown);
+			const happy = await watch.featuresNow(canvas);
+			handle.speak({ mood: figureMood.sad });
+
+			await waitForFace(canvas, happy, shown);
+		});
+
+		it.each([
+			['speak(null)', (handle: FigureHandle) => handle.speak(null)],
+			['a sentence without a mood', (handle: FigureHandle) => handle.speak({})]
+		])('returns the face to the neutral one on %s', async (_, next) => {
+			const { canvas, handle } = await watch.mountFigure();
+			const baseline = await watch.featuresNow(canvas);
+			handle.speak({ mood: figureMood.surprised });
+			await waitForFace(canvas, baseline, shown);
+
+			next(handle);
+
+			await waitForFace(canvas, baseline, neutral);
+		});
+
+		// The sway and the glance move a neutral face between a baseline and a later picture; held still, a face that stays neutral reads the same.
+		describe.runIf(reduced)('with a value that is no mood', () => {
+			it.each([
+				['a name that is no mood', 'furious'],
+				['a number', 7],
+				['an object', { happy: true }]
+			])('leaves the face neutral and throws nothing for %s', async (_, unknown) => {
+				const { canvas, handle } = await watch.mountFigure();
+				const baseline = await watch.featuresNow(canvas);
+
+				expect(() => handle.speak({ mood: unknown as FigureMood })).not.toThrow();
+
+				expect(neutral(await differenceFrom(canvas, baseline))).toBe(true);
+				await new Promise((resolve) => requestFrameOwn.call(window, resolve));
+				expect(neutral(await differenceFrom(canvas, baseline))).toBe(true);
+			});
+		});
+
+		it('shows the mood over the thinking look and the turn to a speaker', async () => {
+			const { canvas, handle } = await watch.mountFigure();
+			const baseline = await watch.featuresNow(canvas);
+
+			handle.think(true);
+			handle.listen(speakerAt(farRight, level));
+			handle.speak({ mood: figureMood.angry });
+
+			await waitForFace(canvas, baseline, shown);
+		});
+
+		describe('with a voice', () => {
+			it('opens the mouth beyond what the mood alone gives', async () => {
+				const { canvas, handle, context } = await figureWithContext();
+				const moodOnly = await moodMouth(canvas, handle);
+
+				handle.speak({ voice: voiceOn(context, mouthShape.aa), mood: figureMood.angry });
+
+				await waitForMouth(canvas, (rows) => rows >= moodOnly.rows + openedRows);
+			});
+
+			it('opens the mouth of a figure whose mood expressions block it', async () => {
+				const blocking = buildGlb(
+					vrmParts(undefined, (json) => {
+						for (const mood of Object.values(figureMood)) json.extensions.VRMC_vrm.expressions.preset[mood].overrideMouth = 'block';
+					})
+				);
+				const context = await runningContext();
+				const { canvas, handle } = await watch.mountFigure(blocking);
+				const moodOnly = await moodMouth(canvas, handle);
+
+				handle.speak({ voice: voiceOn(context, mouthShape.aa), mood: figureMood.angry });
+
+				await waitForMouth(canvas, (rows) => rows >= moodOnly.rows + openedRows);
+			});
+
+			it('keeps the tap of the same voice when the mood changes', async () => {
+				const { handle, context, analysers } = await figureWithContext();
+				const voice = voiceOn(context, mouthShape.aa);
+				const disconnect = vi.spyOn(voice, 'disconnect');
+
+				handle.speak({ voice, mood: figureMood.happy });
+				handle.speak({ voice, mood: figureMood.sad });
+
+				expect(analysers()).toHaveLength(1);
+				expect(disconnect).not.toHaveBeenCalled();
+			});
 		});
 	});
 

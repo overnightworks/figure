@@ -1,6 +1,7 @@
 import { FileLoader, Texture, TextureLoader, type LoadingManager } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
-import { VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
+import { VRMExpressionOverrideType, VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
+import { figureMood } from './expressions.js';
 
 /** A texture loader that reads an image through an `<img>` element, which the script policy allows, and tells when an image fails. */
 class ImageElementTextureLoader extends TextureLoader {
@@ -63,7 +64,13 @@ function loaderPluginFor(parser: GLTFParser): VRMLoaderPlugin {
 	return new VRMLoaderPlugin(parser, { metaPlugin: new VRMMetaLoaderPlugin(parser, { acceptLicenseUrls }) });
 }
 
-/** Parses the bytes into a VRM; rejects when the loader refuses them or any texture fails, which three itself swallows. */
+/** A mood never silences the mouth, whatever its author wrote: the five moods' `overrideMouth` is none, while their blink and look-at overrides stay. */
+function letMoodsKeepTheMouth(vrm: VRM): void {
+	// The check holds the five mood presets, so each expression exists.
+	for (const mood of Object.values(figureMood)) vrm.expressionManager!.getExpression(mood)!.overrideMouth = VRMExpressionOverrideType.None;
+}
+
+/** Parses the bytes into a VRM, its moods letting the mouth move; rejects when the loader refuses them or any texture fails, which three itself swallows. */
 export async function loadFigure(bytes: Uint8Array): Promise<VRM> {
 	let textureFailed = false;
 	const loader = new GLTFLoader();
@@ -76,5 +83,6 @@ export async function loadFigure(bytes: Uint8Array): Promise<VRM> {
 		VRMUtils.deepDispose(vrm.scene);
 		throw new Error('a texture failed to load');
 	}
+	letMoodsKeepTheMouth(vrm);
 	return vrm;
 }

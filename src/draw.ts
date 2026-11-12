@@ -3,12 +3,14 @@ import { VRMUtils, type VRM } from '@pixiv/three-vrm';
 import { checkFigure } from './check.js';
 import { createFigureStage, type FigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
+import type { FigureMood } from './expressions.js';
 import { createFigureMotion, type FigureFacts, type SpeakerOffset } from './figureMotion.js';
 import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 import { createVoiceTap } from './voiceTap.js';
 
 export { figureSignal, type FigureSignal } from './signals.js';
+export type { FigureMood } from './expressions.js';
 
 export interface MountOptions {
 	/** Called with every signal the figure gives, the first one before `mount` resolves. */
@@ -25,10 +27,13 @@ export interface FigureHandle {
 	/** Someone speaks at `speaker`, an element of the page; null: nobody does. The figure turns toward the element's centre and follows it as it moves, while it does not think. Each call replaces the last value and the same element again changes nothing. Anything that is not an element counts as nobody, and so does an element that is not connected, that belongs to another document or that has no box (a bounding rectangle with neither width nor height, as under `display: none`), until it returns. The figure reads the element's bounding rectangle each frame and holds it no longer than until `listen(null)`, another element, `dispose` or the figure's end; a figure that ended or was disposed ignores the call. */
 	listen(speaker: Element | null): void;
 	/**
-	 * The agent speaks a sentence: the mouth follows `voice`, an audio node of the host's graph; null: it stopped. An object means the agent speaks, with a still mouth when it has no `voice`; a field the figure does not know is ignored. While the agent speaks the figure neither thinks nor listens: the gaze is the idle glance, and when it stops the state the other facts name shows, thinking before listening. The figure taps a voice with one analyser of the voice's own context, which it connects to the voice and nothing else, and disconnects, and only it, when another voice, `speak({})`, `speak(null)`, `dispose` or the figure's end releases it; the same node again keeps its tap. It plays nothing and creates no context. A voice it cannot tap (a value that is no audio node, a closed context, a `connect` or `createAnalyser` that throws) speaks with a still mouth and nothing is thrown, and a suspended context reads silence until it runs. A figure that ended or was disposed ignores the call and taps nothing.
+	 * The agent speaks a sentence: the mouth follows `voice`, an audio node of the host's graph, and the face shows `mood`; null: it stopped. An object means the agent speaks, with a still mouth when it has no `voice` and a neutral face when it has no `mood`; a field the figure does not know is ignored. Each call replaces the sentence: another mood replaces the last one and a sentence without a mood lets it fade, as does `speak(null)`. A mood shows only while the agent speaks, with the mouth a little smaller, and a value that is no `FigureMood` shows no mood and throws nothing. While the agent speaks the figure neither thinks nor listens: the gaze is the idle glance, and when it stops the state the other facts name shows, thinking before listening. The figure taps a voice with one analyser of the voice's own context, which it connects to the voice and nothing else, and disconnects, and only it, when another voice, `speak({})`, `speak(null)`, `dispose` or the figure's end releases it; the same node again keeps its tap. It plays nothing and creates no context. A voice it cannot tap (a value that is no audio node, a closed context, a `connect` or `createAnalyser` that throws) speaks with a still mouth and nothing is thrown, and a suspended context reads silence until it runs. A figure that ended or was disposed ignores the call and taps nothing.
 	 */
-	speak(sentence: { readonly voice?: AudioNode } | null): void;
+	speak(sentence: { readonly voice?: AudioNode; readonly mood?: FigureMood } | null): void;
 }
+
+/** What the agent speaks: the voice its mouth follows and the mood its face shows. */
+type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood } | null;
 
 /** What the mount's work gave: the signal, what to free when the app is done with it, and how the facts the host reports reach the figure. */
 interface Outcome {
@@ -36,7 +41,7 @@ interface Outcome {
 	readonly release: () => void;
 	readonly think: (working: boolean) => void;
 	readonly listen: (speaker: Element | null) => void;
-	readonly speak: (sentence: { readonly voice?: AudioNode } | null) => void;
+	readonly speak: (sentence: Sentence) => void;
 }
 
 /** The facts of a figure that is not drawn: nothing reads them. */
@@ -53,7 +58,7 @@ interface Loop {
 	readonly stop: () => void;
 	readonly think: (working: boolean) => void;
 	readonly listen: (speaker: Element | null) => void;
-	readonly speak: (sentence: { readonly voice?: AudioNode } | null) => void;
+	readonly speak: (sentence: Sentence) => void;
 }
 
 /** The browser's own rectangle read: it throws for anything that is not an element, whatever properties that value supplies, of any realm. */
@@ -169,10 +174,10 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const listen = (element: Element | null) => {
 		if (!stopped) speaker = element;
 	};
-	const speak = (sentence: { readonly voice?: AudioNode } | null) => {
+	const speak = (sentence: Sentence) => {
 		if (stopped) return;
 		const speaking = typeof sentence === 'object' && sentence !== null;
-		facts = { ...facts, speaking };
+		facts = { ...facts, speaking, mood: speaking ? sentence.mood : undefined };
 		voiceTap.follow(speaking ? sentence.voice : undefined);
 	};
 	return { stop, think, listen, speak };
@@ -207,7 +212,7 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 /**
  * Draws the VRM in `bytes` into `canvas`, whose CSS size the host owns, and keeps it alive: the figure breathes, sways, blinks and
  * glances, or only blinks while the page asks for reduced motion, shows that its agent thinks while the host reports it through
- * `think`, turns toward whoever speaks and nods now and then while the host names the speaker's element through `listen`, moves its mouth and nods with the agent's voice while the host passes it through `speak`, and is drawn each animation frame at the canvas's size and the device pixel ratio, until `dispose`. While the page is hidden or the canvas is out of the viewport it is not drawn, and it goes on
+ * `think`, turns toward whoever speaks and nods now and then while the host names the speaker's element through `listen`, moves its mouth and nods with the agent's voice and shows its mood while the host passes them through `speak`, and is drawn each animation frame at the canvas's size and the device pixel ratio, until `dispose`. While the page is hidden or the canvas is out of the viewport it is not drawn, and it goes on
  * without a jump when both are back. A context lost while the figure loads or lives gives `lost`, and a figure its frame-time guard finds too
  * slow to keep gives `slow`; either ends it for good, with no restore: a remount needs a fresh canvas.
  * It resolves to a handle holding the first signal, which `onSignal` has had by then. It never rejects: an error `onSignal` throws is reported to the window's error handlers.

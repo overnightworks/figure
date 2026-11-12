@@ -1,5 +1,6 @@
 import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
+import { figureMood } from './expressions.js';
 import { spreadPosture, type FigurePose, type Turn } from './figureMotion.js';
 
 /** The picture's camera, lights and clear colour are the values of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html. */
@@ -99,17 +100,18 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 				view = headAndShouldersCamera(eyes, size.width / size.height);
 				drawn = size;
 			}
-			spine.rotation.x = pose.breath + pose.trunkLean;
+			spine.rotation.x = pose.breath + pose.trunkLean + pose.moodTrunk.spine;
 			const spread = spreadPosture(pose.posture, bones);
 			head.rotation.set(pose.head.pitch + spread.head.pitch, pose.head.yaw + spread.head.yaw, pose.head.roll + spread.head.roll);
 			neck?.rotation.set(spread.neck.pitch, spread.neck.yaw, spread.neck.roll);
-			chest?.rotation.set(spread.chest.pitch + pose.trunkLean, spread.chest.yaw, spread.chest.roll);
+			chest?.rotation.set(spread.chest.pitch + pose.trunkLean + pose.moodTrunk.chest, spread.chest.yaw, spread.chest.roll);
 			turnBone(leftShoulder, pose.arms.leftShoulder);
 			turnBone(rightShoulder, pose.arms.rightShoulder);
 			turnBone(leftUpperArm, pose.arms.leftUpperArm);
 			turnBone(rightUpperArm, pose.arms.rightUpperArm);
 			vrm.expressionManager!.setValue('blink', pose.blink);
 			for (const [shape, weight] of Object.entries(pose.mouth)) vrm.expressionManager!.setValue(shape, weight);
+			for (const mood of Object.values(figureMood)) vrm.expressionManager!.setValue(mood, pose.mood[mood]);
 			vrm.lookAt!.yaw = pose.look.yaw;
 			vrm.lookAt!.pitch = pose.look.pitch;
 			if (!posed) {
