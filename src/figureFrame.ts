@@ -1,4 +1,4 @@
-import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
+import { AmbientLight, DirectionalLight, Euler, MathUtils, PerspectiveCamera, Quaternion, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
 import { figureMood } from './expressions.js';
 import { spreadPosture, type FigurePose, type Turn } from './figureMotion.js';
@@ -49,9 +49,22 @@ function currentSize(canvas: HTMLCanvasElement): DrawingSize {
 	return { width: Math.max(2, canvas.clientWidth), height: Math.max(2, canvas.clientHeight), pixelRatio: drawingPixelRatio() };
 }
 
-/** Sets a bone's rotation to `turn`; a bone the model lacks is skipped. */
-function turnBone(bone: Object3D | null, turn: Turn): void {
-	bone?.rotation.set(turn.pitch, turn.yaw, turn.roll);
+/** Sets a bone's rotation to `turn`. */
+function turnBone(bone: Object3D, turn: Turn): void {
+	bone.rotation.set(turn.pitch, turn.yaw, turn.roll);
+}
+
+const turnAsEuler = new Euler();
+const turnAsQuaternion = new Quaternion();
+
+/** Returns a bone to its rest, the identity of a normalized humanoid bone; a bone the model lacks is skipped. */
+function restBone(bone: Object3D | null): void {
+	bone?.quaternion.identity();
+}
+
+/** Adds `turn` to the rotation the bone holds, in its parent's frame; a bone the model lacks is skipped. */
+function addTurn(bone: Object3D | null, turn: Turn): void {
+	bone?.quaternion.premultiply(turnAsQuaternion.setFromEuler(turnAsEuler.set(turn.pitch, turn.yaw, turn.roll)));
 }
 
 /**
@@ -85,8 +98,10 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	const bones = { neck: neck !== null, chest: chest !== null };
 	const leftShoulder = vrm.humanoid.getNormalizedBoneNode('leftShoulder');
 	const rightShoulder = vrm.humanoid.getNormalizedBoneNode('rightShoulder');
-	const leftUpperArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm');
-	const rightUpperArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
+	const leftUpperArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm')!;
+	const rightUpperArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm')!;
+	const rightLowerArm = vrm.humanoid.getNormalizedBoneNode('rightLowerArm')!;
+	const restedBones = [spine, chest, leftShoulder, rightShoulder];
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;
 	let view: PerspectiveCamera;
@@ -100,15 +115,17 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 				view = headAndShouldersCamera(eyes, size.width / size.height);
 				drawn = size;
 			}
-			spine.rotation.x = pose.breath + pose.trunkLean + pose.moodTrunk.spine;
-			const spread = spreadPosture(pose.posture, bones);
-			head.rotation.set(pose.head.pitch + spread.head.pitch, pose.head.yaw + spread.head.yaw, pose.head.roll + spread.head.roll);
-			neck?.rotation.set(spread.neck.pitch, spread.neck.yaw, spread.neck.roll);
-			chest?.rotation.set(spread.chest.pitch + pose.trunkLean + pose.moodTrunk.chest, spread.chest.yaw, spread.chest.roll);
-			turnBone(leftShoulder, pose.arms.leftShoulder);
-			turnBone(rightShoulder, pose.arms.rightShoulder);
 			turnBone(leftUpperArm, pose.arms.leftUpperArm);
 			turnBone(rightUpperArm, pose.arms.rightUpperArm);
+			turnBone(rightLowerArm, pose.arms.rightLowerArm);
+			restedBones.forEach(restBone);
+			const spread = spreadPosture(pose.posture, bones);
+			addTurn(spine, { pitch: pose.breath + pose.trunkLean + pose.moodTrunk.spine, yaw: 0, roll: 0 });
+			addTurn(chest, { pitch: spread.chest.pitch + pose.trunkLean + pose.moodTrunk.chest, yaw: spread.chest.yaw, roll: spread.chest.roll });
+			addTurn(leftShoulder, pose.shoulders.left);
+			addTurn(rightShoulder, pose.shoulders.right);
+			head.rotation.set(pose.head.pitch + spread.head.pitch, pose.head.yaw + spread.head.yaw, pose.head.roll + spread.head.roll);
+			neck?.rotation.set(spread.neck.pitch, spread.neck.yaw, spread.neck.roll);
 			vrm.expressionManager!.setValue('blink', pose.blink);
 			for (const [shape, weight] of Object.entries(pose.mouth)) vrm.expressionManager!.setValue(shape, weight);
 			for (const mood of Object.values(figureMood)) vrm.expressionManager!.setValue(mood, pose.mood[mood]);

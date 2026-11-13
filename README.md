@@ -42,8 +42,8 @@ export async function showFigure(canvas: HTMLCanvasElement, figureUrl: string, s
 
 The app calls `handle.dispose()` when it is done with the figure; a second call does nothing. `handle.signal` is the last
 signal given. `handle.think(working)` tells the figure whether the agent's model is working: the app reports only the fact,
-and the figure decides its motion, so it looks up and aside while `working` is true and goes back to its idle motion
-when it is false. The same value again changes nothing, and on a figure that ended or was disposed the call does nothing.
+and the figure decides its motion, so it looks up and aside and raises its right hand to its chin while `working` is true, and goes back to its idle motion
+with its arm lowered when it is false. The same value again changes nothing, and on a figure that ended or was disposed the call does nothing.
 `handle.listen(speaker)` hands the figure the element of the page at which someone speaks, or `null` when nobody does: the figure
 turns toward the element's centre, its eyes first and its head a moment later, with a blink when the turn is large, leans in a little,
 nods now and then, lets its eyes jump a little and follows the element as it moves, with no further call, unless it is thinking. Anything that is not an element, and an element that is not connected, belongs to another document or has no box (its bounding
@@ -81,8 +81,8 @@ freed cannot give another.
 **The app owns** the canvas and its CSS size, the fetch of the bytes, its symbol and `dispose`. **The package does** the
 rest: it sizes the drawing buffer to the canvas's client size times the device pixel ratio (at most 2) in every frame,
 so a resized canvas is followed with no call; it poses the figure at rest with its arms lowered at its sides, and gives the figure its idle
-motion (breathing, blinking, glancing), its thinking look, its look toward a speaker (the eyes first) and the nods it makes while one speaks, the small jumps of its eyes (smaller while the agent speaks, none while it thinks), and the mouth and the nod of the head that follow the agent's voice and the mood of the sentence; while the page asks for reduced motion it blinks, slower, holds the arms
-down with no idle motion, takes and leaves those looks and the mouth's shape at once, does not jump its eyes and does not nod; and it draws only
+motion (breathing, blinking, glancing), its thinking look, its look toward a speaker (the eyes first) and the nods it makes while one speaks, the small jumps of its eyes (smaller while the agent speaks, none while it thinks), and the mouth and the nod of the head that follow the agent's voice and the mood of the sentence; while the page asks for reduced motion it blinks, slower, keeps the arms
+down at rest with no idle motion (the hand rises to the chin at once while the figure thinks), takes and leaves those looks and the mouth's shape at once, does not jump its eyes and does not nod; and it draws only
 while the page is visible and the canvas is in the viewport. It never writes the canvas's `style` and adds no element to the page.
 
 The page may run under a strict script policy. The package's browser tests run it under

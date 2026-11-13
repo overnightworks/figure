@@ -61,11 +61,20 @@ export function centreOf(spots: readonly Spot[]): { count: number; x: number; y:
 /** How far from the nose's column, in pixels at a canvas 200 wide, a dark pixel still belongs to the mouth rather than to a corner of it. */
 const MOUTH_REACH = 6;
 
-/** How many rows the mouth covers: the dark pixels below the nose and within `MOUTH_REACH` of its column, where the mouth is the only dark feature. */
-export function mouthRows(spots: Record<FaceFeature, Spot[]>): number {
+/** The mouth's dark pixels: those below the nose and within `MOUTH_REACH` of its column, where the mouth is the only dark feature. */
+function mouthPixels(spots: Record<FaceFeature, Spot[]>): Spot[] {
 	const nose = centreOf(spots.nose);
-	const rows = spots.dark.filter(({ x, y }) => y > nose.y && Math.abs(x - nose.x) <= MOUTH_REACH).map(({ y }) => y);
-	return new Set(rows).size;
+	return spots.dark.filter(({ x, y }) => y > nose.y && Math.abs(x - nose.x) <= MOUTH_REACH);
+}
+
+/** How many rows the mouth covers. */
+export function mouthRows(spots: Record<FaceFeature, Spot[]>): number {
+	return new Set(mouthPixels(spots).map(({ y }) => y)).size;
+}
+
+/** How far below the nose's centre the mouth's lowest row lies, in pixels. */
+export function mouthDepthBelowNose(spots: Record<FaceFeature, Spot[]>): number {
+	return Math.max(...mouthPixels(spots).map(({ y }) => y)) - centreOf(spots.nose).y;
 }
 
 /** Whether the pixels hold any the figure covers: a buffer nothing was drawn into is transparent everywhere. */
