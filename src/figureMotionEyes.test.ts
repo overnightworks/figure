@@ -111,4 +111,3 @@ describe('the figure motion\'s eyes', () => {
 		expect(frames.some((frame) => deviation(speakingNow[frame]!, frame) > 0.1)).toBe(true);
 	});
 });
-
