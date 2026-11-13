@@ -12,6 +12,8 @@ const requestFrameOwn = window.requestAnimationFrame;
 /** How far the nose has to move to the side or up, in pixels at a canvas 200 wide, for a test to call it turned, and how near its resting place it has to be to call it back. */
 const turnedPixels = { side: 10, up: 4 };
 const backPixels = 4;
+/** How long the idle glance holds the head aside at most, plus the head's ease back: a nose that is away only because of it is back within this many milliseconds. */
+const glanceHoldMilliseconds = 3000;
 /** A lowered arm hangs from its shoulder, so its pixels run this far down at 200 px wide; a T-pose arm is only as thick as its bone, about 30 px. */
 const armHangPixels = 60;
 /** The frames after which a spring-bone sleeve has settled into its rest shape. */
@@ -369,6 +371,13 @@ describe('a figure driven by the host', () => {
 		expect(Math.abs(nose.y - expected.y)).toBeLessThan(backPixels);
 	}
 
+	/** The nose back at `expected` once `act` took effect: in the first picture after it under reduced motion, otherwise in a picture within `glanceHoldMilliseconds`, since an idle glance that the figure holds then turns the head aside for a moment. */
+	async function expectNoseBackAfterChange(canvas: HTMLCanvasElement, reduced: boolean, act: () => void, expected: Spot): Promise<void> {
+		const nose = await noseAfterChange(canvas, reduced, act);
+		if (reduced) return expectNear(nose, expected);
+		await vi.waitFor(async () => expectNear(await noseNow(canvas), expected), { timeout: glanceHoldMilliseconds });
+	}
+
 	describe.each(boxlessSpeakers)('a speaker made boxless by %s', (_, makeSpeaker) => {
 		it.each(motions)('counts it as nobody and follows it once it has a box, with no call, in %s', async (__, reduced) => {
 			if (reduced) await emulateReducedMotion();
@@ -377,7 +386,7 @@ describe('a figure driven by the host', () => {
 			const { speaker, hide, show } = makeSpeaker();
 			hide();
 
-			expectNear(await noseAfterChange(canvas, reduced, () => handle.listen(speaker)), resting);
+			await expectNoseBackAfterChange(canvas, reduced, () => handle.listen(speaker), resting);
 			expectTurnedTo(await noseAfterChange(canvas, reduced, show), resting, -1);
 		});
 
@@ -388,7 +397,7 @@ describe('a figure driven by the host', () => {
 			const { speaker, hide, show } = makeSpeaker();
 			expectTurnedTo(await noseAfterChange(canvas, reduced, () => handle.listen(speaker)), resting, -1);
 
-			expectNear(await noseAfterChange(canvas, reduced, hide), resting);
+			await expectNoseBackAfterChange(canvas, reduced, hide, resting);
 			expectTurnedTo(await noseAfterChange(canvas, reduced, show), resting, -1);
 		});
 
@@ -400,7 +409,7 @@ describe('a figure driven by the host', () => {
 			hide();
 			const boxed = speakerAt(farRight, level);
 
-			expectNear(await noseAfterChange(canvas, reduced, () => handle.listen(speaker)), resting);
+			await expectNoseBackAfterChange(canvas, reduced, () => handle.listen(speaker), resting);
 			expectTurnedTo(await noseAfterChange(canvas, reduced, () => handle.listen(boxed)), resting, 1);
 		});
 
@@ -413,7 +422,7 @@ describe('a figure driven by the host', () => {
 			expectTurnedTo(thinking, resting, -1);
 
 			expectNear(await noseAfterChange(canvas, reduced, () => { hide(); handle.listen(speaker); }), thinking);
-			expectNear(await noseAfterChange(canvas, reduced, () => handle.think(false)), resting);
+			await expectNoseBackAfterChange(canvas, reduced, () => handle.think(false), resting);
 			expectTurnedTo(await noseAfterChange(canvas, reduced, show), resting, -1);
 		});
 	});
