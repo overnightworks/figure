@@ -189,7 +189,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 		voiceTap.follow(speaking ? sentence.voice : undefined);
 	};
 	const gesture = (name: unknown) => {
-		if (!stopped && document.visibilityState === 'visible' && isFigureGesture(name)) motion.gesture(name);
+		if (!stopped && document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);
 	};
 	return { stop, think, listen, speak, gesture };
 }

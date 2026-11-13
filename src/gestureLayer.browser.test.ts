@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp } from 'vitest/browser';
 import { centreOf, emulateReducedMotion, restorePageVisibility, setPageVisibility, type FaceFeature, type Spot } from '../tests/browserCanvas.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
@@ -18,6 +18,8 @@ const restPictures = 5;
 const longestWaitSeconds = 30;
 /** The seconds an ignored call is watched, beyond the length of the gesture. */
 const ignoredWatchMarginSeconds = 1;
+/** The frames waited after a canvas leaves the viewport, for the observer to report it and the loop to pause. */
+const outOfViewFrames = 10;
 
 const armTop = (features: Features) => Math.min(...features.arm.map((spot) => spot.y));
 const noseOf = (features: Features) => centreOf(features.nose);
@@ -128,6 +130,21 @@ describe('a figure whose agent waves', () => {
 		const { canvas, handle } = await watch.mountFigure();
 		const resting = await watch.featuresNow(canvas);
 		handle.gesture(figureGesture.wave);
+		const trace = await traceFor(canvas, ignoredWatchSeconds);
+
+		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
+	});
+
+	it('plays none when the preference is lifted after a call made under reduced motion while the canvas was out of the viewport', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await watch.mountFigure();
+		const resting = await watch.featuresNow(canvas);
+		canvas.style.marginTop = '20000px';
+		await vi.waitFor(() => expect(canvas.getBoundingClientRect().top).toBeGreaterThan(window.innerHeight));
+		for (let frame = 0; frame < outOfViewFrames; frame++) await watch.featuresOfNextFrame(canvas);
+		handle.gesture(figureGesture.wave);
+		await cdp().send('Emulation.setEmulatedMedia', { features: [] });
+		canvas.style.marginTop = '';
 		const trace = await traceFor(canvas, ignoredWatchSeconds);
 
 		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
