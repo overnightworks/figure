@@ -1,0 +1,8 @@
+claim_id = "29b1dd25b21d457d8cd3dd22d60ff3fe"
+agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
+role = "builder"
+base = "6013a41ce06ec8946bc15f0d605a21e196d82be8"
+branch = "claude/issue-75-gesture-wave"
+scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "docs/VISION.md", "src/draw.browser.test.ts", "src/draw.ts", "src/drawSpeaking.browser.test.ts", "src/figureFrame.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "src/figureMotionArms.test.ts", "src/figureMotionGesture.test.ts", "src/gestureClips.test.ts", "src/gestureClips.ts", "src/gestureLayer.browser.test.ts", "src/gestureLayer.ts", "src/gestures.ts", "src/index.ts", "tests/browserCanvas.ts", "tests/e2e/stage.spec.ts", "tests/figureArms.ts", "tests/stage/index.html", "tests/stage/main.ts"]
+opened_commit = "4215988a7f923df3f7369584593b280a569dd04c"
+whole_reason = "The closed set, the wave's keys, the clip layer in the frame and the handle's method are one capability: none of them has a caller or a proof without the others."
