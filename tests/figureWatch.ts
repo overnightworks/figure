@@ -2,6 +2,7 @@
 import { expect, vi } from 'vitest';
 import { mount, type FigureHandle } from '../src/draw.js';
 import { buildConformantVrm } from './figureFixtures.js';
+import { slowMedianMilliseconds } from '../src/frameTimeGuard.js';
 import { coversSomething, readPixels, spotsOf, type FaceFeature, type Spot } from './browserCanvas.js';
 
 /** The page's own frame request, which the watch waits on without counting it. */
@@ -9,6 +10,9 @@ const requestFrameOwn = window.requestAnimationFrame;
 
 /** The milliseconds a frame lasts when the watch makes the frames slow: far past what the frame-time guard keeps. */
 const slowFrameMilliseconds = 60;
+
+/** The most a frame the watch hands to a figure lasts unless it makes the frames slow: not past the median the frame-time guard keeps, so a slow runner never ends the figure under test. */
+const longestKeptFrameMilliseconds = slowMedianMilliseconds;
 
 /** A figure the watch mounted, with the canvas it is drawn on. */
 export interface WatchedFigure {
@@ -27,18 +31,19 @@ export interface FigureWatch {
 	end(): void;
 }
 
-/** Starts a watch; `slowFrames` hands the figures frame times that make them too slow to keep. */
+/** Starts a watch; `slowFrames` hands the figures frame times that make them too slow to keep, otherwise the frame times follow the page's but for any frame longer than `longestKeptFrameMilliseconds`. */
 export function startFigureWatch(slowFrames = false): FigureWatch {
 	const canvases: HTMLCanvasElement[] = [];
 	const handles: FigureHandle[] = [];
 	const shown = new Map<HTMLCanvasElement, { width: number; height: number; pixels: Uint8Array }>();
 	let frames = 0;
-	let slowTime: number | undefined;
+	let handedTime: number | undefined;
 	vi.spyOn(Math, 'random').mockImplementation(seededRandom(7));
 	window.requestAnimationFrame = (callback) =>
 		requestFrameOwn.call(window, (time) => {
-			slowTime = (slowTime ?? time) + slowFrameMilliseconds;
-			callback(slowFrames ? slowTime : time);
+			const previousTime = handedTime ?? time;
+			handedTime = slowFrames ? previousTime + slowFrameMilliseconds : Math.min(time, previousTime + longestKeptFrameMilliseconds);
+			callback(handedTime);
 			frames++;
 			canvases.forEach(readIfDrawn);
 		});
