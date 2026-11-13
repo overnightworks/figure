@@ -72,10 +72,13 @@ describe('the right hand at the chin while the figure thinks', () => {
 		});
 	});
 
-	it('returns the arms to rest once the figure stops thinking', () => {
-		const poses = watch(atSecond(2 * settledSeconds) + 1, (frame) => (frame < atSecond(settledSeconds) ? thinking : idle));
+	it.each([
+		['with motion', false, atSecond(2 * settledSeconds)],
+		['at the next frame under reduced motion', true, atSecond(settledSeconds)]
+	])('returns the arms to rest once the figure stops thinking, %s', (_, reducedMotion, returnedFrame) => {
+		const poses = watch(returnedFrame + 1, (frame) => (frame < atSecond(settledSeconds) ? thinking : idle), reducedMotion);
 		const resting = restingArms();
-		const returned = poses[atSecond(2 * settledSeconds)]!.arms;
+		const returned = poses[returnedFrame]!.arms;
 
 		expect(returned.rightUpperArm.roll).toBeCloseTo(resting.rightUpperArm.roll, 3);
 		expect(returned.rightUpperArm.pitch).toBeCloseTo(resting.rightUpperArm.pitch, 3);
