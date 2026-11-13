@@ -147,7 +147,7 @@ describe('the figure motion', () => {
 		expect(returned.advance(thinking, 30, false, null, null)).toEqual(stepped.advance(thinking, 0.1, false, null, null));
 	});
 
-	it('keeps the idle motion of release 0.2.0 when the agent never thinks: its breath, head turn and blink at the same moments, though the eyes lead and jump on top', () => {
+	it('keeps the idle motion recorded for the seed when the agent never thinks: its breath, head turn and blink at the same moments, though the eyes lead and jump on top', () => {
 		const poses = watch(1650, () => idle);
 
 		releasedIdle.forEach(({ frame, pose }) => {
@@ -755,11 +755,11 @@ describe('the arms at rest', () => {
 	});
 });
 
-/** The idle pose of release 0.2.0 for the seed above, 10 ms frames, no thinking and no reduced motion, as that release's idle module printed it at these frames; the look-at is left out, as the eyes now lead the head. */
+/** The idle pose for the seed above, 10 ms frames, no thinking and no reduced motion, as the motion printed it at these frames with every draw taken from the seeded source in order; the look-at is left out, as the eyes lead the head and jump on top of it. */
 const releasedIdle = [
-	{ frame: 540, pose: { blink: 0, breath: 0.020895656768874456, head: { yaw: 0.03635257427386759, pitch: 0.011104483145713905, roll: 0.0199915048587643 } } },
-	{ frame: 660, pose: { blink: 0.8951632913550626, breath: 0.005440682537475133, head: { yaw: 0.021380111188512303, pitch: -0.00805803367391107, roll: 0.018594378446629405 } } },
-	{ frame: 960, pose: { blink: 0, breath: 0.014277515334769496, head: { yaw: 0.0399122111362154, pitch: 0.006570158580842797, roll: 0.006360561898760413 } } },
-	{ frame: 1100, pose: { blink: 0.6736956436465578, breath: 0.010990086855098304, head: { yaw: -0.028895394562669055, pitch: -0.007610273745231622, roll: -0.001645161637623551 } } },
-	{ frame: 1650, pose: { blink: 0, breath: -0.014277515334768658, head: { yaw: -0.03665233346014622, pitch: 0.03218480725494611, roll: -0.019886568123676833 } } }
+	{ frame: 540, pose: { blink: 0, breath: 0.020895656768874456, head: { yaw: -0.04161635932390453, pitch: 0.015656019783450336, roll: 0.0199915048587643 } } },
+	{ frame: 585, pose: { blink: 0.961825643172819, breath: 0.021040238825292983, head: { yaw: 0.005673312285950308, pitch: 0.0037694117636025565, roll: 0.019745667769759525 } } },
+	{ frame: 960, pose: { blink: 0, breath: 0.014277515334769496, head: { yaw: -0.015340766900433452, pitch: -0.018115034548822496, roll: 0.006360561898760413 } } },
+	{ frame: 1155, pose: { blink: 0.9957341762950346, breath: -0.0049763373768014095, head: { yaw: -0.0025962965084032515, pitch: -0.029215927177524845, roll: -0.004790005830756964 } } },
+	{ frame: 1650, pose: { blink: 0, breath: -0.014277515334768658, head: { yaw: -0.004706420008340174, pitch: 0.011583931404945107, roll: -0.019886568123676833 } } }
 ];

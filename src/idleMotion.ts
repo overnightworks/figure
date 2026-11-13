@@ -42,17 +42,6 @@ const clockStartSpreadSeconds = 10;
 
 type Interval = readonly [number, number];
 
-/** A source of numbers in [0, 1) that `seed` fixes (mulberry32). */
-function derivedRandom(seed: number): () => number {
-	let state = Math.floor(seed * 2 ** 32);
-	return () => {
-		state = (state + 0x6d2b79f5) | 0;
-		let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
-		mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
-		return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
-	};
-}
-
 /** What the idle life gives for one frame. */
 export interface IdlePose {
 	/** The blink expression's weight, 0 to 1. */
@@ -78,16 +67,13 @@ export function createIdleMotion(random: () => number): IdleMotion {
 	const between = ([minimum, maximum]: Interval) => minimum + random() * (maximum - minimum);
 	const clockStart = random();
 	let clock = clockStart * clockStartSpreadSeconds;
-	// The jumps draw from a source the first draw fixes, so they leave the blinks' and the glances' draws as they are.
-	const jumpRandom = derivedRandom(clockStart);
-	const jumpBetween = ([minimum, maximum]: Interval) => minimum + jumpRandom() * (maximum - minimum);
 	let blinkStart = between(blink.firstStart);
 	let blinkSeconds = -1;
 	let glanceStart = between(glance.firstStart);
 	let glanceEnd = 0;
 	let target = { yaw: 0, pitch: 0 };
 	let blinkEnd = clock;
-	let jumpStart = clock + jumpBetween(eyeJump.gapSeconds);
+	let jumpStart = clock + between(eyeJump.gapSeconds);
 	let eyes = { yaw: 0, pitch: 0 };
 
 	const blinkWeight = (step: number, reducedMotion: boolean): number => {
@@ -115,8 +101,8 @@ export function createIdleMotion(random: () => number): IdleMotion {
 	const eyesNow = (reducedMotion: boolean) => {
 		if (reducedMotion) return { yaw: 0, pitch: 0 };
 		if (clock > jumpStart) {
-			eyes = { yaw: jumpBetween([-eyeJumpReach.yaw, eyeJumpReach.yaw]), pitch: jumpBetween([-eyeJumpReach.pitch, eyeJumpReach.pitch]) };
-			jumpStart = clock + jumpBetween(eyeJump.gapSeconds);
+			eyes = { yaw: between([-eyeJumpReach.yaw, eyeJumpReach.yaw]), pitch: between([-eyeJumpReach.pitch, eyeJumpReach.pitch]) };
+			jumpStart = clock + between(eyeJump.gapSeconds);
 		}
 		return eyes;
 	};

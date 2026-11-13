@@ -146,6 +146,19 @@ describe('the idle motion', () => {
 			expect(Math.max(...poses.map((pose) => Math.abs(pose.eyes.yaw)))).toBeGreaterThan(eyeJumpReach.yaw / 2);
 		});
 
+		it.each([
+			['the top', 0.999, 1],
+			['the bottom', 0.001, -1]
+		])('draws the eyes\' jumps from the source it is given: one that always gives %s of the interval puts every jump at that end of its reach', (_name, drawn, side) => {
+			const motion = createIdleMotion(() => drawn);
+			const poses = Array.from({ length: 1000 }, () => motion.advance(frameSeconds, false)).slice(300);
+
+			poses.forEach(({ eyes }) => {
+				expect(eyes.yaw * side).toBeGreaterThan(eyeJumpReach.yaw * 0.99);
+				expect(eyes.pitch * side).toBeGreaterThan(eyeJumpReach.pitch * 0.99);
+			});
+		});
+
 		it('breathes and sways, so the pose varies over time', () => {
 			const poses = watch(seed, 60);
 			const range = (values: number[]) => Math.max(...values) - Math.min(...values);
