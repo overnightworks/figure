@@ -513,7 +513,7 @@ describe('the figure motion while the agent speaks a mood', () => {
 	/** The weight a mood reaches, read from the pose that reduced motion gives at once: the peak the easing goes toward. */
 	const peakOf = (mood: FigureMood): number => watch(1, () => speakingMood(mood), true)[0]!.mood[mood];
 	/** What a pose adds to the posture over the same frame of a figure speaking with no mood: the head's pitch and roll, the chest's trunk and the left shoulder's roll. */
-	const leanOf = (pose: FigurePose, plain: FigurePose) => ({ pitch: pose.posture.pitch - plain.posture.pitch, roll: pose.posture.roll - plain.posture.roll, spine: pose.moodTrunk.spine, chest: pose.moodTrunk.chest, shoulder: pose.arms.leftShoulder.roll - plain.arms.leftShoulder.roll });
+	const leanOf = (pose: FigurePose, plain: FigurePose) => ({ pitch: pose.posture.pitch - plain.posture.pitch, roll: pose.posture.roll - plain.posture.roll, spine: pose.moodTrunk.spine, chest: pose.moodTrunk.chest, shoulder: pose.shoulders.left.roll - plain.shoulders.left.roll });
 	/** What a mood at its peak leans the posture by, as reduced motion reaches it at once. */
 	const fullLean = (mood: FigureMood) => leanOf(watch(1, () => speakingMood(mood), true)[0]!, watch(1, () => speaking, true)[0]!);
 	const noMood: Record<FigureMood, number> = { happy: 0, angry: 0, sad: 0, relaxed: 0, surprised: 0 };
@@ -601,7 +601,7 @@ describe('the figure motion while the agent speaks a mood', () => {
 
 		expect(pose!.mood[mood]).toBe(peakOf(mood));
 		expect(pose!.posture.yaw).toBeCloseTo(plain!.posture.yaw, 12);
-		expect(pose!.arms.rightShoulder.roll - plain!.arms.rightShoulder.roll).toBeCloseTo(-lean.shoulder, 12);
+		expect(pose!.shoulders.right.roll - plain!.shoulders.right.roll).toBeCloseTo(-lean.shoulder, 12);
 		expect(lean.spine * lean.chest).toBeGreaterThanOrEqual(0);
 		expect(Math.abs(lean.chest)).toBeGreaterThanOrEqual(Math.abs(lean.spine));
 	});
@@ -637,6 +637,7 @@ describe('the figure motion while the agent speaks a mood', () => {
 		watch(300, () => speaking).forEach((pose, frame) => {
 			expect(pose.posture).toEqual(idling[frame]!.posture);
 			expect(pose.arms).toEqual(idling[frame]!.arms);
+			expect(pose.shoulders).toEqual(idling[frame]!.shoulders);
 			expect(pose.moodTrunk).toEqual({ spine: 0, chest: 0 });
 		});
 	});
@@ -712,7 +713,7 @@ describe('the spread of a posture turn', () => {
 describe('the arms at rest', () => {
 	it.each([
 		['idle', idle],
-		['thinking', thinking]
+		['speaking', speaking]
 	])('lowers both upper arms about their forward axis, by 1.38 rad, the left one negative, when %s', (_, facts) => {
 		const poses = watch(600, () => facts);
 
@@ -726,11 +727,11 @@ describe('the arms at rest', () => {
 
 	it('turns the shoulders with the breath, the left up and the right down, by 0.012 rad at the top of a breath', () => {
 		const poses = watch(1000, () => idle);
-		const rises = poses.map(({ arms }) => arms.leftShoulder.roll);
+		const rises = poses.map(({ shoulders }) => shoulders.left.roll);
 
 		expect(Math.max(...rises)).toBeCloseTo(0.012, 4);
 		expect(Math.min(...rises)).toBeCloseTo(-0.012, 4);
-		poses.forEach(({ arms }) => expect(arms.rightShoulder.roll).toBeCloseTo(-arms.leftShoulder.roll, 12));
+		poses.forEach(({ shoulders }) => expect(shoulders.right.roll).toBeCloseTo(-shoulders.left.roll, 12));
 	});
 
 	it('swings the left upper arm about its x axis with the breath, by 0.01 rad at the top of a breath, and leaves the right one still', () => {
@@ -743,15 +744,77 @@ describe('the arms at rest', () => {
 	});
 
 	it('holds the arms down under reduced motion, with the shoulders and the swing still, from the first frame', () => {
-		const poses = watch(600, (frame) => (frame < 300 ? idle : thinking), true);
+		const poses = watch(600, (frame) => (frame < 300 ? idle : speaking), true);
 
-		poses.forEach(({ arms }) => {
+		poses.forEach(({ arms, shoulders }) => {
 			expect(arms.leftUpperArm.roll).toBeCloseTo(-1.38, 12);
 			expect(arms.rightUpperArm.roll).toBeCloseTo(1.38, 12);
-			expect(arms.leftShoulder.roll).toBeCloseTo(0, 12);
-			expect(arms.rightShoulder.roll).toBeCloseTo(0, 12);
+			expect(shoulders.left.roll).toBeCloseTo(0, 12);
+			expect(shoulders.right.roll).toBeCloseTo(0, 12);
 			expect(arms.leftUpperArm.pitch).toBeCloseTo(0, 12);
 		});
+	});
+});
+
+describe('the right hand at the chin while the figure thinks', () => {
+	const settledSeconds = 3;
+	const restingArms = () => watch(1, () => idle, true)[0]!.arms;
+	const settledThinkingArms = () => watch(atSecond(settledSeconds) + 1, () => thinking)[atSecond(settledSeconds)]!.arms;
+
+	it('raises the right arm away from its rest once the thinking look has settled', () => {
+		const [resting, settled] = [restingArms(), settledThinkingArms()];
+
+		expect(settled.rightUpperArm).not.toEqual(resting.rightUpperArm);
+		expect(settled.rightLowerArm).not.toEqual(resting.rightLowerArm);
+	});
+
+	it('moves the right arm monotonically from its rest to the settled pose as the thinking weight rises', () => {
+		const poses = watch(atSecond(settledSeconds) + 1, () => thinking);
+		const [resting, settled] = [restingArms(), settledThinkingArms()];
+		const shareOf = (value: number, from: number, to: number) => (value - from) / (to - from);
+		const lowerShares = poses.map(({ arms }) => shareOf(arms.rightLowerArm.yaw, resting.rightLowerArm.yaw, settled.rightLowerArm.yaw));
+		const upperShares = poses.map(({ arms }) => shareOf(arms.rightUpperArm.pitch, resting.rightUpperArm.pitch, settled.rightUpperArm.pitch));
+
+		lowerShares.forEach((share, frame) => {
+			expect(share).toBeCloseTo(upperShares[frame]!, 9);
+			if (frame > 0) expect(share).toBeGreaterThan(lowerShares[frame - 1]!);
+		});
+	});
+
+	it('returns the arms to rest once the figure stops thinking', () => {
+		const poses = watch(atSecond(2 * settledSeconds) + 1, (frame) => (frame < atSecond(settledSeconds) ? thinking : idle));
+		const resting = restingArms();
+		const returned = poses[atSecond(2 * settledSeconds)]!.arms;
+
+		expect(returned.rightUpperArm.roll).toBeCloseTo(resting.rightUpperArm.roll, 3);
+		expect(returned.rightUpperArm.pitch).toBeCloseTo(resting.rightUpperArm.pitch, 3);
+		expect(returned.rightLowerArm.yaw).toBeCloseTo(resting.rightLowerArm.yaw, 3);
+	});
+
+	it('shows the settled pose at the first frame under reduced motion', () => {
+		const [first] = watch(1, () => thinking, true);
+		const settled = settledThinkingArms();
+
+		(['pitch', 'yaw', 'roll'] as const).forEach((angle) => {
+			expect(first!.arms.rightUpperArm[angle]).toBeCloseTo(settled.rightUpperArm[angle], 3);
+			expect(first!.arms.rightLowerArm[angle]).toBeCloseTo(settled.rightLowerArm[angle], 3);
+		});
+	});
+
+	it('keeps the left arm as it is at rest', () => {
+		const resting = watch(300, () => idle);
+
+		watch(300, () => thinking).forEach((pose, frame) => expect(pose.arms.leftUpperArm).toEqual(resting[frame]!.arms.leftUpperArm));
+	});
+
+	it('lowers the hand when the agent speaks while the figure thinks, as speaking comes first', () => {
+		const frames = atSecond(2 * settledSeconds) + 1;
+		const poses = watch(frames, (frame) => (frame < atSecond(settledSeconds) ? thinking : thinkingAndSpeaking));
+		const resting = restingArms();
+		const lowered = poses[frames - 1]!.arms;
+
+		expect(lowered.rightUpperArm.roll).toBeCloseTo(resting.rightUpperArm.roll, 3);
+		expect(lowered.rightLowerArm.yaw).toBeCloseTo(resting.rightLowerArm.yaw, 3);
 	});
 });
 

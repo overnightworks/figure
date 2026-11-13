@@ -15,8 +15,8 @@ import type { VowelWeights } from './vowelWeights.js';
  * the look-at reaches the goal at once, and there are no jumps and no blink brought forward.
  *
  * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and
- * to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the easing rates. The picture
- * also raises a hand to the chin, which the figure does not do. The listening look is that of its listening state: the gaze toward the
+ * to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the easing rates. The right arm
+ * rises with the thinking weight to the picture's hand at the chin. The listening look is that of its listening state: the gaze toward the
  * speaker, the head's larger share of its yaw, the slower yaw and the lean, and a nod every 2.5 to 5 seconds, which the picture times
  * and which `spreadPosture` shares between neck and head. Under reduced motion the pose is reached and left at once, and no nod comes.
  * The speaking look is that of its speaking state: the five mouth weights easing at 38 a second up and 22 down, and the head nodding
@@ -69,16 +69,23 @@ export interface FigurePose {
 	readonly mouth: VowelWeights;
 	/** The look-at's angles in degrees. */
 	readonly look: { readonly yaw: number; readonly pitch: number };
-	/** The arms' rest posture: the shoulders rise and fall with the breath and take the moods' lean, the upper arms are lowered. */
+	/** The base pose of the arms, absolute: both lowered at rest, and while the figure thinks the right hand at the chin, by the thinking look's weight. */
 	readonly arms: Arms;
+	/** What the shoulders add to their rest, a delta: they rise and fall with the breath and take the moods' lean. */
+	readonly shoulders: Shoulders;
 }
 
-/** The turns of the arms' bones in radians; the lower arms and the hands stay at rest. */
+/** The turns of the arms' bones in radians, as the base pose sets them; the left lower arm, the hands and the fingers stay at rest. */
 export interface Arms {
-	readonly leftShoulder: Turn;
-	readonly rightShoulder: Turn;
 	readonly leftUpperArm: Turn;
 	readonly rightUpperArm: Turn;
+	readonly rightLowerArm: Turn;
+}
+
+/** The turns the shoulders add to their rest in radians. */
+export interface Shoulders {
+	readonly left: Turn;
+	readonly right: Turn;
 }
 
 export interface FigureMotion {
@@ -138,17 +145,29 @@ const radiansPerDegree = Math.PI / 180;
  * because its bone runs along +X; the shoulders rise by 0.012 rad at the top of a breath, the left upper arm swings 0.01 rad about x.
  */
 const restingArm = { upperArmRoll: 1.38, shoulderRise: 0.012, upperArmSwing: 0.01 };
+const restTurn: Turn = { yaw: 0, pitch: 0, roll: 0 };
+/** The right arm at the full thinking look, the hand at the chin: the values of the picture's THINK_POSE; the arm blends from rest to it linearly in these angles, as the picture does. */
+const chinArm = { upperArm: { pitch: -0.6, yaw: 0.5, roll: 0.6 }, lowerArm: { pitch: 0, yaw: 2.4, roll: 0 } };
 
-/** The arms at rest for a breath of `breath` radians: the breath as a share of its largest lean sets the shoulders' and the swing's share, and `moodShoulder` radians more lift the left shoulder and lower the right one. */
-function restingArms(breath: number, moodShoulder: number): Arms {
-	const share = breath / breathLean;
-	const lift = restingArm.shoulderRise * share + moodShoulder;
+/** The turn `weight` of the way from `from` to `to`, each angle on its own. */
+function blendedTurn(from: Turn, to: Turn, weight: number): Turn {
+	return { yaw: from.yaw + (to.yaw - from.yaw) * weight, pitch: from.pitch + (to.pitch - from.pitch) * weight, roll: from.roll + (to.roll - from.roll) * weight };
+}
+
+/** The arms' base pose: lowered, the left upper arm swinging with `breathShare`, the breath as a share of its largest lean, and the right arm on its way to the chin by `thinkingWeight`. */
+function baseArms(breathShare: number, thinkingWeight: number): Arms {
+	const restingRightUpperArm: Turn = { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll };
 	return {
-		leftShoulder: { yaw: 0, pitch: 0, roll: lift },
-		rightShoulder: { yaw: 0, pitch: 0, roll: -lift },
-		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * share, roll: -restingArm.upperArmRoll },
-		rightUpperArm: { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll }
+		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * breathShare, roll: -restingArm.upperArmRoll },
+		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, thinkingWeight),
+		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, thinkingWeight)
 	};
+}
+
+/** What the shoulders add to their rest for `breathShare`: the breath's lift, and `moodShoulder` radians more lift the left shoulder and lower the right one. */
+function shoulderDeltas(breathShare: number, moodShoulder: number): Shoulders {
+	const lift = restingArm.shoulderRise * breathShare + moodShoulder;
+	return { left: { yaw: 0, pitch: 0, roll: lift }, right: { yaw: 0, pitch: 0, roll: -lift } };
 }
 
 /** The shares of a posture turn the neck takes, and the chest takes of its yaw; the head takes the rest. */
@@ -320,6 +339,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 			gaze = { yaw: ease(gaze.yaw, goal.yaw, listening ? easing.listeningYaw : easing.yaw), pitch: ease(gaze.pitch, goal.pitch, easing.pitch) };
 			eyeGaze = { yaw: ease(eyeGaze.yaw, goal.yaw, eyeEaseRate), pitch: ease(eyeGaze.pitch, goal.pitch, eyeEaseRate) };
 			const jump = jumpShare(thinking, facts.speaking);
+			const breathShare = base.breath / breathLean;
 			thinkingWeight = ease(thinkingWeight, thinking ? 1 : 0, easing.thinking);
 			leanWeight = ease(leanWeight, listening ? 1 : 0, easing.lean);
 			return {
@@ -340,7 +360,8 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				moodTrunk: { spine: mood.chest * trunkShare.spine, chest: mood.chest * trunkShare.chest },
 				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
 				look: { yaw: clamp(eyeGaze.yaw * lookGain + jump * base.eyes.yaw, lookReachDegrees), pitch: clamp(eyeGaze.pitch * lookGain + jump * base.eyes.pitch, lookReachDegrees) },
-				arms: restingArms(base.breath, mood.shoulder * shoulderShare)
+				arms: baseArms(breathShare, thinkingWeight),
+				shoulders: shoulderDeltas(breathShare, mood.shoulder * shoulderShare)
 			};
 		}
 	};
