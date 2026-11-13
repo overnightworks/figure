@@ -4,8 +4,9 @@ The fleet's VRM 1.0 profile as a check: the framework-free TypeScript ESM packag
 
 Today figure ships two things: the check, `figure check <file>` and `checkFigure(bytes)`, which tell whether a figure
 file meets the profile's container, VRM and budget rules; and the drawing, `mount` from `overnightworks-figure/draw`,
-which draws a figure that passes into an app's canvas, rests it with its arms lowered, keeps it alive with its idle motion and
-shows it thinking or listening when the app reports so, until the app disposes it.
+which draws a figure that passes into an app's canvas, rests it with its arms lowered, keeps it alive with its idle motion, shows it thinking or listening when the app reports so,
+and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
+mood of the sentence, until the app disposes it.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick start
@@ -99,7 +100,7 @@ https://github.com/overnightworks/figure/releases/download/v<version>/overnightw
 ```
 
 ```sh
-pnpm add https://github.com/overnightworks/figure/releases/download/v0.3.0/overnightworks-figure-0.3.0.tgz
+pnpm add https://github.com/overnightworks/figure/releases/download/v0.4.0/overnightworks-figure-0.4.0.tgz
 ```
 
 pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it downloads the tarball. The value to compare stands
