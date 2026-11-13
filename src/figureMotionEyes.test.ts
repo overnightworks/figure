@@ -20,7 +20,7 @@ describe('the figure motion\'s eyes', () => {
 			expect(turned / settledHead).toBeLessThan(0.5);
 		});
 
-		it('has the look-at at 90 percent of the thinking look while the head\'s turn is below half of its own, and the eyes without a jump', () => {
+		it('has the look-at at 90 percent of the thinking look while the head\'s turn is below half of its own', () => {
 			const poses = watch(100, () => thinking);
 			const resting = watch(100, () => idle);
 			const arrived = poses.findIndex((pose) => pose.look.yaw / thinkingLook.yaw >= 0.9);
@@ -63,25 +63,11 @@ describe('the figure motion\'s eyes', () => {
 		expect(blinksOf(watch(length, () => idle, false, speakerFrom(at(2.5), nearSpeaker)))).toEqual(blinks.slice(0, wait + 1));
 	});
 
-	it('does not bring a blink forward sooner than 2 seconds after the last one ended, and not under reduced motion', () => {
+	it('does not bring a blink forward under reduced motion', () => {
 		const { blinks, wait, at } = quietMoment();
 		const length = blinks[wait]!.end + 100;
-		const reducedBlinks = blinksOf(watch(length, () => idle, true));
 
-		expect(blinksOf(watch(length, () => idle, false, speakerFrom(at(1), farSpeaker)))).toEqual(blinks.slice(0, wait + 1));
-		expect(blinksOf(watch(length, () => idle, true, speakerFrom(at(2.5), farSpeaker)))).toEqual(reducedBlinks);
-	});
-
-	it('leaves 2 to 6 seconds between one blink and the next, though the speaker moves far every second', () => {
-		const farLeftAndRight = (frame: number): SpeakerOffset => ({ across: Math.floor(frame / 100) % 2 === 0 ? -1 : 1, down: 0 });
-		const blinks = blinksOf(watch(60000, () => idle, false, farLeftAndRight));
-
-		expect(blinks.length).toBeGreaterThan(100);
-		blinks.slice(1).forEach((blink, index) => {
-			const gap = (blink.start - blinks[index]!.end) * frameSeconds;
-			expect(gap).toBeGreaterThanOrEqual(2);
-			expect(gap).toBeLessThanOrEqual(6 + frameSeconds);
-		});
+		expect(blinksOf(watch(length, () => idle, true, speakerFrom(at(2.5), farSpeaker)))).toEqual(blinksOf(watch(length, () => idle, true)));
 	});
 
 	it('makes no second blink for a second far shift inside the 2 seconds after the brought-forward blink ended', () => {

@@ -378,7 +378,7 @@ describe('the figure motion while the agent speaks', () => {
 		const speakingOverAll = watch(3000, () => thinkingAndSpeaking, false, () => speakerLeft);
 
 		speakingOverAll.forEach((pose, frame) => {
-			expect(Math.abs(pose.look.yaw - idling[frame]!.look.yaw)).toBeLessThanOrEqual(eyeJumpReach.yaw * 1.4);
+			expect(Math.abs(pose.look.yaw - idling[frame]!.look.yaw)).toBeLessThanOrEqual(eyeJumpReach.yaw);
 			expect(pose.posture).toEqual(idling[frame]!.posture);
 			expect(pose.trunkLean).toBe(0);
 			expect(pose.blink).toBe(idling[frame]!.blink);
