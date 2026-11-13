@@ -1,4 +1,6 @@
 import { figureMood, mouthShape, type FigureMood } from './expressions.js';
+import { gestureLengthSeconds } from './gestureClips.js';
+import type { FigureGesture } from './gestures.js';
 import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.js';
 import type { VowelWeights } from './vowelWeights.js';
 
@@ -22,7 +24,9 @@ import type { VowelWeights } from './vowelWeights.js';
  * The speaking look is that of its speaking state: the five mouth weights easing at 38 a second up and 22 down, and the head nodding
  * with the voice by the weights' eased level. A mood the sentence names shows while the agent speaks: its weight eases toward its peak at 9
  * a second and away at 4, the mouth's weights shrink to 0.72 of themselves while any mood is shown, and each mood leans the head, the
- * trunk and the shoulders by its share of the picture's offsets.
+ * trunk and the shoulders by its share of the picture's offsets. A gesture the host asks for starts at the next frame and runs its clip's
+ * length on the clock the motion owns, the step of every other blend; the pose names it and its seconds, and the clip over the base pose
+ * is the frame's. Under reduced motion none starts and a running one ends at the next frame.
  */
 
 /** What the host reports about its agent. */
@@ -73,6 +77,14 @@ export interface FigurePose {
 	readonly arms: Arms;
 	/** What the shoulders add to their rest, a delta: they rise and fall with the breath and take the moods' lean. */
 	readonly shoulders: Shoulders;
+	/** The gesture that runs, laid over the base pose of the arm, and for how many seconds; null: none. */
+	readonly gesture: GesturePlay | null;
+}
+
+/** A gesture under way: its name and the seconds its clock has run, from 0 to `gestureLengthSeconds(name)`. */
+export interface GesturePlay {
+	readonly name: FigureGesture;
+	readonly seconds: number;
 }
 
 /** The turns of the arms' bones in radians, as the base pose sets them; the left lower arm, the hands and the fingers stay at rest. */
@@ -89,6 +101,8 @@ export interface Shoulders {
 }
 
 export interface FigureMotion {
+	/** Asks for `name` to start at the next `advance`; a call while a gesture plays is ignored, with no restart and no queue. */
+	gesture(name: FigureGesture): void;
 	/** The pose `elapsedSeconds` after the last call, given the facts now, where the speaker is, if anyone speaks, and the mouth weights the agent's voice asks for, if any, while the page asks for reduced motion or not. */
 	advance(facts: FigureFacts, elapsedSeconds: number, reducedMotion: boolean, speaker: SpeakerOffset | null, mouth: VowelWeights | null): FigurePose;
 }
@@ -310,11 +324,44 @@ function createMood(): MoodMotion {
 	};
 }
 
+/** The gesture's clock: what a call asked for, and the gesture that plays. */
+interface GestureMotion {
+	gesture(name: FigureGesture): void;
+	advance(step: number, reducedMotion: boolean): GesturePlay | null;
+}
+
+/**
+ * The gesture clock. A call is kept until the next step starts it at 0, unless a gesture plays then or the page asks for reduced motion;
+ * a gesture ends when its clock reaches the clip's length, and reduced motion ends one at once.
+ */
+function createGestureMotion(): GestureMotion {
+	let playing: GesturePlay | null = null;
+	let asked: FigureGesture | null = null;
+	return {
+		gesture(name) {
+			if (playing === null) asked = name;
+		},
+		advance(step, reducedMotion) {
+			if (reducedMotion) {
+				playing = null;
+			} else if (playing !== null) {
+				const seconds = playing.seconds + step;
+				playing = seconds < gestureLengthSeconds(playing.name) ? { name: playing.name, seconds } : null;
+			} else if (asked !== null) {
+				playing = { name: asked, seconds: 0 };
+			}
+			asked = null;
+			return playing;
+		}
+	};
+}
+
 export function createFigureMotion(random: () => number): FigureMotion {
 	const idle = createIdleMotion(random);
 	const nodding = createNod(random);
 	const mouthMotion = createMouth();
 	const moodMotion = createMood();
+	const gestureMotion = createGestureMotion();
 	let gaze: Gaze = { yaw: 0, pitch: 0 };
 	let eyeGaze: Gaze = { yaw: 0, pitch: 0 };
 	let previousGoal: Gaze = gaze;
@@ -322,6 +369,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 	let leanWeight = 0;
 
 	return {
+		gesture: gestureMotion.gesture,
 		advance(facts, elapsedSeconds, reducedMotion, speaker, mouth) {
 			const step = Math.min(elapsedSeconds, longestStepSeconds);
 			const base = idle.advance(elapsedSeconds, reducedMotion);
@@ -361,7 +409,8 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
 				look: { yaw: clamp(eyeGaze.yaw * lookGain + jump * base.eyes.yaw, lookReachDegrees), pitch: clamp(eyeGaze.pitch * lookGain + jump * base.eyes.pitch, lookReachDegrees) },
 				arms: baseArms(breathShare, thinkingWeight),
-				shoulders: shoulderDeltas(breathShare, mood.shoulder * shoulderShare)
+				shoulders: shoulderDeltas(breathShare, mood.shoulder * shoulderShare),
+				gesture: gestureMotion.advance(step, reducedMotion)
 			};
 		}
 	};

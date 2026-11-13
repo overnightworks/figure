@@ -86,8 +86,10 @@ const SKIN_JOINT_NAMES: readonly string[] = [
 	'rightEye',
 	'leftUpperArm',
 	'leftLowerArm',
+	'leftHand',
 	'rightUpperArm',
 	'rightLowerArm',
+	'rightHand',
 	...SLEEVE_BONES
 ];
 

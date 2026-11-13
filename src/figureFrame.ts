@@ -1,6 +1,7 @@
-import { AmbientLight, DirectionalLight, Euler, MathUtils, PerspectiveCamera, Quaternion, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
+import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Quaternion, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
 import { figureMood } from './expressions.js';
+import { createGestureLayer, quaternionOfTurn } from './gestureLayer.js';
 import { spreadPosture, type FigurePose, type Turn } from './figureMotion.js';
 
 /** The picture's camera, lights and clear colour are the values of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html. */
@@ -54,7 +55,6 @@ function turnBone(bone: Object3D, turn: Turn): void {
 	bone.rotation.set(turn.pitch, turn.yaw, turn.roll);
 }
 
-const turnAsEuler = new Euler();
 const turnAsQuaternion = new Quaternion();
 
 /** Returns a bone to its rest, the identity of a normalized humanoid bone; a bone the model lacks is skipped. */
@@ -64,7 +64,7 @@ function restBone(bone: Object3D | null): void {
 
 /** Adds `turn` to the rotation the bone holds, in its parent's frame; a bone the model lacks is skipped. */
 function addTurn(bone: Object3D | null, turn: Turn): void {
-	bone?.quaternion.premultiply(turnAsQuaternion.setFromEuler(turnAsEuler.set(turn.pitch, turn.yaw, turn.roll)));
+	bone?.quaternion.premultiply(quaternionOfTurn(turn, turnAsQuaternion));
 }
 
 /**
@@ -101,6 +101,8 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	const leftUpperArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm')!;
 	const rightUpperArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm')!;
 	const rightLowerArm = vrm.humanoid.getNormalizedBoneNode('rightLowerArm')!;
+	const rightHand = vrm.humanoid.getNormalizedBoneNode('rightHand')!;
+	const gestures = createGestureLayer(vrm.humanoid);
 	const restedBones = [spine, chest, leftShoulder, rightShoulder];
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;
@@ -118,6 +120,8 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 			turnBone(leftUpperArm, pose.arms.leftUpperArm);
 			turnBone(rightUpperArm, pose.arms.rightUpperArm);
 			turnBone(rightLowerArm, pose.arms.rightLowerArm);
+			restBone(rightHand);
+			if (pose.gesture !== null) gestures.apply(pose.gesture);
 			restedBones.forEach(restBone);
 			const spread = spreadPosture(pose.posture, bones);
 			addTurn(spine, { pitch: pose.breath + pose.trunkLean + pose.moodTrunk.spine, yaw: 0, roll: 0 });
