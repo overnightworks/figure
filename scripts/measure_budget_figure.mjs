@@ -13,7 +13,8 @@
 // the page by request routing, and writes the page's bundle only to a temporary directory that its outer process removes even
 // when the capped one is killed (the figure stays in memory).
 // Exit codes: 0 when the measurement ran (`slow` is a result, not a failure), 1 when the figure fails the check, no `drawn`
-// came, fewer than 300 frames came or the browser failed, 2 when dist/ is not built.
+// came, fewer than 300 frames came, the browser failed or probe-run could not be started, 2 when dist/ is not built or probe-run
+// found no room within an hour.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -49,14 +50,16 @@ function runGuarded() {
 	];
 	const workDirectory = mkdtempSync(join(tmpdir(), 'figure-budget-'));
 	let status;
+	let error;
 	try {
-		({ status } = spawnSync(command[0], command.slice(1), {
+		({ status, error } = spawnSync(command[0], command.slice(1), {
 			stdio: 'inherit',
 			env: { ...process.env, [guardedMarker]: '1', [workDirectoryVariable]: workDirectory }
 		}));
 	} finally {
 		rmSync(workDirectory, { recursive: true, force: true });
 	}
+	if (error !== undefined) console.error(`cannot start ${command[0]}: ${error.message}`);
 	process.exit(status ?? 1);
 }
 
