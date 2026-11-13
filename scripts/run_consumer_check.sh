@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Runs the browser layer (tests/e2e) alone on this machine: under the fleet's probe-stack lock, capped at 30 minutes.
+# Runs the browser layer (tests/e2e) through the fleet's probe-run: it starts once the machine's load leaves room and is
+# capped at 30 minutes.
 # Usage: scripts/run_consumer_check.sh [playwright arguments]; run it from the repository after `pnpm install`.
-# Exit codes: Playwright's, or timeout's when the cap cut the run.
+# Exit codes: Playwright's, timeout's when the cap cut the run, or probe-run's 2 when the load left no room within an hour.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-exec flock -o -w 3600 /tmp/probe-stack.lock setpriv --pdeathsig TERM timeout -k 30 1800 pnpm run test:consumer "$@"
+exec probe-run pnpm run test:consumer "$@"
