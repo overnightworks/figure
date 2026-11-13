@@ -54,4 +54,3 @@ export function idleLife(frames: number) {
 	const idleMotion = createIdleMotion(seededRandom(seed));
 	return Array.from({ length: frames }, () => idleMotion.advance(frameSeconds, false));
 }
-
