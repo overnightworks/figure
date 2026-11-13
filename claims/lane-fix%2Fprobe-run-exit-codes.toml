@@ -1,7 +1,0 @@
-claim_id = "aa5db807db58417cb250e8224f37ed99"
-agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
-role = "builder"
-base = "57b01b37077cf4c3325957ece72aef5384b8bcd0"
-branch = "fix/probe-run-exit-codes"
-scope = ["scripts/measure_budget_figure.mjs", "scripts/run_browser_tests.sh", "scripts/run_consumer_check.sh"]
-opened_commit = "9a27bb69d95ce6673c8ac0ea56e8febdfe97c153"
