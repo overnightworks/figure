@@ -1,46 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { figureMood, mouthShape, type FigureMood, type MouthShape } from './expressions.js';
-import { createFigureMotion, spreadPosture, type FigureFacts, type FigurePose, type SpeakerOffset } from './figureMotion.js';
+import { eyeJumpReach } from './idleMotion.js';
+import { createFigureMotion, spreadPosture, type FigureFacts, type FigurePose } from './figureMotion.js';
+import { atSecond, frameSeconds, idle, seededRandom, seed, speaking, speakerLeft, thinking, thinkingAndSpeaking, thinkingHead, thinkingLook, watch } from '../tests/figureMotionWatch.js';
 import type { VowelWeights } from './vowelWeights.js';
 
-/** A small seeded source of numbers in [0, 1) (mulberry32), so a run is the same every time. */
-function seededRandom(seed: number): () => number {
-	let state = seed;
-	return () => {
-		state = (state + 0x6d2b79f5) | 0;
-		let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
-		mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
-		return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
-	};
-}
-
-const seed = 7;
-const frameSeconds = 0.01;
-const idle: FigureFacts = { thinking: false, speaking: false };
-const thinking: FigureFacts = { thinking: true, speaking: false };
-const speaking: FigureFacts = { thinking: false, speaking: true };
-const thinkingAndSpeaking: FigureFacts = { thinking: true, speaking: true };
-
-/** The picture's thinking look, in the units the pose uses: the gaze 18 degrees to the side and 13 up, the look-at turning 2.4 times that. */
-const thinkingLook = { yaw: -43.2, pitch: 31.2 };
-/** The head's own turn at the picture's thinking look with the sway at rest: half the gaze's yaw and 0.55 of its pitch, in radians. */
-const thinkingHead = { yaw: -0.15708, pitch: -0.12479, roll: 0 };
 /** The turn the thinking look adds to the head, from the picture, in radians. */
 const thinkingPosture = { yaw: -0.2, pitch: -0.1, roll: 0.16 };
 /** The idle glance reaches 14 degrees of yaw and the look-at turns 2.4 times the gaze, so no glance looks further than this. */
 const widestIdleLookYaw = 14 * 2.4;
-
-/** The poses of a figure given `factsAt(frame)`, the speaker `speakerAt(frame)` and the mouth weights `mouthAt(frame)` for `frames` frames of 10 ms, while the page asks for reduced motion or not. */
-function watch(
-	frames: number,
-	factsAt: (frame: number) => FigureFacts,
-	reducedMotion = false,
-	speakerAt: (frame: number) => SpeakerOffset | null = () => null,
-	mouthAt: (frame: number) => VowelWeights | null = () => null
-): FigurePose[] {
-	const motion = createFigureMotion(seededRandom(seed));
-	return Array.from({ length: frames }, (_, frame) => motion.advance(factsAt(frame), frameSeconds, reducedMotion, speakerAt(frame), mouthAt(frame)));
-}
 
 /** The longest stretch, in seconds, the eyes stay closing in `poses`. */
 function longestBlinkSeconds(poses: FigurePose[]): number {
@@ -51,10 +19,6 @@ function longestBlinkSeconds(poses: FigurePose[]): number {
 		longest = Math.max(longest, run);
 	});
 	return longest * frameSeconds;
-}
-
-function atSecond(seconds: number): number {
-	return Math.round(seconds / frameSeconds) - 1;
 }
 
 /** The forward pitch of each pose's posture, in radians: a nod is all of it while the figure listens. */
@@ -100,18 +64,21 @@ describe('the figure motion', () => {
 		expect(posture.roll).toBeCloseTo(thinkingPosture.roll, 3);
 	});
 
-	it('eases the gaze toward the thinking look and does not jump to it', () => {
-		const looks = watch(300, () => thinking, false).map((pose) => pose.look.yaw);
+	it('eases the head toward the thinking gaze at 7 a second and does not jump to it, a share of 1 - e^(-7 t) after t seconds', () => {
+		const resting = watch(100, () => idle);
+		const poses = watch(100, () => thinking);
 
-		expect(looks[0]!).toBeGreaterThan(thinkingLook.yaw * 0.2);
-		looks.slice(30).forEach((yaw, index) => expect(yaw).toBeLessThanOrEqual(looks[29 + index]! + 1e-9));
+		[0.01, 0.25, 0.5, 1].forEach((seconds) => {
+			const frame = atSecond(seconds);
+			expect(poses[frame]!.head.yaw - resting[frame]!.head.yaw).toBeCloseTo(thinkingHead.yaw * (1 - Math.exp(-7 * seconds)), 6);
+		});
 	});
 
 	it('returns to the idle look when the agent stops thinking: no posture and a gaze within the idle glance\'s reach', () => {
 		const neverThought = watch(3000, () => idle);
 		const thought = watch(3000, (frame) => (frame < 1000 ? thinking : idle));
 
-		expect(thought.slice(atSecond(15)).every((pose) => Math.abs(pose.look.yaw) <= widestIdleLookYaw + 1e-9)).toBe(true);
+		expect(thought.slice(atSecond(15)).every((pose) => Math.abs(pose.look.yaw) <= widestIdleLookYaw + eyeJumpReach.yaw + 1e-9)).toBe(true);
 		expect(thought.at(-1)!.posture.yaw).toBeCloseTo(0, 3);
 		expect(thought.at(-1)!.posture.pitch).toBeCloseTo(0, 3);
 		expect(thought.at(-1)!.posture.roll).toBeCloseTo(0, 3);
@@ -124,7 +91,7 @@ describe('the figure motion', () => {
 		const after = poses.slice(1500);
 
 		whileThinking.forEach((pose) => expect(pose.look.yaw).toBeCloseTo(thinkingLook.yaw, 1));
-		expect(after.some((pose) => Math.abs(pose.look.yaw) > 5 && Math.abs(pose.look.yaw) <= widestIdleLookYaw)).toBe(true);
+		expect(after.some((pose) => Math.abs(pose.look.yaw) > 5 && Math.abs(pose.look.yaw) <= widestIdleLookYaw + eyeJumpReach.yaw)).toBe(true);
 	});
 
 	it('blinks at 0.8 of its idle weight while thinking, starting at the same instants as when idle', () => {
@@ -150,10 +117,12 @@ describe('the figure motion', () => {
 		expect(poses[20]!.posture.roll).toBe(0);
 	});
 
-	it('keeps breath, sway and glance off under reduced motion, thinking or not', () => {
+	it('keeps breath, sway, glance and the eyes\' jumps off under reduced motion, thinking or not', () => {
 		[idle, thinking].forEach((facts) => {
 			const poses = watch(600, () => facts, true);
 
+			expect(new Set(poses.slice(atSecond(2)).map((pose) => pose.look.yaw)).size).toBe(1);
+			expect(new Set(poses.slice(atSecond(2)).map((pose) => pose.look.pitch)).size).toBe(1);
 			expect(new Set(poses.slice(atSecond(2)).map((pose) => pose.breath))).toEqual(new Set([0]));
 			expect(poses.slice(atSecond(2)).every((pose) => Math.abs(pose.head.yaw - poses.at(-1)!.head.yaw) < 1e-9)).toBe(true);
 		});
@@ -178,7 +147,7 @@ describe('the figure motion', () => {
 		expect(returned.advance(thinking, 30, false, null, null)).toEqual(stepped.advance(thinking, 0.1, false, null, null));
 	});
 
-	it('keeps the idle look of release 0.2.0 when the agent never thinks: its breath, head turn, gaze and blink at the same moments', () => {
+	it('keeps the idle motion of release 0.2.0 when the agent never thinks: its breath, head turn and blink at the same moments, though the eyes lead and jump on top', () => {
 		const poses = watch(1650, () => idle);
 
 		releasedIdle.forEach(({ frame, pose }) => {
@@ -188,15 +157,10 @@ describe('the figure motion', () => {
 			expect(drawn.head.yaw).toBeCloseTo(pose.head.yaw, 9);
 			expect(drawn.head.pitch).toBeCloseTo(pose.head.pitch, 9);
 			expect(drawn.head.roll).toBeCloseTo(pose.head.roll, 9);
-			expect(drawn.look.yaw).toBeCloseTo(pose.look.yaw, 9);
-			expect(drawn.look.pitch).toBeCloseTo(pose.look.pitch, 9);
 			expect(Object.values(drawn.posture).every((turn) => turn === 0)).toBe(true);
 		});
 	});
 });
-
-/** A speaker at the picture's full reach to the left, in half-viewport shares from the canvas's centre. */
-const speakerLeft: SpeakerOffset = { across: -0.5, down: 0 };
 
 describe('the figure motion while someone speaks', () => {
 	it.each([
@@ -220,21 +184,25 @@ describe('the figure motion while someone speaks', () => {
 		expect(head.pitch).toBeCloseTo((-9 * Math.PI * 0.55) / 180 + 0.04, 9);
 	});
 
-	it('eases the yaw toward the speaker at 5 a second, a share of 1 - e^(-5 t) after t seconds', () => {
+	it('eases the head\'s yaw toward the speaker at 5 a second, a share of 1 - e^(-5 t) after t seconds', () => {
 		const poses = watch(300, () => idle, false, () => speakerLeft);
 		const resting = watch(300, () => idle);
 
 		[0.25, 0.5, 1].forEach((seconds) => {
 			const frame = atSecond(seconds);
-			expect(resting[frame]!.look.yaw).toBe(0);
-			expect(poses[frame]!.look.yaw).toBeCloseTo(-48 * (1 - Math.exp(-5 * seconds)), 6);
+			expect(resting[frame]!.look.yaw).toBeLessThanOrEqual(eyeJumpReach.yaw);
+			expect(poses[frame]!.head.yaw - resting[frame]!.head.yaw).toBeCloseTo((-20 * Math.PI * 0.75 * (1 - Math.exp(-5 * seconds))) / 180, 6);
 		});
 	});
 
-	it('eases the pitch toward the speaker at 6 a second as it does for any gaze', () => {
+	it('eases the head\'s pitch toward the speaker at 6 a second as it does for any gaze, under the lean', () => {
 		const poses = watch(100, () => idle, false, () => ({ across: 0, down: -0.5 }));
+		const resting = watch(100, () => idle);
+		const seconds = 0.5;
+		const frame = atSecond(seconds);
+		const lean = 0.04 * (1 - Math.exp(-3 * seconds));
 
-		expect(poses[atSecond(0.5)]!.look.pitch).toBeCloseTo(21.6 * (1 - Math.exp(-6 * 0.5)), 6);
+		expect(poses[frame]!.head.pitch - resting[frame]!.head.pitch - lean).toBeCloseTo((-9 * Math.PI * 0.55 * (1 - Math.exp(-6 * seconds))) / 180, 6);
 	});
 
 	it('leans in at 3 a second: the head by 0.04 rad, the spine and the chest by 0.02 rad each at full weight', () => {
@@ -290,7 +258,7 @@ describe('the figure motion while someone speaks', () => {
 		const listening = watch(6000, () => idle, false, () => speakerLeft);
 
 		expect(idling.some((pose) => Math.abs(pose.look.yaw) > 5)).toBe(true);
-		listening.slice(atSecond(10)).forEach((pose) => expect(pose.look.yaw).toBeCloseTo(-48, 3));
+		listening.slice(atSecond(10)).forEach((pose) => expect(Math.abs(pose.look.yaw + 48)).toBeLessThanOrEqual(eyeJumpReach.yaw + 1e-3));
 		listening.forEach((pose, frame) => expect(pose.breath).toBeCloseTo(idling[frame]!.breath, 12));
 		expect(listening.findIndex((pose) => pose.blink > 0)).toBe(idling.findIndex((pose) => pose.blink > 0));
 		expect(new Set(listening.slice(atSecond(10)).map((pose) => pose.head.roll)).size).toBeGreaterThan(100);
@@ -298,9 +266,9 @@ describe('the figure motion while someone speaks', () => {
 
 	it('follows a speaker that moves, at the same easing, with no restart', () => {
 		const poses = watch(400, () => idle, false, (frame) => (frame < 200 ? speakerLeft : { across: 0.5, down: 0 }));
-		const settled = poses[199]!.look.yaw;
+		const fixedRight = watch(400, () => idle, false, () => ({ across: 0.5, down: 0 }));
 
-		expect(poses[atSecond(3)]!.look.yaw).toBeCloseTo(48 + (settled - 48) * Math.exp(-5 * 1), 6);
+		expect(poses[atSecond(3)]!.head.yaw - fixedRight[atSecond(3)]!.head.yaw).toBeCloseTo((0.75 * Math.PI * (-40 * Math.exp(-5 * 1))) / 180, 6);
 	});
 
 	it('reaches the turn and the lean at once under reduced motion, holds them, follows a moved speaker at once and leaves at once', () => {
@@ -410,7 +378,7 @@ describe('the figure motion while the agent speaks', () => {
 		const speakingOverAll = watch(3000, () => thinkingAndSpeaking, false, () => speakerLeft);
 
 		speakingOverAll.forEach((pose, frame) => {
-			expect(pose.look).toEqual(idling[frame]!.look);
+			expect(Math.abs(pose.look.yaw - idling[frame]!.look.yaw)).toBeLessThanOrEqual(eyeJumpReach.yaw * 1.4);
 			expect(pose.posture).toEqual(idling[frame]!.posture);
 			expect(pose.trunkLean).toBe(0);
 			expect(pose.blink).toBe(idling[frame]!.blink);
@@ -787,11 +755,11 @@ describe('the arms at rest', () => {
 	});
 });
 
-/** The idle pose of release 0.2.0 for the seed above, 10 ms frames, no thinking and no reduced motion, as that release's idle module printed it at these frames. */
+/** The idle pose of release 0.2.0 for the seed above, 10 ms frames, no thinking and no reduced motion, as that release's idle module printed it at these frames; the look-at is left out, as the eyes now lead the head. */
 const releasedIdle = [
-	{ frame: 540, pose: { blink: 0, breath: 0.020895656768874456, head: { yaw: 0.03635257427386759, pitch: 0.011104483145713905, roll: 0.0199915048587643 }, look: { yaw: 1.4179446541437428, pitch: -1.6970160640890233 } } },
-	{ frame: 660, pose: { blink: 0.8951632913550626, breath: 0.005440682537475133, head: { yaw: 0.021380111188512303, pitch: -0.00805803367391107, roll: 0.018594378446629405 }, look: { yaw: 0.006569148506562625, pitch: -0.01718210424218766 } } },
-	{ frame: 960, pose: { blink: 0, breath: 0.014277515334769496, head: { yaw: 0.0399122111362154, pitch: 0.006570158580842797, roll: 0.006360561898760413 }, look: { yaw: 15.195659745714682, pitch: -6.171741306919668 } } },
-	{ frame: 1100, pose: { blink: 0.6736956436465578, breath: 0.010990086855098304, head: { yaw: -0.028895394562669055, pitch: -0.007610273745231622, roll: -0.001645161637623551 }, look: { yaw: 0.002610958512164997, pitch: -0.0036914069484576383 } } },
-	{ frame: 1650, pose: { blink: 0, breath: -0.014277515334768658, head: { yaw: -0.03665233346014622, pitch: 0.03218480725494611, roll: -0.019886568123676833 }, look: { yaw: -8.785756864697582, pitch: -5.150588685712275 } } }
+	{ frame: 540, pose: { blink: 0, breath: 0.020895656768874456, head: { yaw: 0.03635257427386759, pitch: 0.011104483145713905, roll: 0.0199915048587643 } } },
+	{ frame: 660, pose: { blink: 0.8951632913550626, breath: 0.005440682537475133, head: { yaw: 0.021380111188512303, pitch: -0.00805803367391107, roll: 0.018594378446629405 } } },
+	{ frame: 960, pose: { blink: 0, breath: 0.014277515334769496, head: { yaw: 0.0399122111362154, pitch: 0.006570158580842797, roll: 0.006360561898760413 } } },
+	{ frame: 1100, pose: { blink: 0.6736956436465578, breath: 0.010990086855098304, head: { yaw: -0.028895394562669055, pitch: -0.007610273745231622, roll: -0.001645161637623551 } } },
+	{ frame: 1650, pose: { blink: 0, breath: -0.014277515334768658, head: { yaw: -0.03665233346014622, pitch: 0.03218480725494611, roll: -0.019886568123676833 } } }
 ];

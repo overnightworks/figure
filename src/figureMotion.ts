@@ -8,6 +8,12 @@ import type { VowelWeights } from './vowelWeights.js';
  * the one that is true and strongest decides the gaze, and while the agent speaks the gaze is the idle glance. Whether someone speaks
  * to the agent, and where, is read by the caller each frame and given as numbers, and so are the mouth weights of the agent's voice.
  *
+ * The gaze has one goal and two eases: the look-at reaches the goal in a jump, the head follows at the picture's ease, so the eyes
+ * lead the head and both settle where the picture puts them. A goal that shifts by more than `largeGazeShiftDegrees` brings the next
+ * blink forward. The eyes also make small jumps of their own, an offset on the look-at alone that the head never takes: all of their
+ * size at rest and while listening, `speakingJumpShare` of it while the agent speaks, none while it thinks. Under reduced motion
+ * the look-at reaches the goal at once, and there are no jumps and no blink brought forward.
+ *
  * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and
  * to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the easing rates. The picture
  * also raises a hand to the chin, which the figure does not do. The listening look is that of its listening state: the gaze toward the
@@ -90,7 +96,13 @@ const speakerGazeReach: Gaze = { yaw: 40, pitch: 18 };
 const thinkingLook = { posture: { yaw: -0.2, pitch: -0.1, roll: 0.16 }, blinkWeight: 0.8 };
 /** The lean at its full weight, in radians: the head's pitch, and the spine's and the chest's each. */
 const listeningLean = { head: 0.04, trunk: 0.02 };
-/** The easing rates per second: the gaze's yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, and the voice's level. */
+/** The look-at's ease, per second: it covers nine tenths of a new goal in about 60 ms, while the head's slowest ease covers a third. */
+const eyeEaseRate = 40;
+/** A shift of the gaze's goal beyond this many degrees, in yaw and pitch together, brings the next blink forward; the idle glance's widest shift is below it. */
+const largeGazeShiftDegrees = 18;
+/** The eyes' small jumps while the agent speaks, as a share of their size at rest. */
+const speakingJumpShare = 0.4;
+/** The easing rates per second: the head's gaze yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, and the voice's level. */
 const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3, mouthRise: 38, mouthFall: 22, voiceLevel: 12, moodRise: 9, moodFall: 4 };
 /** The head's nod with the voice: its forward pitch at a full level in radians, and its angular frequency in radians a second. */
 const voiceNod = { peakRadians: 0.045, radiansPerSecond: 5.1 };
@@ -113,7 +125,7 @@ const noMood: MoodWeights = { happy: 0, angry: 0, sad: 0, relaxed: 0, surprised:
 const stillMouth: VowelWeights = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
 /** The head turns half the gaze's yaw, three quarters of it while listening, and tilts 0.55 of its pitch; the look-at turns 2.4 times the gaze. */
 const headShare = { yaw: 0.5, listeningYaw: 0.75, pitch: 0.55 };
-/** The look-at turns 2.4 times the gaze and no further than 90 degrees either way, as the picture clamps it. */
+/** The look-at turns 2.4 times the gaze plus the eyes' jump, and no further than 90 degrees either way, as the picture clamps it. */
 const lookGain = 2.4;
 const lookReachDegrees = 90;
 /** The listening nod: a half sine of `durationSeconds` to a forward pitch of `peakRadians`, and the seconds from one nod's start to the next's, drawn from `gapSeconds`. */
@@ -170,6 +182,12 @@ function gazeToward(speaker: SpeakerOffset): Gaze {
 function gazeFor(thinking: boolean, speaker: SpeakerOffset | null, idleGlance: Gaze): Gaze {
 	if (thinking) return thinkingGaze;
 	return speaker === null ? idleGlance : gazeToward(speaker);
+}
+
+/** The share of the eyes' small jump the look-at takes: none while the figure thinks, a part of it while the agent speaks. */
+function jumpShare(thinking: boolean, speaking: boolean): number {
+	if (thinking) return 0;
+	return speaking ? speakingJumpShare : 1;
 }
 
 /** The nod's forward pitch for the step just taken, in radians: zero when no nod is under way. */
@@ -279,6 +297,8 @@ export function createFigureMotion(random: () => number): FigureMotion {
 	const mouthMotion = createMouth();
 	const moodMotion = createMood();
 	let gaze: Gaze = { yaw: 0, pitch: 0 };
+	let eyeGaze: Gaze = { yaw: 0, pitch: 0 };
+	let previousGoal: Gaze = gaze;
 	let thinkingWeight = 0;
 	let leanWeight = 0;
 
@@ -295,7 +315,11 @@ export function createFigureMotion(random: () => number): FigureMotion {
 			const mood = moodMotion.advance(step, facts.speaking ? facts.mood : undefined, reducedMotion);
 			const moodShown = moods.some((name) => mood.weights[name] > mouthUnderMood.shownAbove);
 			const goal = gazeFor(thinking, heard, base.glance);
+			if (!reducedMotion && Math.hypot(goal.yaw - previousGoal.yaw, goal.pitch - previousGoal.pitch) > largeGazeShiftDegrees) idle.blinkWithGazeShift();
+			previousGoal = goal;
 			gaze = { yaw: ease(gaze.yaw, goal.yaw, listening ? easing.listeningYaw : easing.yaw), pitch: ease(gaze.pitch, goal.pitch, easing.pitch) };
+			eyeGaze = { yaw: ease(eyeGaze.yaw, goal.yaw, eyeEaseRate), pitch: ease(eyeGaze.pitch, goal.pitch, eyeEaseRate) };
+			const jump = jumpShare(thinking, facts.speaking);
 			thinkingWeight = ease(thinkingWeight, thinking ? 1 : 0, easing.thinking);
 			leanWeight = ease(leanWeight, listening ? 1 : 0, easing.lean);
 			return {
@@ -315,7 +339,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				mood: mood.weights,
 				moodTrunk: { spine: mood.chest * trunkShare.spine, chest: mood.chest * trunkShare.chest },
 				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
-				look: { yaw: clamp(gaze.yaw * lookGain, lookReachDegrees), pitch: clamp(gaze.pitch * lookGain, lookReachDegrees) },
+				look: { yaw: clamp(eyeGaze.yaw * lookGain + jump * base.eyes.yaw, lookReachDegrees), pitch: clamp(eyeGaze.pitch * lookGain + jump * base.eyes.pitch, lookReachDegrees) },
 				arms: restingArms(base.breath, mood.shoulder * shoulderShare)
 			};
 		}
