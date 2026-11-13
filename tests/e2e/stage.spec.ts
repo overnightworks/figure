@@ -175,16 +175,20 @@ test.describe('the demo stage under the script policy', () => {
 		await pickFigure();
 		await expectTwoDrawings(page);
 		await page.getByRole('button', { name: 'speak without a voice' }).click();
-		// The speaking pose eases in, so the reference is the picture that two successive ones no longer differ from.
-		let neutral = await pictures();
-		await expect
-			.poll(async () => {
-				const next = await pictures();
-				const moved = await differs(neutral, next);
-				neutral = next;
-				return moved;
-			})
-			.toBeLessThan(shownPixels / 10);
+		// A figure settles after its mount (its spring bones restart at the pose), so a picture counts once two successive ones no longer differ.
+		const settledPicture = async () => {
+			let latest = await pictures();
+			await expect
+				.poll(async () => {
+					const next = await pictures();
+					const moved = await differs(latest, next);
+					latest = next;
+					return moved;
+				})
+				.toBeLessThan(shownPixels / 10);
+			return latest;
+		};
+		const neutral = await settledPicture();
 
 		await page.getByLabel('surprised', { exact: true }).check();
 		await expect.poll(async () => differs(neutral, await pictures())).toBeGreaterThan(shownPixels);
@@ -196,7 +200,9 @@ test.describe('the demo stage under the script policy', () => {
 		await page.getByLabel('surprised', { exact: true }).check();
 		await pickFigure();
 		await expectTwoDrawings(page);
-		await expect.poll(async () => differs(neutral, await pictures())).toBeGreaterThan(shownPixels);
+		const fresh = await settledPicture();
+		expect(await differs(neutral, fresh)).toBeGreaterThan(shownPixels);
+		expect(await differs(surprised, fresh)).toBeLessThan(shownPixels);
 		await expectTwoDrawings(page);
 		await expectNoViolations(page, pageErrors);
 	});
