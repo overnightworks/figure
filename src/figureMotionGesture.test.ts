@@ -75,7 +75,7 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 	});
 
 	it('ends a running gesture at the next frame under reduced motion and does not resume it', () => {
-		const run = gesturesOf(name, calledAt + framesToEnd, (frame) => ({ ...callAtFrame(calledAt)(frame), reducedMotion: frame >= calledAt + 30 }));
+		const run = gesturesOf(name, calledAt + framesToEnd, (frame) => ({ ...callAtFrame(calledAt)(frame), reducedMotion: frame >= calledAt + 30 && frame < calledAt + 40 }));
 
 		expect(played(run)).toHaveLength(30);
 		expect(run.slice(calledAt + 30)).toEqual(Array(run.length - calledAt - 30).fill(null));
