@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createIdleMotion, type IdlePose } from './idleMotion.js';
+import { createIdleMotion, eyeJumpReach, type IdlePose } from './idleMotion.js';
 
 /** A small seeded source of numbers in [0, 1) (mulberry32), so a run is the same every time. */
 function seededRandom(seed: number): () => number {
@@ -15,10 +15,13 @@ function seededRandom(seed: number): () => number {
 const frameSeconds = 0.01;
 const longRunSeconds = 1000;
 
-/** The poses of a figure watched for `seconds`, one every 10 ms; the page asks for reduced motion in the frames `reducedFrom` selects. */
-function watch(seed: number, seconds: number, reducedFrom: (frame: number) => boolean = () => false): IdlePose[] {
+/** The poses of a figure watched for `seconds`, one every 10 ms; the page asks for reduced motion in the frames `reducedFrom` selects, and the gaze shifts far before the frames `shiftsAt` selects. */
+function watch(seed: number, seconds: number, reducedFrom: (frame: number) => boolean = () => false, shiftsAt: (frame: number) => boolean = () => false): IdlePose[] {
 	const motion = createIdleMotion(seededRandom(seed));
-	return Array.from({ length: Math.round(seconds / frameSeconds) }, (_, frame) => motion.advance(frameSeconds, reducedFrom(frame)));
+	return Array.from({ length: Math.round(seconds / frameSeconds) }, (_, frame) => {
+		if (shiftsAt(frame)) motion.blinkWithGazeShift();
+		return motion.advance(frameSeconds, reducedFrom(frame));
+	});
 }
 
 /** The first frame of each stretch of frames `isOn` holds for, and the first frame after it. */
@@ -36,8 +39,8 @@ function stretches(poses: readonly IdlePose[], isOn: (pose: IdlePose) => boolean
 }
 
 /** Whether every part but the blink is at rest; a rotation of -0 is at rest. */
-function isAtRest({ breath, sway, glance }: IdlePose): boolean {
-	return [breath, sway.yaw, sway.pitch, sway.roll, glance.yaw, glance.pitch].every((value) => value === 0);
+function isAtRest({ breath, sway, glance, eyes }: IdlePose): boolean {
+	return [breath, sway.yaw, sway.pitch, sway.roll, glance.yaw, glance.pitch, eyes.yaw, eyes.pitch].every((value) => value === 0);
 }
 
 function seconds(frames: number): number {
@@ -85,6 +88,35 @@ describe('the idle motion', () => {
 			blinks.forEach((blink) => expect(Math.abs(seconds(blink.end - blink.start) - duration)).toBeLessThanOrEqual(2 * frameSeconds));
 		});
 
+		it('blinks with 2 to 6 seconds between one blink and the next while the gaze shifts far every second', () => {
+			const blinks = stretches(
+				watch(seed, longRunSeconds, () => false, (frame) => frame % 100 === 0),
+				(pose) => pose.blink > 0
+			);
+
+			expect(blinks.length).toBeGreaterThan(100);
+			blinks.slice(1).forEach((blink, index) => {
+				const gap = seconds(blink.start - blinks[index]!.end);
+				expect(gap).toBeGreaterThanOrEqual(2);
+				expect(gap).toBeLessThanOrEqual(6 + frameSeconds);
+			});
+		});
+
+		it('brings the next blink forward to a far shift of the gaze once 2 seconds have passed since the last blink, and not before', () => {
+			const natural = stretches(watch(seed, 200), (pose) => pose.blink > 0);
+			const wait = natural.findIndex((blink, index) => index > 0 && seconds(blink.start - natural[index - 1]!.end) > 5);
+			const lastEnd = natural[wait - 1]!.end;
+			const shiftAt = (secondsAfter: number) => (frame: number) => frame === lastEnd + Math.round(secondsAfter / frameSeconds);
+
+			const early = stretches(watch(seed, 200, () => false, shiftAt(1)), (pose) => pose.blink > 0);
+			const late = stretches(watch(seed, 200, () => false, shiftAt(2.5)), (pose) => pose.blink > 0);
+
+			expect(wait).toBeGreaterThan(0);
+			expect(early[wait]).toEqual(natural[wait]);
+			expect(late[wait]!.start - (lastEnd + 250)).toBeLessThanOrEqual(1);
+			expect(late[wait]!.start).toBeLessThan(natural[wait]!.start);
+		});
+
 		it('glances with 3 to 8 seconds between one glance and the next, and looks straight ahead before each', () => {
 			const poses = watch(seed, longRunSeconds);
 			const starts = glanceStarts(poses);
@@ -95,6 +127,36 @@ describe('the idle motion', () => {
 				expect(gap).toBeLessThanOrEqual(8 + 2 * frameSeconds);
 			});
 			expect(Math.max(...poses.map((pose) => Math.abs(pose.glance.yaw)))).toBeGreaterThan(5);
+		});
+
+		it('makes small jumps of the eyes, each within its reach and 0.5 to 2.5 seconds after the last', () => {
+			const poses = watch(seed, longRunSeconds);
+			const jumps = poses.flatMap((pose, frame) => (frame > 0 && (pose.eyes.yaw !== poses[frame - 1]!.eyes.yaw || pose.eyes.pitch !== poses[frame - 1]!.eyes.pitch) ? [frame] : []));
+
+			expect(jumps.length).toBeGreaterThan(300);
+			gaps(jumps).forEach((gap) => {
+				expect(gap).toBeGreaterThanOrEqual(0.5 - 2 * frameSeconds);
+				expect(gap).toBeLessThanOrEqual(2.5 + 2 * frameSeconds);
+			});
+			expect(new Set(gaps(jumps).map((gap) => gap.toFixed(2))).size).toBeGreaterThan(50);
+			poses.forEach(({ eyes }) => {
+				expect(Math.abs(eyes.yaw)).toBeLessThanOrEqual(eyeJumpReach.yaw);
+				expect(Math.abs(eyes.pitch)).toBeLessThanOrEqual(eyeJumpReach.pitch);
+			});
+			expect(Math.max(...poses.map((pose) => Math.abs(pose.eyes.yaw)))).toBeGreaterThan(eyeJumpReach.yaw / 2);
+		});
+
+		it.each([
+			['the top', 0.999, 1],
+			['the bottom', 0.001, -1]
+		])('draws the eyes\' jumps from the source it is given: one that always gives %s of the interval puts every jump at that end of its reach', (_name, drawn, side) => {
+			const motion = createIdleMotion(() => drawn);
+			const poses = Array.from({ length: 1000 }, () => motion.advance(frameSeconds, false)).slice(300);
+
+			poses.forEach(({ eyes }) => {
+				expect(eyes.yaw * side).toBeGreaterThan(eyeJumpReach.yaw * 0.99);
+				expect(eyes.pitch * side).toBeGreaterThan(eyeJumpReach.pitch * 0.99);
+			});
 		});
 
 		it('breathes and sways, so the pose varies over time', () => {

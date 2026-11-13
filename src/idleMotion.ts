@@ -1,15 +1,17 @@
 /**
  * The figure's idle life as a function of elapsed time and a source of chance, with no three and no DOM: the caller gives the
  * seconds since the last frame and `Math.random`, a test gives a clock it advances and a seeded source. It is the base layer of
- * the figure's motion (breath, sway, blink) and the source of the idle glance, whose target the figure's motion eases and splits
- * between head and eyes.
+ * the figure's motion (breath, sway, blink), the source of the idle glance, whose target the figure's motion eases and splits
+ * between head and eyes, and of the small jumps of the eyes, which lie on the look-at alone.
  *
  * The values are those of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its idle state: the breath's period
  * and the spine's lean (the mockup's spine and chest shares summed, as the figure's required bones have no chest); the sway's
  * three slow sines; the blink's duration, 0.17 s, and 0.28 s under reduced motion, which keeps the blink; the glance's targets
  * and hold. Where the ruled intervals differ the ruled ones win: a blink starts 2 to 6 s after
  * the last one ended and a glance 3 to 8 s after the last one began, and the mockup's occasional double blink, which leaves no
- * gap, is not taken. Under reduced motion the breath, the sway and the glance rest at once.
+ * gap, is not taken. A large shift of the gaze, which the figure's motion reports, brings the next blink forward to that moment, but
+ * never to less than the shortest gap after the last blink; the gap after it is drawn as after any blink. Under reduced motion the
+ * breath, the sway, the glance and the eyes' jumps rest at once.
  */
 
 /** Radians the spine leans forward at the top of a breath. */
@@ -30,6 +32,9 @@ const glance = {
 	firstStart: [2, 5],
 	gapAfterStart: [3, 8]
 } as const;
+/** The eyes' small jumps: the time from one jump to the next, and the farthest a jump lies from the gaze, in degrees of the look-at. */
+const eyeJump = { gapSeconds: [0.5, 2.5] } as const;
+export const eyeJumpReach = { yaw: 3, pitch: 2 } as const;
 /** Seconds after which a step counts as this long: a page that was hidden returns with one long step. */
 export const longestStepSeconds = 0.1;
 /** The clock starts at a random time within this many seconds, so two figures do not breathe in step. */
@@ -47,21 +52,29 @@ export interface IdlePose {
 	readonly sway: { readonly yaw: number; readonly pitch: number; readonly roll: number };
 	/** Where the idle glance looks, in degrees from straight ahead: its target while it is held, otherwise straight ahead. */
 	readonly glance: { readonly yaw: number; readonly pitch: number };
+	/** Where the eyes' small jump lies from the gaze, in degrees of the look-at: held until the next jump, within `eyeJumpReach`. */
+	readonly eyes: { readonly yaw: number; readonly pitch: number };
 }
 
 export interface IdleMotion {
 	/** The pose `elapsedSeconds` after the last call, while the page asks for reduced motion or not. */
 	advance(elapsedSeconds: number, reducedMotion: boolean): IdlePose;
+	/** The gaze's goal has shifted far: the next blink starts with the next call of `advance` unless one is under way or the last ended less than the shortest gap ago. */
+	blinkWithGazeShift(): void;
 }
 
 export function createIdleMotion(random: () => number): IdleMotion {
 	const between = ([minimum, maximum]: Interval) => minimum + random() * (maximum - minimum);
-	let clock = random() * clockStartSpreadSeconds;
+	const clockStart = random();
+	let clock = clockStart * clockStartSpreadSeconds;
 	let blinkStart = between(blink.firstStart);
 	let blinkSeconds = -1;
 	let glanceStart = between(glance.firstStart);
 	let glanceEnd = 0;
 	let target = { yaw: 0, pitch: 0 };
+	let blinkEnd = clock;
+	let jumpStart = clock + between(eyeJump.gapSeconds);
+	let eyes = { yaw: 0, pitch: 0 };
 
 	const blinkWeight = (step: number, reducedMotion: boolean): number => {
 		if (blinkSeconds < 0 && clock > blinkStart) blinkSeconds = 0;
@@ -70,6 +83,7 @@ export function createIdleMotion(random: () => number): IdleMotion {
 		const duration = reducedMotion ? blink.reducedDurationSeconds : blink.durationSeconds;
 		if (blinkSeconds < duration) return Math.sin((blinkSeconds / duration) * Math.PI);
 		blinkSeconds = -1;
+		blinkEnd = clock;
 		blinkStart = clock + between(blink.gapAfterEnd);
 		return 0;
 	};
@@ -84,7 +98,19 @@ export function createIdleMotion(random: () => number): IdleMotion {
 		return held ? target : { yaw: 0, pitch: 0 };
 	};
 
+	const eyesNow = (reducedMotion: boolean) => {
+		if (reducedMotion) return { yaw: 0, pitch: 0 };
+		if (clock > jumpStart) {
+			eyes = { yaw: between([-eyeJumpReach.yaw, eyeJumpReach.yaw]), pitch: between([-eyeJumpReach.pitch, eyeJumpReach.pitch]) };
+			jumpStart = clock + between(eyeJump.gapSeconds);
+		}
+		return eyes;
+	};
+
 	return {
+		blinkWithGazeShift() {
+			if (blinkSeconds < 0 && clock >= blinkEnd + blink.gapAfterEnd[0]) blinkStart = Math.min(blinkStart, clock);
+		},
 		advance(elapsedSeconds, reducedMotion) {
 			const step = Math.min(elapsedSeconds, longestStepSeconds);
 			clock += step;
@@ -95,7 +121,8 @@ export function createIdleMotion(random: () => number): IdleMotion {
 				blink: blinkWeight(step, reducedMotion),
 				breath: moving * breathLean * Math.sin((clock * 2 * Math.PI) / breathPeriodSeconds),
 				sway: { yaw: swayAt(sway.yaw), pitch: swayAt(sway.pitch), roll: swayAt(sway.roll) },
-				glance: glanceNow
+				glance: glanceNow,
+				eyes: eyesNow(reducedMotion)
 			};
 		}
 	};
