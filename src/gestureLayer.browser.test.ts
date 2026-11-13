@@ -18,6 +18,8 @@ const restPictures = 5;
 const longestWaitSeconds = 30;
 /** The seconds an ignored call is watched, beyond the length of the gesture. */
 const ignoredWatchMarginSeconds = 1;
+/** The time a test of the wave has: twice the longest wait, since a test mounts a figure, reads it at rest and then watches the length of a wave or waits for one. */
+const testTimeoutMilliseconds = 2 * longestWaitSeconds * 1000;
 /** The frames waited after a canvas leaves the viewport, for the observer to report it and the loop to pause. */
 const outOfViewFrames = 10;
 
@@ -39,7 +41,7 @@ function showsArmAt(features: Features, resting: Features): boolean {
 	return features.arm.length > 0 && Math.abs(armTop(features) - armTop(resting)) <= restPixels;
 }
 
-describe('a figure whose agent waves', () => {
+describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () => {
 	let watch: FigureWatch;
 
 	beforeEach(() => {
