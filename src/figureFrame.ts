@@ -49,9 +49,9 @@ function currentSize(canvas: HTMLCanvasElement): DrawingSize {
 	return { width: Math.max(2, canvas.clientWidth), height: Math.max(2, canvas.clientHeight), pixelRatio: drawingPixelRatio() };
 }
 
-/** Sets a bone's rotation to `turn`; a bone the model lacks is skipped. */
-function turnBone(bone: Object3D | null, turn: Turn): void {
-	bone?.rotation.set(turn.pitch, turn.yaw, turn.roll);
+/** Sets a bone's rotation to `turn`. */
+function turnBone(bone: Object3D, turn: Turn): void {
+	bone.rotation.set(turn.pitch, turn.yaw, turn.roll);
 }
 
 const turnAsEuler = new Euler();
@@ -98,9 +98,9 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	const bones = { neck: neck !== null, chest: chest !== null };
 	const leftShoulder = vrm.humanoid.getNormalizedBoneNode('leftShoulder');
 	const rightShoulder = vrm.humanoid.getNormalizedBoneNode('rightShoulder');
-	const leftUpperArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm');
-	const rightUpperArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
-	const rightLowerArm = vrm.humanoid.getNormalizedBoneNode('rightLowerArm');
+	const leftUpperArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm')!;
+	const rightUpperArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm')!;
+	const rightLowerArm = vrm.humanoid.getNormalizedBoneNode('rightLowerArm')!;
 	const restedBones = [spine, chest, leftShoulder, rightShoulder];
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;

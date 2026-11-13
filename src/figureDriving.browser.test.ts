@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng } from '../tests/glbBuilder.js';
-import { centreOf, coversSomething, emulateReducedMotion, readPixels, spotsOf, type FaceFeature, type Spot } from '../tests/browserCanvas.js';
+import { centreOf, coversSomething, emulateReducedMotion, mouthDepthBelowNose, readPixels, spotsOf, type FaceFeature, type Spot } from '../tests/browserCanvas.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 
@@ -16,6 +16,9 @@ const backPixels = 4;
 const glanceHoldMilliseconds = 3000;
 /** A lowered arm hangs from its shoulder, so its pixels run this far down at 200 px wide; a T-pose arm is only as thick as its bone, about 30 px. */
 const armHangPixels = 60;
+/** A hand at the chin lifts the arms' top pixel this far at a canvas 200 wide, and the arm then reaches no further than this far below the mouth's lowest row. */
+const raisedPixels = 20;
+const chinReachPixels = 25;
 /** The frames after which a spring-bone sleeve has settled into its rest shape. */
 const settlingFrames = 60;
 /** How many of a figure's first drawn frames the sleeve test compares with the settled one. */
@@ -152,6 +155,21 @@ describe('a figure driven by the host', () => {
 		const nose = await noseNow(canvas);
 
 		expectArmsLowered(await armsNow(canvas), nose);
+	});
+
+	it('raises the arm to the chin on think(true) under reduced motion, with the nose still in view', async () => {
+		await emulateReducedMotion();
+		const { canvas, handle } = await mountFigure();
+		const resting = await featuresAfter(canvas, frames + 2);
+		const mouthDepth = mouthDepthBelowNose(resting);
+		handle.think(true);
+		const thinking = await featuresAfter(canvas, frames + 2);
+		const mouthBottom = centreOf(thinking.nose).y + mouthDepth;
+		const armTop = (features: Record<FaceFeature, Spot[]>) => Math.min(...features.arm.map((spot) => spot.y));
+
+		expect(armTop(thinking)).toBeLessThan(armTop(resting) - raisedPixels);
+		expect(armTop(thinking)).toBeLessThan(mouthBottom + chinReachPixels);
+		expect(centreOf(thinking.nose).count).toBeGreaterThan(centreOf(resting.nose).count / 2);
 	});
 
 	it('draws the sleeves in their first frames where they rest after settling, under reduced motion', async () => {
