@@ -1,8 +1,0 @@
-claim_id = "cd39ba511e154426a9803eb050078cb3"
-agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
-role = "builder"
-base = "57b01b37077cf4c3325957ece72aef5384b8bcd0"
-branch = "claude/issue-70-the-eyes-lead-the-head-blink-on-a-large"
-scope = ["README.md", "docs/ARCHITECTURE.md", "src/figureDriving.browser.test.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "src/figureMotionEyes.test.ts", "src/idleMotion.test.ts", "src/idleMotion.ts", "tests/figureMotionWatch.ts"]
-opened_commit = "6f23094768b66126a351f2743cd63841ef23ad6f"
-whole_reason = "The eyes' lead, the blink brought forward and the small jumps are one gaze behaviour, split between the two pure motion modules, their tests and the two documents that state it."
