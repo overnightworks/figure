@@ -151,10 +151,14 @@ describe('a figure whose agent waves', () => {
 	});
 
 	it('ignores a call on a disposed figure', async () => {
-		const { handle } = await watch.mountFigure();
+		const { canvas, handle } = await watch.mountFigure();
+		const resting = await watch.featuresNow(canvas);
 		handle.dispose();
 
 		expect(() => handle.gesture(figureGesture.wave)).not.toThrow();
+		const trace = await traceFor(canvas, ignoredWatchSeconds);
+
+		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
 	});
 
 	it('ignores a call on a figure that was refused', async () => {
