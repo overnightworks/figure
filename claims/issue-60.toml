@@ -1,8 +1,0 @@
-claim_id = "7bb4bdb11e5540c3ab0d85effa97841a"
-agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
-role = "builder"
-base = "054ad0c6f50769579f7b18882bd7eb39db6f91d0"
-branch = "claude/issue-60-a-speaking-figure-shows-the-mood-of-its"
-scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "src/draw.ts", "src/drawSpeaking.browser.test.ts", "src/figureFrame.ts", "src/figureLoader.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "tests"]
-opened_commit = "7ec84ca9217ec7fa24c1c2cbfed438ee518ff35f"
-whole_reason = "#2 rules that every method lands whole in one slice: the field, the driver's mood layer, the load step that keeps the mouth and the stage control that proves them are one behaviour."
