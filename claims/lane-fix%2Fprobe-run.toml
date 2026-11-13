@@ -1,0 +1,8 @@
+claim_id = "59a1eba9f1f84274b852abff5d4165d7"
+agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
+role = "builder"
+base = "7dbf4e1d799878f7b0e775ee486d0b178f691cf1"
+branch = "fix/probe-run"
+scope = ["AGENTS.md", "scripts/measure_budget_figure.mjs", "scripts/run_browser_tests.sh", "scripts/run_consumer_check.sh"]
+opened_commit = "aaf3f5536ace15d80444f54fb687b3673bc63828"
+whole_reason = "One contract change (probe-run replaces the machine-wide lock) touches the three wrappers and the command lines that describe them."
