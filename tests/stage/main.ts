@@ -1,4 +1,4 @@
-import { figureSignal, mount, type FigureHandle, type FigureSignal } from '../../src/draw.js';
+import { figureSignal, mount, type FigureHandle, type FigureMood, type FigureSignal } from '../../src/draw.js';
 import type { MouthShape } from '../../src/expressions.js';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { syntheticVoice } from '../syntheticVoice.js';
@@ -33,9 +33,12 @@ const speakerMarkers = new Map<SpeakerChoice, HTMLElement>();
 let speaker: HTMLElement | null = null;
 
 /** What the stage reports its agent as saying: nothing until the visitor starts a sentence. A freshly mounted figure is told at once. */
-type Sentence = { readonly voice?: AudioNode } | null;
+type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood } | null;
 
 let sentence: Sentence = null;
+
+/** The mood the visitor chose for what the agent says, none until chosen; it applies to the sentence that plays and to the next ones. */
+let mood: FigureMood | undefined;
 
 /** The share of the voices' level the visitor hears. */
 const heardGain = 0.3;
@@ -102,6 +105,7 @@ const thinkButton = document.querySelector<HTMLButtonElement>('#think')!;
 const picker = document.querySelector<HTMLInputElement>('#picker')!;
 const voiceStatus = document.querySelector<HTMLElement>('#voice-status')!;
 const voicePicker = document.querySelector<HTMLInputElement>('#voice-picker')!;
+const moodChoice = document.querySelector<HTMLFieldSetElement>('#mood')!;
 const slots = cssWidths.map((cssWidth) => createSlot(cssWidth, stage));
 
 /** A marker the visitor can see and, for the dragged one, move with a pointer. */
@@ -153,6 +157,17 @@ function tell(next: Sentence, status: string): void {
 	slots.forEach((slot) => slot.handle?.speak(sentence));
 }
 
+/** The sentence `voice` speaks in the chosen mood. */
+function sentenceOf(voice?: AudioNode): Sentence {
+	return { ...(voice === undefined ? {} : { voice }), ...(mood === undefined ? {} : { mood }) };
+}
+
+moodChoice.addEventListener('change', (event) => {
+	const chosen = (event.target as HTMLInputElement).value;
+	mood = chosen === '' ? undefined : (chosen as FigureMood);
+	if (sentence !== null) tell(sentenceOf(sentence.voice), voiceStatus.textContent ?? '');
+});
+
 /** The number of the control that took the stage last. */
 let lastControl = 0;
 
@@ -162,9 +177,12 @@ function takeControl(): () => boolean {
 	return () => mine === lastControl;
 }
 
-function endSentence(): void {
-	silence();
-	silence = () => {};
+/** Tells the figures `next` and only then ends the sound of the sentence before it, so a figure releases its tap on a voice before the voice is disconnected; `silenceNext` ends the sound of `next`. */
+function replaceSentence(next: Sentence, status: string, silenceNext: () => void = () => {}): void {
+	const previous = silence;
+	silence = silenceNext;
+	tell(next, status);
+	previous();
 }
 
 /** The audio context, made at the first call and running by the time it returns; a click is the user activation the browser asks for. */
@@ -188,15 +206,13 @@ document.querySelector<HTMLButtonElement>('#speak')!.addEventListener('click', a
 	const stillMine = takeControl();
 	const { context, speakers } = await runningAudio();
 	if (!stillMine()) return;
-	endSentence();
 	const vowel = pickedVowel();
 	const voice = syntheticVoice(context, vowel);
 	voice.output.connect(speakers);
-	silence = () => {
+	replaceSentence(sentenceOf(voice.output), `speaking ${vowel} (audio ${context.state})`, () => {
 		voice.stop();
 		voice.output.disconnect();
-	};
-	tell({ voice: voice.output }, `speaking ${vowel} (audio ${context.state})`);
+	});
 });
 
 voicePicker.addEventListener('change', async () => {
@@ -207,7 +223,6 @@ voicePicker.addEventListener('change', async () => {
 	voicePicker.value = '';
 	const { context, speakers } = await runningAudio();
 	if (!stillMine()) return;
-	endSentence();
 	let recording: AudioBuffer | undefined;
 	try {
 		recording = await context.decodeAudioData(bytes);
@@ -216,7 +231,7 @@ voicePicker.addEventListener('change', async () => {
 	}
 	if (!stillMine()) return;
 	if (recording === undefined) {
-		tell(null, 'not audio');
+		replaceSentence(null, 'not audio');
 		return;
 	}
 	const source = context.createBufferSource();
@@ -224,29 +239,23 @@ voicePicker.addEventListener('change', async () => {
 	const player = context.createGain();
 	source.connect(player);
 	player.connect(speakers);
-	silence = () => {
+	source.onended = () => replaceSentence(null, 'quiet');
+	source.start();
+	replaceSentence(sentenceOf(player), `speaking ${picked.name} (audio ${context.state})`, () => {
 		source.onended = null;
 		source.stop();
 		player.disconnect();
-	};
-	source.onended = () => {
-		endSentence();
-		tell(null, 'quiet');
-	};
-	source.start();
-	tell({ voice: player }, `speaking ${picked.name} (audio ${context.state})`);
+	});
 });
 
 document.querySelector<HTMLButtonElement>('#speak-without-voice')!.addEventListener('click', () => {
 	takeControl();
-	endSentence();
-	tell({}, 'speaking without a voice');
+	replaceSentence(sentenceOf(), 'speaking without a voice');
 });
 
 document.querySelector<HTMLButtonElement>('#stop')!.addEventListener('click', () => {
 	takeControl();
-	endSentence();
-	tell(null, 'quiet');
+	replaceSentence(null, 'quiet');
 });
 
 picker.addEventListener('change', async () => {

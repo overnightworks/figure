@@ -10,6 +10,8 @@ import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './s
 const stageConfig = fileURLToPath(new URL('../stage/vite.config.ts', import.meta.url));
 /** Mounting two figures in a page takes longer than a plain page load, so the signals are awaited with this bound. */
 const drawingTimeout = 30_000;
+/** The pixels of a canvas a shown mood changes at least: the brows and the mouth lie well beyond it, a sleeve's spring or a blink does not reach it. */
+const shownPixels = 300;
 
 interface BuiltStage {
 	readonly bundleDirectory: string;
@@ -49,6 +51,27 @@ async function pickNotAFigure(page: Page): Promise<void> {
 async function expectNoViolations(page: Page, pageErrors: string[]): Promise<void> {
 	expect(await page.evaluate(() => window.securityPolicyViolations)).toEqual([]);
 	expect(pageErrors).toEqual([]);
+}
+
+/** The pixels of two screenshots that differ by more than a rounding of the colour: counted in the page, which decodes the PNGs. */
+async function differingPixels(page: Page, first: Buffer, second: Buffer): Promise<number> {
+	return page.evaluate(
+		async ([before, after]) => {
+			const pixelsOf = async (base64: string) => {
+				const bitmap = await createImageBitmap(new Blob([Uint8Array.from(atob(base64), (character) => character.charCodeAt(0))], { type: 'image/png' }));
+				const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
+				context.drawImage(bitmap, 0, 0);
+				return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+			};
+			const [one, other] = [await pixelsOf(before!), await pixelsOf(after!)];
+			let differing = 0;
+			for (let offset = 0; offset < one.length; offset += 4) {
+				if ([0, 1, 2].some((channel) => Math.abs(one[offset + channel]! - other[offset + channel]!) > 32)) differing++;
+			}
+			return differing;
+		},
+		[first.toString('base64'), second.toString('base64')]
+	);
 }
 
 test.describe('the demo stage under the script policy', () => {
@@ -135,6 +158,51 @@ test.describe('the demo stage under the script policy', () => {
 		await expect(status).toHaveText('speaking without a voice');
 		await page.getByRole('button', { name: 'stop' }).click();
 		await expect(status).toHaveText('quiet');
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	test('the mood choice changes the face of the figure that speaks, a fresh figure is told at once, and none returns the face, with both figures still drawn', async ({ page }) => {
+		// Held still, a figure's face changes only with the mood. The phone-wide figure lies in the viewport; both are told by the one control.
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		const figure = page.locator('canvas').nth(0);
+		const pictures = () => figure.screenshot();
+		const differs = (first: Buffer, second: Buffer) => differingPixels(page, first, second);
+		const pickFigure = () => page.locator('#picker').setInputFiles({ name: 'figure.vrm', mimeType: 'model/gltf-binary', buffer: Buffer.from(buildConformantVrm()) });
+		// Both figures are the picked one, so every picture is of the same model in the same state: speaking, held still.
+		await pickFigure();
+		await expectTwoDrawings(page);
+		await page.getByRole('button', { name: 'speak without a voice' }).click();
+		// A figure settles after its mount (its spring bones restart at the pose), so a picture counts once two successive ones no longer differ.
+		const settledPicture = async () => {
+			let latest = await pictures();
+			await expect
+				.poll(async () => {
+					const next = await pictures();
+					const moved = await differs(latest, next);
+					latest = next;
+					return moved;
+				})
+				.toBeLessThan(shownPixels / 10);
+			return latest;
+		};
+		const neutral = await settledPicture();
+
+		await page.getByLabel('surprised', { exact: true }).check();
+		await expect.poll(async () => differs(neutral, await pictures())).toBeGreaterThan(shownPixels);
+		const surprised = await pictures();
+		await page.getByLabel('none', { exact: true }).check();
+		await expect.poll(async () => differs(surprised, await pictures())).toBeGreaterThan(shownPixels);
+		await expect.poll(async () => differs(neutral, await pictures())).toBeLessThan(shownPixels);
+
+		await page.getByLabel('surprised', { exact: true }).check();
+		await pickFigure();
+		await expectTwoDrawings(page);
+		const fresh = await settledPicture();
+		expect(await differs(neutral, fresh)).toBeGreaterThan(shownPixels);
+		expect(await differs(surprised, fresh)).toBeLessThan(shownPixels);
 		await expectTwoDrawings(page);
 		await expectNoViolations(page, pageErrors);
 	});

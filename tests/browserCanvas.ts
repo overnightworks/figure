@@ -77,3 +77,21 @@ export function coversSomething(pixels: Uint8Array): boolean {
 export async function emulateReducedMotion(): Promise<void> {
 	await cdp().send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
 }
+
+/** How far, in pixels, a dark pixel of one picture may lie from one of the other, once both are measured from the nose, and still be the same feature. */
+const SAME_FEATURE_REACH = 1;
+
+/**
+ * How many dark pixels (the mouth, its corners and the brows) of either picture have none of the other within `SAME_FEATURE_REACH`, each
+ * measured from its own picture's nose, so a head that moved as a whole changes little and a feature that moved on the face changes much.
+ */
+export function faceDifference(first: Record<FaceFeature, Spot[]>, second: Record<FaceFeature, Spot[]>): number {
+	const fromNose = (spots: Record<FaceFeature, Spot[]>) => {
+		const nose = centreOf(spots.nose);
+		return spots.dark.map(({ x, y }) => ({ x: x - nose.x, y: y - nose.y }));
+	};
+	const unmatched = (from: readonly Spot[], to: readonly Spot[]) =>
+		from.filter((spot) => !to.some((other) => Math.abs(other.x - spot.x) <= SAME_FEATURE_REACH && Math.abs(other.y - spot.y) <= SAME_FEATURE_REACH)).length;
+	const [firstDark, secondDark] = [fromNose(first), fromNose(second)];
+	return unmatched(firstDark, secondDark) + unmatched(secondDark, firstDark);
+}
