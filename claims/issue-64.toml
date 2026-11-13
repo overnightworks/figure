@@ -1,7 +1,0 @@
-claim_id = "23ad86ecf7bb4103bfe45054d2f03b68"
-agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
-role = "builder"
-base = "a2fb8cb6014acb5d37a9b71af1a04e272e75d491"
-branch = "claude/issue-64-the-still-mouth-browser-cell-holds-on-ev"
-scope = ["src/drawSpeaking.browser.test.ts", "tests/figureWatch.ts"]
-opened_commit = "25b3df3a14b67debd94abdc64437d6805f9e8758"
