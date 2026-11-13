@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, userEvent } from 'vitest/browser';
-import { centreOf, emulateReducedMotion, faceDifference, mouthRows } from '../tests/browserCanvas.js';
+import { centreOf, emulateReducedMotion, faceDifference, mouthRows, restorePageVisibility, setPageVisibility } from '../tests/browserCanvas.js';
 import { vrmParts } from '../tests/figureFixtures.js';
 import { buildGlb } from '../tests/glbBuilder.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
@@ -64,7 +64,7 @@ describe('a figure whose agent speaks', () => {
 
 	afterEach(async () => {
 		watch.end();
-		Reflect.deleteProperty(document, 'visibilityState');
+		restorePageVisibility();
 		voices.splice(0).forEach((voice) => voice.stop());
 		speakers.splice(0).forEach((speaker) => speaker.remove());
 		await Promise.all(contexts.splice(0).map((context) => (context.state === 'closed' ? undefined : context.close())));
@@ -147,12 +147,6 @@ describe('a figure whose agent speaks', () => {
 		document.body.append(speaker);
 		speakers.push(speaker);
 		return speaker;
-	}
-
-	/** Sets the document's visibility state and fires its `visibilitychange` event, as a tab switch does. */
-	function setPageVisibility(state: 'hidden' | 'visible'): void {
-		Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
-		document.dispatchEvent(new Event('visibilitychange'));
 	}
 
 	/** A figure mounted with a running context and the analysers it makes. */

@@ -5,7 +5,7 @@ The fleet's VRM 1.0 profile as a check: the framework-free TypeScript ESM packag
 Today figure ships two things: the check, `figure check <file>` and `checkFigure(bytes)`, which tell whether a figure
 file meets the profile's container, VRM and budget rules; and the drawing, `mount` from `overnightworks-figure/draw`,
 which draws a figure that passes into an app's canvas, rests it with its arms lowered, keeps it alive with its idle motion, shows it thinking or listening when the app reports so,
-and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
+waves when the app asks, and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
 mood of the sentence, until the app disposes it.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -64,6 +64,10 @@ agent. A voice the figure cannot tap speaks with a still mouth and throws nothin
 does not know is ignored, and on a figure that ended or was disposed the call does nothing. The mouth has five vowel shapes (`aa`, `ih`, `ou`, `ee`,
 `oh`) chosen from the voice's first two formants and opened by its loudness; consonants show only as dips in loudness, and it lags the sound by 30
 to 40 ms.
+`handle.gesture(name)` asks the figure for one of its own gestures, which the package plays on the figure: the host hands no bytes and nothing is fetched. `name` is a
+key of `figureGesture`, exported from the package root `overnightworks-figure` with the type `FigureGesture`; today it is `wave`, a neutral wave of the right arm that eases in and out, with the lower arm and the hand trailing the upper arm.
+The call starts the gesture at the next drawn frame, returns nothing, gives no signal and never throws, and the figure's breath, moods, gaze, blink and mouth go on under it; while the figure thinks, the wave lifts the hand from the chin and gives it back.
+One gesture shows at a time and calls never queue: a call for the gesture that plays does nothing, and neither does a value that is no `FigureGesture`, a call made while the page is hidden (it does not play when the page shows again), and a call on a figure that ended or was disposed. Under reduced motion no gesture plays, and one that runs ends at the next frame.
 `mount` never rejects, and the first signal has reached `onSignal` before it resolves.
 
 | Signal | Means | The app |
@@ -82,7 +86,7 @@ freed cannot give another.
 rest: it sizes the drawing buffer to the canvas's client size times the device pixel ratio (at most 2) in every frame,
 so a resized canvas is followed with no call; it poses the figure at rest with its arms lowered at its sides, and gives the figure its idle
 motion (breathing, blinking, glancing), its thinking look, its look toward a speaker (the eyes first) and the nods it makes while one speaks, the small jumps of its eyes (smaller while the agent speaks, none while it thinks), and the mouth and the nod of the head that follow the agent's voice and the mood of the sentence; while the page asks for reduced motion it blinks, slower, keeps the arms
-down at rest with no idle motion (the hand rises to the chin at once while the figure thinks), takes and leaves those looks and the mouth's shape at once, does not jump its eyes and does not nod; and it draws only
+down at rest with no idle motion (the hand rises to the chin at once while the figure thinks), takes and leaves those looks and the mouth's shape at once, does not jump its eyes, does not nod and plays no gesture; and it draws only
 while the page is visible and the canvas is in the viewport. It never writes the canvas's `style` and adds no element to the page.
 
 The page may run under a strict script policy. The package's browser tests run it under
@@ -159,5 +163,5 @@ The closed set lives in `src/codes.ts` and is exported as `overnightworks-figure
 ## Develop
 
 `pnpm run check` type-checks, `pnpm exec vitest run --coverage` runs the tests (build first), and `quality check` runs
-the shared static check. `pnpm run stage` serves a demo page on localhost, where a figure mounts at 390 and 1280 px.
+the shared static check. `pnpm run stage` serves a demo page on localhost, where a figure mounts at 390 and 1280 px and waves on a button.
 [AGENTS.md](AGENTS.md) lists the commands and rules for agents.

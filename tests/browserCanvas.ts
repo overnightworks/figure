@@ -1,4 +1,4 @@
-// What the browser tests share to read a drawn canvas: its pixels, the face's features in them, the mouth's opening, and the page's reduced-motion setting.
+// What the browser tests share to read a drawn canvas: its pixels, the face's features in them, the mouth's opening, and the page's reduced-motion setting and visibility.
 import { cdp } from 'vitest/browser';
 
 /** The canvas's drawing buffer as RGBA bytes; read in the task that drew it, a buffer holds nothing afterwards. */
@@ -85,6 +85,17 @@ export function coversSomething(pixels: Uint8Array): boolean {
 /** Sets the page's `prefers-reduced-motion` to `reduce` through the browser's own media emulation, which is what a person's setting reaches the package as. */
 export async function emulateReducedMotion(): Promise<void> {
 	await cdp().send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+}
+
+/** Sets the document's visibility state and fires its `visibilitychange` event, as a tab switch does. */
+export function setPageVisibility(state: 'hidden' | 'visible'): void {
+	Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+	document.dispatchEvent(new Event('visibilitychange'));
+}
+
+/** Gives the document its own visibility state back, so the next test sees the browser's. */
+export function restorePageVisibility(): void {
+	Reflect.deleteProperty(document, 'visibilityState');
 }
 
 /** How far, in pixels, a dark pixel of one picture may lie from one of the other, once both are measured from the nose, and still be the same feature. */

@@ -33,9 +33,9 @@ const turn = (pitch: number, yaw: number, roll: number): Turn => ({ pitch, yaw, 
 
 /** The wave's poses: the raised hand beside the face, palm forward, and the two turning points of its swing, the arm and the hand each. */
 type WavePose = Readonly<Record<'upperArm' | 'lowerArm' | 'hand', Turn>>;
-const raised: WavePose = { upperArm: turn(-0.5, -0.18, 0.98), lowerArm: turn(-0.47, 2.45, 0), hand: turn(0, 0, 0) };
-const swungOut: WavePose = { upperArm: turn(-0.47, -0.29, 1.14), lowerArm: turn(-0.54, 2.4, 0), hand: turn(0, 0, 0.2) };
-const swungIn: WavePose = { upperArm: turn(-0.55, -0.01, 0.76), lowerArm: turn(-0.4, 2.45, 0), hand: turn(0, 0, -0.2) };
+const raised: WavePose = { upperArm: turn(-1.3, 0.01, 1.38), lowerArm: turn(0.05, 2.51, 0), hand: turn(0, 0, 0) };
+const swungOut: WavePose = { upperArm: turn(-1.3, -0.07, 1.38), lowerArm: turn(-0.21, 2.51, 0), hand: turn(0, 0, 0.2) };
+const swungIn: WavePose = { upperArm: turn(-1.3, 0.09, 1.38), lowerArm: turn(0.31, 2.51, 0), hand: turn(0, 0, -0.2) };
 
 /** The seconds of the wave's keys: the rise, the swing out, in, out, in, and the fall; the raised pose holds through both fades. */
 const waveSeconds = { raised: 0.45, firstOut: 0.75, firstIn: 1.05, secondOut: 1.35, secondIn: 1.65, lowering: 1.85, end: 2.3 };

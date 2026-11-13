@@ -1,6 +1,6 @@
 // The synthetic figure's arms: a box on each upper arm, each lower arm and each hand, skinned to the bone it hangs from, in one colour of its own,
 // and a sleeve on each upper arm, a box in a colour of its own skinned to a spring bone that is no humanoid bone.
-import { figureSkeleton, skinnedBox, worldPositions, type SkinnedMesh, type Vector3 } from './figureModel.ts';
+import { figureSkeleton, skinnedBox, worldPositions, type MeshData, type SkinnedMesh, type Vector3 } from './figureModel.ts';
 
 /** Half the width and the depth of an arm, in metres. */
 const ARM_HALF_THICKNESS = 0.05;
@@ -27,32 +27,40 @@ function armSegments(): { bone: string; from: string; to: string }[] {
 /** Half the length of a hand, in metres: the box runs from the wrist outward along X, as far as the width of the arm is thick. */
 const HAND_HALF_LENGTH = 0.05;
 
-/** The hands' boxes: each from its wrist outward, so a hand's turn shows in pixels. */
-function handSegments(): { bone: string; centre: Vector3; halfSize: Vector3 }[] {
-	return SIDE_PREFIXES.map((prefix) => {
-		const wrist = positionOf(prefix + 'Hand');
-		const direction = Math.sign(wrist[0]);
-		return {
-			bone: prefix + 'Hand',
-			centre: [wrist[0] + direction * HAND_HALF_LENGTH, wrist[1], wrist[2]],
-			halfSize: [HAND_HALF_LENGTH, ARM_HALF_THICKNESS, ARM_HALF_THICKNESS]
-		};
-	});
+/** The box a hand's turn shows in: from the wrist outward, skinned to the hand. */
+function handBox(side: string, jointOf: (bone: string) => number): MeshData {
+	const wrist = positionOf(side + 'Hand');
+	const centre: Vector3 = [wrist[0] + Math.sign(wrist[0]) * HAND_HALF_LENGTH, wrist[1], wrist[2]];
+	return skinnedBox(centre, [HAND_HALF_LENGTH, ARM_HALF_THICKNESS, ARM_HALF_THICKNESS], () => jointOf(side + 'Hand'));
 }
 
-/** The arm meshes, skinned by the joint `jointOf` names: one primitive per arm segment and one per hand, each in the arm material. */
+/** `first` and `second` as one mesh: a hand's box joins its lower arm's, so a hand adds no primitive of its own. */
+function joined(first: MeshData, second: MeshData): MeshData {
+	const firstVertices = first.positions.length / 3;
+	return {
+		positions: [...first.positions, ...second.positions],
+		normals: [...first.normals, ...second.normals],
+		textureCoordinates: [...first.textureCoordinates, ...second.textureCoordinates],
+		joints: [...first.joints, ...second.joints],
+		weights: [...first.weights, ...second.weights],
+		indices: [...first.indices, ...second.indices.map((index) => index + firstVertices)]
+	};
+}
+
+/** The arm meshes, skinned by the joint `jointOf` names: one primitive per arm segment, each in the arm material, the lower arm's with its hand's box. */
 export function armMeshes(jointOf: (bone: string) => number): SkinnedMesh[] {
-	const limbBoxes = armSegments().map(({ bone, from, to }) => {
-		const start = positionOf(from);
-		const end = positionOf(to);
-		const centre: Vector3 = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
-		const halfSize: Vector3 = [Math.abs(end[0] - start[0]) / 2, ARM_HALF_THICKNESS, ARM_HALF_THICKNESS];
-		return { bone, centre, halfSize };
-	});
 	return [
 		{
 			name: 'arms',
-			primitives: [...limbBoxes, ...handSegments()].map(({ bone, centre, halfSize }) => ({ data: skinnedBox(centre, halfSize, () => jointOf(bone)), material: 'arm', morphs: [] }))
+			primitives: armSegments().map(({ bone, from, to }) => {
+				const start = positionOf(from);
+				const end = positionOf(to);
+				const centre: Vector3 = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
+				const halfSize: Vector3 = [Math.abs(end[0] - start[0]) / 2, ARM_HALF_THICKNESS, ARM_HALF_THICKNESS];
+				const box = skinnedBox(centre, halfSize, () => jointOf(bone));
+				const side = SIDE_PREFIXES.find((prefix) => bone.startsWith(prefix))!;
+				return { data: bone.endsWith('LowerArm') ? joined(box, handBox(side, jointOf)) : box, material: 'arm', morphs: [] };
+			})
 		}
 	];
 }

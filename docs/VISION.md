@@ -8,8 +8,9 @@ handles any media. One package does this for every app, so a figure looks and
 behaves the same wherever an agent appears, and no app builds its own.
 
 A figure lives. It breathes, blinks and glances around when idle, turns toward
-whoever is speaking when it listens, shows that it works when it thinks, and
-speaks with a real mouth shape per sound and a mood the agent chooses. figure
+whoever is speaking when it listens, shows that it works when it thinks,
+speaks with a real mouth shape per sound and a mood the agent chooses, and
+gestures on its agent's choice, starting with a neutral wave. figure
 also owns the fleet's profile for a figure file, and a check that tells whether
 a file meets it.
 
