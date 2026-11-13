@@ -1,7 +1,0 @@
-claim_id = "fd96843197134af89ae6a49987031dd2"
-agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
-role = "builder"
-base = "7c90abb6b58a66a25c78f942b355e5a76e3b52fd"
-branch = "claude/issue-66-release-0-4-0-carries-speak-with-voice-a"
-scope = ["README.md", "docs/ARCHITECTURE.md", "package.json"]
-opened_commit = "fb48f7c4d7eb406f1317c48d65d85ca77a433d8f"
