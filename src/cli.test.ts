@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCommand } from './cli.js';
 import { clipProfile, figureProfile } from './profile.js';
 import { conformantTrack, type ClipTrack } from '../tests/clipBuilder.js';
-import { buildClipGlb, buildClipGlbOfSize, type ClipJson } from '../tests/clipFixtures.js';
+import { buildClipGlb, buildClipGlbOfSize, expressionNode, lookAtNode, retarget } from '../tests/clipFixtures.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 
 describe('runCommand', () => {
@@ -101,24 +101,6 @@ describe('runCommand', () => {
 		expect(stdout).toHaveLength(1);
 		expect(stderr).toEqual([]);
 	});
-
-	const expressionNode = (json: ClipJson) => {
-		json.nodes.push({ name: 'expression' });
-		json.extensions.VRMC_vrm_animation.expressions = { preset: { happy: { node: json.nodes.length - 1 } } };
-		return json.nodes.length - 1;
-	};
-	const lookAtNode = (json: ClipJson) => {
-		json.nodes.push({ name: 'lookAt' });
-		json.extensions.VRMC_vrm_animation.lookAt = { node: json.nodes.length - 1 };
-		return json.nodes.length - 1;
-	};
-	/** Points the clip's one channel at `node` with a rotation or a translation; a translation reads VEC3. */
-	const retarget = (json: ClipJson, node: number, path: 'rotation' | 'translation') => {
-		json.animations[0].channels[0].target = { node, path };
-		if (path === 'translation') {
-			Object.assign(json.accessors[json.animations[0].samplers[0].output], { type: 'VEC3', count: 3 });
-		}
-	};
 
 	it.each<[string, Uint8Array, string[]]>([
 		['a file that is not a GLB', new TextEncoder().encode('not a clip'), ['not_glb']],

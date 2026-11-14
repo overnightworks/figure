@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkClip } from './check.js';
 import { clipProfile } from './profile.js';
 import { conformantTrack, identity, type ClipTrack } from '../tests/clipBuilder.js';
-import { buildClipGlb } from '../tests/clipFixtures.js';
+import { addNode, buildClipGlb, expressionNode, lookAtNode, nodeOf, retarget } from '../tests/clipFixtures.js';
 
 type Json = Record<string, any>;
 
@@ -14,28 +14,8 @@ function codesOf(change: (json: Json) => void, animations?: readonly (readonly C
 	return refusalsOf(change, animations).map(({ code }) => code);
 }
 
-/** Node indices of the conformant clip's bones, so a test can name a channel's target. */
-const nodeOf = (bone: string) => clipProfile.requiredHumanBones.indexOf(bone as (typeof clipProfile.requiredHumanBones)[number]);
 const hips = nodeOf('hips');
 const spine = nodeOf('spine');
-
-/** Adds a node outside the humanoid and returns its index. */
-function addNode(json: Json): number {
-	json.nodes.push({ name: 'extra' });
-	return json.nodes.length - 1;
-}
-
-/** Points the first channel of an animation at `node` with `path`, over a sampler of the matching shape (a translation or scale reads VEC3). */
-function retarget(json: Json, node: number | undefined, path: string, animation = 0): void {
-	const channel = json.animations[animation].channels[0];
-	channel.target = node === undefined ? { path } : { node, path };
-	if (path !== 'rotation') {
-		const output = json.accessors[json.animations[animation].samplers[0].output];
-		output.type = 'VEC3';
-		output.count = 3;
-		json.bufferViews[output.bufferView].byteLength = 3 * 3 * 4;
-	}
-}
 
 describe('the clip rules', () => {
 	it('pass the conformant clip with no refusal', () => {
@@ -141,15 +121,8 @@ describe('the clip rules', () => {
 			['a scale on a humanoid bone', (json: Json) => retarget(json, spine, 'scale')],
 			['a scale on the hips', (json: Json) => retarget(json, hips, 'scale')],
 			['a translation on a bone other than the hips', (json: Json) => retarget(json, spine, 'translation')],
-			['a translation on the look-at node', (json: Json) => {
-				json.extensions.VRMC_vrm_animation.lookAt = { node: addNode(json) };
-				retarget(json, json.extensions.VRMC_vrm_animation.lookAt.node, 'translation');
-			}],
-			['a rotation on an expression node', (json: Json) => {
-				const node = addNode(json);
-				json.extensions.VRMC_vrm_animation.expressions = { preset: { happy: { node } } };
-				retarget(json, node, 'rotation');
-			}],
+			['a translation on the look-at node', (json: Json) => retarget(json, lookAtNode(json), 'translation')],
+			['a rotation on an expression node', (json: Json) => retarget(json, expressionNode(json), 'rotation')],
 			['a scale on an expression node', (json: Json) => {
 				const node = addNode(json);
 				json.extensions.VRMC_vrm_animation.expressions = { custom: { wink: { node } } };
@@ -162,15 +135,8 @@ describe('the clip rules', () => {
 		it.each([
 			['a translation on the hips', (json: Json) => retarget(json, hips, 'translation')],
 			['a rotation on the hips', (json: Json) => retarget(json, hips, 'rotation')],
-			['a translation on an expression node', (json: Json) => {
-				const node = addNode(json);
-				json.extensions.VRMC_vrm_animation.expressions = { preset: { happy: { node } } };
-				retarget(json, node, 'translation');
-			}],
-			['a rotation on the look-at node', (json: Json) => {
-				json.extensions.VRMC_vrm_animation.lookAt = { node: addNode(json) };
-				retarget(json, json.extensions.VRMC_vrm_animation.lookAt.node, 'rotation');
-			}],
+			['a translation on an expression node', (json: Json) => retarget(json, expressionNode(json), 'translation')],
+			['a rotation on the look-at node', (json: Json) => retarget(json, lookAtNode(json), 'rotation')],
 			['a scale on a node that is no humanoid bone, expression or look-at', (json: Json) => retarget(json, addNode(json), 'scale')]
 		])('pass %s', (_name, change) => {
 			expect(codesOf(change)).toEqual([]);
