@@ -80,6 +80,9 @@ function locate(json: JsonObject, binary: Uint8Array, accessorIndex: unknown, ty
 	if (componentType !== FLOAT && !(type === 'VEC4' && NORMALISED_INTEGERS.includes(componentType as number))) {
 		unreadable(`accessor ${index} has a component type glTF does not give this data`);
 	}
+	if (accessor['normalized'] === true && componentType === FLOAT) {
+		unreadable(`accessor ${index} is normalised, which glTF forbids for float`);
+	}
 	const count = accessor['count'];
 	if (!Number.isInteger(count) || (count as number) < 1) {
 		unreadable(`accessor ${index} has a count that is not a positive integer`);

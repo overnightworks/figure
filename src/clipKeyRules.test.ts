@@ -42,6 +42,8 @@ describe('the accessors of a clip’s keys', () => {
 			output.componentType = SHORT;
 			json.animations[0].channels[0].target = { node: clipProfile.requiredHumanBones.indexOf('hips'), path: 'translation' };
 		}],
+		['float times that are normalised', (json: Json) => (json.accessors[times].normalized = true)],
+		['float rotations that are normalised', (json: Json) => (json.accessors[rotations].normalized = true)],
 		['a component type that is no number', (json: Json) => (json.accessors[rotations].componentType = 'FLOAT')],
 		['a count that is not a positive integer', (json: Json) => (json.accessors[times].count = 0)],
 		['a buffer view that names none', (json: Json) => (json.accessors[times].bufferView = 99)],
