@@ -2,17 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { checkClip } from './check.js';
 import { clipProfile } from './profile.js';
 import { clipParts, conformantTrack, identity, type ClipTrack, type Quaternion } from '../tests/clipBuilder.js';
-import { buildClipGlb } from '../tests/clipFixtures.js';
+import { buildClipGlb, rejectedAccessorShapes, rotationsAccessor, timesAccessor } from '../tests/clipFixtures.js';
 import { buildGlb } from '../tests/glbBuilder.js';
 
 type Json = Record<string, any>;
 
-const SHORT = 5122;
-const UNSIGNED_INT = 5125;
-
-/** The conformant clip's accessors: the times, then the rotations. */
-const times = 0;
-const rotations = 1;
+const times = timesAccessor;
+const rotations = rotationsAccessor;
 
 function codesOfJson(change: (json: Json) => void): string[] {
 	const parts = clipParts(clipProfile);
@@ -27,50 +23,8 @@ function codesOfTrack(track: Partial<ClipTrack>): string[] {
 const unit = (length: number): Quaternion => [0, 0, 0, length];
 
 describe('the accessors of a clip’s keys', () => {
-	it.each([
-		['no accessors', (json: Json) => delete json.accessors],
-		['a sampler input that names no accessor', (json: Json) => (json.animations[0].samplers[0].input = 99)],
-		['a sampler output that names no accessor', (json: Json) => (json.animations[0].samplers[0].output = 99)],
-		['times that are not SCALAR', (json: Json) => (json.accessors[times].type = 'VEC3')],
-		['rotations that are not VEC4', (json: Json) => (json.accessors[rotations].type = 'SCALAR')],
-		['times that are not float', (json: Json) => (json.accessors[times].componentType = SHORT)],
-		['rotations of a component type glTF gives no rotation', (json: Json) => (json.accessors[rotations].componentType = UNSIGNED_INT)],
-		['translations of a component type other than float', (json: Json) => {
-			const output = json.accessors[rotations];
-			output.type = 'VEC3';
-			output.count = 3;
-			output.componentType = SHORT;
-			json.animations[0].channels[0].target = { node: clipProfile.requiredHumanBones.indexOf('hips'), path: 'translation' };
-		}],
-		['float times that are normalised', (json: Json) => (json.accessors[times].normalized = true)],
-		['float rotations that are normalised', (json: Json) => (json.accessors[rotations].normalized = true)],
-		['no buffers', (json: Json) => delete json.buffers],
-		['a component type that is no number', (json: Json) => (json.accessors[rotations].componentType = 'FLOAT')],
-		['a count that is not a positive integer', (json: Json) => (json.accessors[times].count = 0)],
-		['a buffer view that names none', (json: Json) => (json.accessors[times].bufferView = 99)],
-		['a buffer view with a stride', (json: Json) => (json.bufferViews[times].byteStride = 4)],
-		['an accessor offset that is not an integer', (json: Json) => (json.accessors[times].byteOffset = 1.5)],
-		['an offset that is not a multiple of 4', (json: Json) => {
-			json.accessors[times].byteOffset = 2;
-			json.bufferViews[times].byteLength += 4;
-		}],
-		['a buffer view offset that is not a multiple of 4', (json: Json) => {
-			json.bufferViews[times].byteOffset = 2;
-			json.bufferViews[times].byteLength += 4;
-		}],
-		['fewer rotations than times', (json: Json) => (json.accessors[rotations].count = 2)],
-		['fewer times than rotations', (json: Json) => (json.accessors[times].count = 2)],
-		['an interpolation whose count does not fit', (json: Json) => (json.animations[0].samplers[0].interpolation = 'CUBICSPLINE')]
-	])('refuse %s as gltf_invalid alone', (_name, change) => {
-		expect(codesOfJson(change)).toEqual(['gltf_invalid']);
-	});
-
-	it.each([
-		['a sparse accessor', (json: Json) => (json.accessors[rotations].sparse = { count: 1 })],
-		['an accessor without a buffer view', (json: Json) => delete json.accessors[rotations].bufferView],
-		['normalised integer rotations', (json: Json) => (json.accessors[rotations].componentType = SHORT)]
-	])('refuse %s as clip_track_not_allowed alone', (_name, change) => {
-		expect(codesOfJson(change)).toEqual(['clip_track_not_allowed']);
+	it.each(rejectedAccessorShapes)('refuse %s alone', (_name, change, code) => {
+		expect(codesOfJson(change)).toEqual([code]);
 	});
 
 	it.each([
@@ -160,11 +114,5 @@ describe('the bytes of a clip’s keys', () => {
 		parts.json.animations[0].channels[0].target = { node: hips, path: 'translation' };
 		new DataView(parts.binary.buffer, parts.binary.byteOffset).setFloat32(parts.json.bufferViews[rotations].byteOffset, Number.NaN, true);
 		expect(checkClip(buildGlb(parts))).toEqual([]);
-	});
-
-	it('are judged for every channel of every animation', () => {
-		const bad = { ...conformantTrack(), times: [0, 2, 1] };
-		const codes = checkClip(buildClipGlb({ animations: [[conformantTrack()], [bad]] })).map(({ code }) => code);
-		expect(codes).toEqual(['clip_keys_invalid']);
 	});
 });

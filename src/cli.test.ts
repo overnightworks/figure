@@ -5,7 +5,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCommand } from './cli.js';
 import { clipProfile, figureProfile } from './profile.js';
 import { conformantTrack, type ClipTrack } from '../tests/clipBuilder.js';
-import { buildClipGlb, buildClipGlbOfSize, expressionNode, lookAtNode, retarget } from '../tests/clipFixtures.js';
+import {
+	buildClipGlb,
+	buildClipGlbOfSize,
+	expressionNode,
+	forbiddenClipContent,
+	lookAtNode,
+	rejectedAccessorShapes,
+	retarget,
+	secondAnimationCases
+} from '../tests/clipFixtures.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 
 describe('runCommand', () => {
@@ -100,6 +109,23 @@ describe('runCommand', () => {
 		expect(runCommand(['check', '--as', 'clip', writeFigure('ok.vrma', bytes)], output)).toBe(0);
 		expect(stdout).toHaveLength(1);
 		expect(stderr).toEqual([]);
+	});
+
+	it.each(forbiddenClipContent)('exits 1 with clip_content_not_allowed naming %s for a clip that holds them', (property) => {
+		const path = writeFigure('content.vrma', buildClipGlb({ change: (json) => (json[property] = []) }));
+		expect(runCommand(['check', '--as', 'clip', path], output)).toBe(1);
+		expect(stdout).toEqual([expect.stringMatching(new RegExp(`^clip_content_not_allowed\\b.*${property}`))]);
+	});
+
+	it.each(rejectedAccessorShapes)('exits 1 with only its code for a clip with %s under --as clip', (_name, change, code) => {
+		expect(runCommand(['check', '--as', 'clip', writeFigure('shape.vrma', buildClipGlb({ change }))], output)).toBe(1);
+		expect(codesPrinted()).toEqual([code]);
+	});
+
+	it.each(secondAnimationCases)('judges %s under --as clip as the check does', (_name, variant, codes) => {
+		const path = writeFigure('second.vrma', buildClipGlb(variant));
+		expect(runCommand(['check', '--as', 'clip', path], output)).toBe(codes.length === 0 ? 0 : 1);
+		expect(stdout.map((line) => line.split(':')[0])).toEqual(codes.length === 0 ? [path] : codes);
 	});
 
 	it.each<[string, Uint8Array, string[]]>([

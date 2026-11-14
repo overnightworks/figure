@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkClip } from './check.js';
 import { clipProfile } from './profile.js';
 import { conformantTrack, identity, type ClipTrack } from '../tests/clipBuilder.js';
-import { addNode, buildClipGlb, expressionNode, lookAtNode, nodeOf, retarget } from '../tests/clipFixtures.js';
+import { addNode, buildClipGlb, expressionNode, forbiddenClipContent, lookAtNode, nodeOf, retarget, secondAnimationCases } from '../tests/clipFixtures.js';
 
 type Json = Record<string, any>;
 
@@ -53,7 +53,7 @@ describe('the clip rules', () => {
 		expect(codesOf(change)).toEqual(['not_vrm_animation']);
 	});
 
-	it.each(['meshes', 'skins', 'materials', 'textures', 'images', 'samplers', 'cameras'])(
+	it.each(forbiddenClipContent)(
 		'refuse a clip that holds %s as clip_content_not_allowed naming it',
 		(property) => {
 			const refusals = refusalsOf((json) => (json[property] = []));
@@ -155,9 +155,8 @@ describe('the clip rules', () => {
 			expect(codesOf(change)).toEqual(['gltf_invalid']);
 		});
 
-		it('judge the channels of every animation, not only the first', () => {
-			const codes = codesOf((json) => retarget(json, spine, 'scale', 1), [[conformantTrack()], [conformantTrack()]]);
-			expect(codes).toEqual(['clip_track_not_allowed']);
+		it.each(secondAnimationCases)('judge %s', (_name, variant, codes) => {
+			expect(checkClip(buildClipGlb(variant)).map(({ code }) => code)).toEqual(codes);
 		});
 	});
 
@@ -175,10 +174,6 @@ describe('the clip rules', () => {
 		it('judges the longest track of the first animation', () => {
 			const longer = { ...track(clipProfile.maxSeconds + 1), bone: 'rightLowerArm' };
 			expect(codesOf(() => {}, [[conformantTrack(), longer]])).toEqual(['clip_too_long']);
-		});
-
-		it('passes a second animation that runs past the budget', () => {
-			expect(codesOf(() => {}, [[conformantTrack()], [track(clipProfile.maxSeconds + 1)]])).toEqual([]);
 		});
 
 		it('passes a track of one key', () => {
