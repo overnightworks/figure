@@ -147,7 +147,7 @@ A clip runs steps 1 to 3 against `clipProfile`, then the clip rules, all reporte
 
 ## 4. Deployment View
 
-The build is `tsc` alone and emits ESM and declarations to `dist/`. `prepack` runs it, so `pnpm pack` yields a tarball whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm. The build resolves imports as a bundler does, because three-vrm's types need it; `tests/tsconfig.node.json` type-checks the modules `bin.ts` reaches under Node's own resolution, which demands each relative import's `.js`.
+The build is `tsc`, then `scripts/write_vocabulary.mjs`: `tsc` emits ESM and declarations to `dist/`, and the script writes `dist/figure-vocabulary.json` from the built modules, which the package publishes as `overnightworks-figure/vocabulary.json`. `prepack` runs the build, so `pnpm pack` yields a tarball whose `figure` command runs in Node and whose modules a bundler takes. The package is private: nothing goes to npm. The build resolves imports as a bundler does, because three-vrm's types need it; `tests/tsconfig.node.json` type-checks the modules `bin.ts` reaches under Node's own resolution, which demands each relative import's `.js`.
 
 A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the build packs `overnightworks-figure-<version>.tgz` and proves it with `scripts/check_packed_tarball.sh`, and quality's tag job publishes the tarball, alone, on an immutable release whose notes carry its URL, its `sha512-` integrity and the gzip size of a checking and of a mounting consumer bundle (`scripts/measure_bundle_size.mjs`). quality's `docs/release.md` owns the path.
 
