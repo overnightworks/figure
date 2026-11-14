@@ -79,7 +79,8 @@ const { figureMood } = await import(pathToFileURL(join(process.argv[1], "dist", 
 const { default: vocabulary } = await import("overnightworks-figure/vocabulary.json", { with: { type: "json" } });
 const expected = { version: 1, gestures: Object.keys(figureGesture), moods: Object.values(figureMood) };
 if (!isDeepStrictEqual(vocabulary, expected)) {
-  console.error("vocabulary.json disagrees with the installed figureGesture and figureMood:", JSON.stringify(vocabulary), JSON.stringify(expected));
+  const differing = [...new Set([...Object.keys(vocabulary), ...Object.keys(expected)])].filter((key) => !isDeepStrictEqual(vocabulary[key], expected[key]));
+  console.error("vocabulary.json disagrees with the installed figureGesture and figureMood in:", differing.join(", "), JSON.stringify(vocabulary), JSON.stringify(expected));
   process.exit(1);
 }
 ' "${installed}"
