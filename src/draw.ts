@@ -1,11 +1,13 @@
 import { WebGLRenderer } from 'three';
 import { VRMUtils, type VRM } from '@pixiv/three-vrm';
-import { checkFigure } from './check.js';
+import { checkClip, checkFigure } from './check.js';
+import { loadClip } from './clipLoader.js';
 import { createFigureStage, type FigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
 import type { FigureMood } from './expressions.js';
 import { createFigureMotion, type FigureFacts, type SpeakerOffset } from './figureMotion.js';
 import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
+import type { LoadedClip } from './gestureLayer.js';
 import { isFigureGesture, type FigureGesture } from './gestures.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 import { createVoiceTap } from './voiceTap.js';
@@ -17,6 +19,10 @@ export type { FigureGesture } from './gestures.js';
 export interface MountOptions {
 	/** Called with every signal the figure gives, the first one before `mount` resolves. */
 	readonly onSignal?: (signal: FigureSignal) => void;
+	/**
+	 * A persona's own clips: the bytes of a `.vrma` file (`VRMC_vrm_animation` 1.0) for the base gesture a clip replaces. After the figure is drawn, each clip is judged by `checkClip`, the same check as `figure check --as clip`, and only then parsed, with no wait: `mount` resolves and the signal comes first, and a gesture that starts before a clip has parsed plays figure's own clip to its end. A clip plays the arms, hands, fingers, shoulders, spine, chest and upper chest it keys, trailing down each limb by a small lag the author does not write, on figure's fades; every other track is dropped. A key that is no `FigureGesture`, a clip that is refused or fails to load, and a clip that finishes parsing after `dispose` are dropped with no signal and nothing thrown. The option is read once, at mount.
+	 */
+	readonly gestures?: Readonly<Partial<Record<FigureGesture, Uint8Array>>>;
 }
 
 export interface FigureHandle {
@@ -49,12 +55,13 @@ interface Outcome {
 	readonly listen: (speaker: Element | null) => void;
 	readonly speak: (sentence: Sentence) => void;
 	readonly gesture: (name: unknown) => void;
+	readonly replaceClip: (name: FigureGesture, clip: LoadedClip) => void;
 }
 
 /** The facts of a figure that is not drawn: nothing reads them. */
 const ignoreFacts = () => {};
 
-const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts, gesture: ignoreFacts };
+const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts, gesture: ignoreFacts, replaceClip: ignoreFacts };
 
 function ended(signal: FigureSignal): Outcome {
 	return { signal, release: () => {}, ...endedFacts };
@@ -118,7 +125,7 @@ type LoopEnding = typeof figureSignal.lost | typeof figureSignal.slow;
  * the pose the motion gives for the facts the host reported by then.
  */
 function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: LoopEnding) => void): Loop {
-	const motion = createFigureMotion(Math.random);
+	const motion = createFigureMotion(Math.random, stage.gestures.clipOf);
 	const voiceTap = createVoiceTap();
 	let facts: FigureFacts = { thinking: false, speaking: false };
 	let speaker: Element | null = null;
@@ -212,11 +219,35 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 		const figure = vrm;
 		// A loss during the load fired its event before the loop listens for it, so the state is read here.
 		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release, ...endedFacts };
-		loop = runLoop(createFigureStage(renderer, canvas, figure), canvas, give);
-		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen, speak: loop.speak, gesture: loop.gesture };
+		const stage = createFigureStage(renderer, canvas, figure);
+		loop = runLoop(stage, canvas, give);
+		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen, speak: loop.speak, gesture: loop.gesture, replaceClip: stage.gestures.replace };
 	} catch {
 		release();
 		return ended(figureSignal.refused);
+	}
+}
+
+/**
+ * Judges each clip of `gestures` under a key that names a gesture with `checkClip`, parses what passes, and hands the parsed clip to
+ * `replaceClip` unless `isDisposed` by then. Whatever goes wrong with a clip, or with the option itself, drops it: nothing is signalled
+ * and nothing rejects.
+ */
+async function adoptClips(gestures: MountOptions['gestures'], replaceClip: Outcome['replaceClip'], isDisposed: () => boolean): Promise<void> {
+	try {
+		await Promise.all(
+			Object.entries(gestures ?? {}).map(async ([name, bytes]) => {
+				try {
+					if (!isFigureGesture(name) || checkClip(bytes).length > 0) return;
+					const clip = await loadClip(bytes);
+					if (!isDisposed()) replaceClip(name, clip);
+				} catch {
+					// A clip that cannot be judged or loaded leaves figure's own clip playing.
+				}
+			})
+		);
+	} catch {
+		// An option that cannot be read as a map of clips drops them all.
 	}
 }
 
@@ -238,9 +269,10 @@ export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, option
 			reportError(error);
 		}
 	};
-	const { signal, release, think, listen, speak, gesture } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
+	const { signal, release, think, listen, speak, gesture, replaceClip } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
 	give(signal);
 	let disposed = false;
+	if (signal === figureSignal.drawn) void adoptClips(options?.gestures, replaceClip, () => disposed);
 	return {
 		get signal() {
 			return current;
