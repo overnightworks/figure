@@ -7,7 +7,7 @@ file meets the profile's container, VRM and budget rules, and its siblings for a
 `checkClip(bytes)`, and for a persona's room (one static GLB, unlit materials only), `figure check --as room <file>` and `checkRoom(bytes)`; and the drawing, `mount` from `overnightworks-figure/draw`,
 which draws a figure that passes into an app's canvas, rests it with its arms lowered, keeps it alive with its idle motion, shows it thinking or listening when the app reports so,
 waves when the app asks (with a persona's own `.vrma` clip in place of figure's wave when the app hands one through `gestures`), and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
-mood of the sentence, until the app disposes it.
+mood of the sentence, until the app disposes it. Beside them, `overnightworks-figure/vocabulary.json`, lists the gesture and mood names for a consumer that does not run TypeScript.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick start
@@ -109,7 +109,7 @@ https://github.com/overnightworks/figure/releases/download/v<version>/overnightw
 ```
 
 ```sh
-pnpm add https://github.com/overnightworks/figure/releases/download/v0.6.0/overnightworks-figure-0.6.0.tgz
+pnpm add https://github.com/overnightworks/figure/releases/download/v0.7.0/overnightworks-figure-0.7.0.tgz
 ```
 
 pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it downloads the tarball. The value to compare stands
