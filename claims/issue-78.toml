@@ -3,6 +3,6 @@ agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
 role = "builder"
 base = "265738ea1c247fbc5bb8bae8e5428470aaa6a96d"
 branch = "claude/issue-78-check-a-persona-s-clip-figure-check-as-c"
-scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "scripts/check_packed_tarball.sh", "scripts/write_base_clips.mjs", "src/bin.test.ts", "src/check.test.ts", "src/check.ts", "src/cli.test.ts", "src/cli.ts", "src/clipKeyRules.test.ts", "src/clipKeyRules.ts", "src/clipRules.test.ts", "src/clipRules.ts", "src/codes.ts", "src/index.ts", "src/profile.test.ts", "src/profile.ts", "tests/clipBuilder.ts", "tests/e2e"]
+scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "scripts/check_packed_tarball.sh", "scripts/write_base_clips.mjs", "src/bin.test.ts", "src/check.test.ts", "src/check.ts", "src/cli.test.ts", "src/cli.ts", "src/clipKeyRules.test.ts", "src/clipKeyRules.ts", "src/clipRules.test.ts", "src/clipRules.ts", "src/codes.ts", "src/index.ts", "src/profile.test.ts", "src/profile.ts", "tests/clipBuilder.ts", "tests/clipFixtures.ts", "tests/e2e"]
 opened_commit = "492cc04864475cf18deb16e577acebd3f8cc3680"
 whole_reason = "The profile, its rules, the codes and the command are one check: none has a caller or a proof without the others, and the base set in CI is its first caller."
