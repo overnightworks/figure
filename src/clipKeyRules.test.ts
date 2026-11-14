@@ -35,6 +35,13 @@ describe('the accessors of a clip’s keys', () => {
 		['rotations that are not VEC4', (json: Json) => (json.accessors[rotations].type = 'SCALAR')],
 		['times that are not float', (json: Json) => (json.accessors[times].componentType = SHORT)],
 		['rotations of a component type glTF gives no rotation', (json: Json) => (json.accessors[rotations].componentType = UNSIGNED_INT)],
+		['translations of a component type other than float', (json: Json) => {
+			const output = json.accessors[rotations];
+			output.type = 'VEC3';
+			output.count = 3;
+			output.componentType = SHORT;
+			json.animations[0].channels[0].target = { node: clipProfile.requiredHumanBones.indexOf('hips'), path: 'translation' };
+		}],
 		['a component type that is no number', (json: Json) => (json.accessors[rotations].componentType = 'FLOAT')],
 		['a count that is not a positive integer', (json: Json) => (json.accessors[times].count = 0)],
 		['a buffer view that names none', (json: Json) => (json.accessors[times].bufferView = 99)],
