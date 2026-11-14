@@ -3,6 +3,6 @@ agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
 role = "builder"
 base = "8c002d61effc097b75a190cee3e8f2019cdd4cae"
 branch = "claude/issue-82-ease-the-right-arm-into-and-out-of-think"
-scope = ["src/figureFrame.ts", "src/figureMotion.ts", "src/gestureClips.ts", "src/gestureLayer.ts"]
+scope = ["docs/ARCHITECTURE.md", "src/figureFrame.ts", "src/figureMotion.ts", "src/figureMotionArms.test.ts", "src/figureMotionGesture.test.ts", "src/gestureClips.ts", "src/gestureLayer.ts"]
 opened_commit = "7dee75cce0384f3cec5ecfa5b3512a879f0072db"
 whole_reason = "All findings are the right arm's transitions between the thinking base and the wave, judged on one persona drive."
