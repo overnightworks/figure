@@ -128,7 +128,7 @@ Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } fro
 |---|---|---|
 | 0 | the file passes every rule | one line on stdout |
 | 1 | the file is refused | one line per refusal on stdout, starting with its code |
-| 2 | no verdict: no file named, a file that cannot be read, an unknown command, an `--as` that is neither `clip` nor `room` | the reason, or the usage line `usage: figure check [--as clip|room] <file>`, on stderr |
+| 2 | no verdict: no file named, a file that cannot be read, an unknown command, an `--as` that is neither `clip` nor `room` | the reason, or the usage line `usage: figure check [--as clip\|room] <file>`, on stderr |
 
 `--as` sits between `check` and the file and its value is `clip` or `room`; without it the file is a figure. The codes and the exit codes are the contract; the wording of a line is not.
 
