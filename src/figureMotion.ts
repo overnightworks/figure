@@ -16,17 +16,19 @@ import type { VowelWeights } from './vowelWeights.js';
  * size at rest and while listening, `speakingJumpShare` of it while the agent speaks, none while it thinks. Under reduced motion
  * the look-at reaches the goal at once, and there are no jumps and no blink brought forward.
  *
- * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and
- * to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the easing rates. The right arm
- * rises with the thinking weight to the picture's hand at the chin. The listening look is that of its listening state: the gaze toward the
- * speaker, the head's larger share of its yaw, the slower yaw and the lean, and a nod every 2.5 to 5 seconds, which the picture times
- * and which `spreadPosture` shares between neck and head. Under reduced motion the pose is reached and left at once, and no nod comes.
- * The speaking look is that of its speaking state: the five mouth weights easing at 38 a second up and 22 down, and the head nodding
- * with the voice by the weights' eased level. A mood the sentence names shows while the agent speaks: its weight eases toward its peak at 9
- * a second and away at 4, the mouth's weights shrink to 0.72 of themselves while any mood is shown, and each mood leans the head, the
- * trunk and the shoulders by its share of the picture's offsets. A gesture the host asks for starts at the next frame and runs its clip's
- * length on the clock the motion owns, the step of every other blend; the pose names it and its seconds, and the clip over the base pose
- * is the frame's, and while one plays the base pose's arm leaves the chin by the share its clip shows, so the hand travels below the frame instead of across the face. Under reduced motion none starts and a running one ends at the next frame.
+ * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and to
+ * the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the
+ * easing rates. The right arm rises with the thinking weight to the picture's hand at the chin, the forearm folding ahead of the upper
+ * arm. The listening look is that of its listening state: the gaze toward the speaker, the head's larger share of its yaw, the slower yaw
+ * and the lean, and a nod every 2.5 to 5 seconds, which the picture times and which `spreadPosture` shares between neck and head. Under
+ * reduced motion the pose is reached and left at once, and no nod comes. The speaking look is that of its speaking state: the five mouth
+ * weights easing at 38 a second up and 22 down, and the head nodding with the voice by the weights' eased level. A mood the sentence
+ * names shows while the agent speaks: its weight eases toward its peak at 9 a second and away at 4, the mouth's weights shrink to 0.72 of
+ * themselves while any mood is shown, and each mood leans the head, the trunk and the shoulders by its share of the picture's offsets. A
+ * gesture the host asks for starts at the next frame and runs its clip's length on the clock the motion owns, the step of every other
+ * blend; the pose names it and its seconds, and the clip over the base pose is the frame's, and while one plays the base pose's arm
+ * leaves the chin by the share its clip shows, so the hand travels below the frame instead of across the face. Under reduced motion none
+ * starts and a running one ends at the next frame, and the arm's share that it had taken returns to the chin at the thinking look's rate.
  */
 
 /** What the host reports about its agent. */
@@ -160,7 +162,7 @@ const radiansPerDegree = Math.PI / 180;
  */
 const restingArm = { upperArmRoll: 1.38, shoulderRise: 0.012, upperArmSwing: 0.01 };
 const restTurn: Turn = { yaw: 0, pitch: 0, roll: 0 };
-/** The right arm at the full thinking look, the hand at the chin: the values of the picture's THINK_POSE; the arm blends from rest to it linearly in these angles, as the picture does. */
+/** The right arm at the full thinking look, the hand at the chin: the values of the picture's THINK_POSE; the arm blends from rest to it in these angles. */
 const chinArm = { upperArm: { pitch: -0.6, yaw: 0.5, roll: 0.6 }, lowerArm: { pitch: 0, yaw: 2.4, roll: 0 } };
 
 /** The turn `weight` of the way from `from` to `to`, each angle on its own. */
@@ -168,13 +170,28 @@ function blendedTurn(from: Turn, to: Turn, weight: number): Turn {
 	return { yaw: from.yaw + (to.yaw - from.yaw) * weight, pitch: from.pitch + (to.pitch - from.pitch) * weight, roll: from.roll + (to.roll - from.roll) * weight };
 }
 
-/** The arms' base pose: lowered, the left upper arm swinging with `breathShare`, the breath as a share of its largest lean, and the right arm on its way to the chin by `thinkingWeight`. */
-function baseArms(breathShare: number, thinkingWeight: number): Arms {
+/**
+ * The share of the way to the chin that the forearm has folded when the arm is `armWeight` of the way there: it leads the upper arm, so
+ * the hand rises close to the body and stays inside the picture's side, where a forearm still hanging straight would swing out beyond it.
+ */
+function forearmFoldShare(armWeight: number): number {
+	return 1 - (1 - armWeight) ** 4;
+}
+
+/**
+ * The arms' base pose: lowered, the left upper arm swinging with `breathShare`, the breath as a share of its largest lean, and the
+ * right arm on its way to the chin by `thinkingWeight`, less `armGiven`, the share of the way back to rest that a gesture takes it.
+ * While a gesture plays, the forearm gives way by that share of its own fold, so a wave from the chin rises as the clip lifts it; once
+ * the page's reduced motion has ended the gesture, `armGiven` is the arm's return, and the forearm folds ahead on it as on the way up.
+ */
+function baseArms(breathShare: number, thinkingWeight: number, armGiven: number, armReturning: boolean): Arms {
 	const restingRightUpperArm: Turn = { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll };
+	const keptWeight = thinkingWeight * (1 - armGiven);
+	const forearmShare = armReturning ? forearmFoldShare(keptWeight) : forearmFoldShare(thinkingWeight) * (1 - armGiven);
 	return {
 		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * breathShare, roll: -restingArm.upperArmRoll },
-		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, thinkingWeight),
-		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, thinkingWeight)
+		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, keptWeight),
+		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, forearmShare)
 	};
 }
 
@@ -367,6 +384,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 	let previousGoal: Gaze = gaze;
 	let thinkingWeight = 0;
 	let leanWeight = 0;
+	let armGiven = 0;
 
 	return {
 		gesture: gestureMotion.gesture,
@@ -391,6 +409,9 @@ export function createFigureMotion(random: () => number): FigureMotion {
 			thinkingWeight = ease(thinkingWeight, thinking ? 1 : 0, easing.thinking);
 			leanWeight = ease(leanWeight, listening ? 1 : 0, easing.lean);
 			const gesture = gestureMotion.advance(step, reducedMotion);
+			// Under reduced motion no gesture plays, yet the share a wave cut short had taken from the chin returns at the thinking look's rate, not in one frame.
+			const armShown = gesture === null ? 0 : armShare(gesture.name, gesture.seconds);
+			armGiven = reducedMotion ? easeToward(armGiven, armShown, easing.thinking, step, false) : armShown;
 			return {
 				blink: thinking ? base.blink * thinkingLook.blinkWeight : base.blink,
 				breath: base.breath,
@@ -409,7 +430,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				moodTrunk: { spine: mood.chest * trunkShare.spine, chest: mood.chest * trunkShare.chest },
 				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
 				look: { yaw: clamp(eyeGaze.yaw * lookGain + jump * base.eyes.yaw, lookReachDegrees), pitch: clamp(eyeGaze.pitch * lookGain + jump * base.eyes.pitch, lookReachDegrees) },
-				arms: baseArms(breathShare, thinkingWeight * (1 - (gesture === null ? 0 : armShare(gesture.name, gesture.seconds)))),
+				arms: baseArms(breathShare, thinkingWeight, armGiven, reducedMotion),
 				shoulders: shoulderDeltas(breathShare, mood.shoulder * shoulderShare),
 				gesture
 			};

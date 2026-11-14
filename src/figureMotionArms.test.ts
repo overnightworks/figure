@@ -59,7 +59,7 @@ describe('the right hand at the chin while the figure thinks', () => {
 		expect(settled.rightLowerArm).not.toEqual(resting.rightLowerArm);
 	});
 
-	it('moves the right arm monotonically from its rest to the settled pose as the thinking weight rises', () => {
+	it('moves the right arm monotonically from its rest to the settled pose as the thinking weight rises, the forearm folding ahead of the upper arm', () => {
 		const poses = watch(atSecond(settledSeconds) + 1, () => thinking);
 		const [resting, settled] = [restingArms(), settledThinkingArms()];
 		const shareOf = (value: number, from: number, to: number) => (value - from) / (to - from);
@@ -67,9 +67,11 @@ describe('the right hand at the chin while the figure thinks', () => {
 		const upperShares = poses.map(({ arms }) => shareOf(arms.rightUpperArm.pitch, resting.rightUpperArm.pitch, settled.rightUpperArm.pitch));
 
 		lowerShares.forEach((share, frame) => {
-			expect(share).toBeCloseTo(upperShares[frame]!, 9);
-			if (frame > 0) expect(share).toBeGreaterThan(lowerShares[frame - 1]!);
+			expect(share).toBeGreaterThanOrEqual(upperShares[frame]!);
+			if (frame > 0) expect(share).toBeGreaterThanOrEqual(lowerShares[frame - 1]!);
+			if (frame > 0) expect(upperShares[frame]!).toBeGreaterThanOrEqual(upperShares[frame - 1]!);
 		});
+		expect(lowerShares[1]).toBeGreaterThan(upperShares[1]!);
 	});
 
 	it.each([
