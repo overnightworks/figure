@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCommand } from './cli.js';
 import { figureProfile } from './profile.js';
+import { buildClipGlb } from '../tests/clipFixtures.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 
 describe('runCommand', () => {
@@ -64,14 +65,40 @@ describe('runCommand', () => {
 		expect(stderr).toHaveLength(1);
 	});
 
+	it('exits 0 and says so on stdout for a conformant clip under --as clip', () => {
+		expect(runCommand(['check', '--as', 'clip', writeFigure('ok.vrma', buildClipGlb())], output)).toBe(0);
+		expect(stdout).toHaveLength(1);
+		expect(stderr).toEqual([]);
+	});
+
+	it('exits 1 with the clip code and the text it found for a clip that breaks a clip rule', () => {
+		const path = writeFigure('mesh.vrma', buildClipGlb({ change: (json) => (json.meshes = []) }));
+		expect(runCommand(['check', '--as', 'clip', path], output)).toBe(1);
+		expect(stdout).toEqual([expect.stringMatching(/^clip_content_not_allowed\b.*meshes/)]);
+	});
+
+	it('judges a figure as a clip under --as clip, and a clip as a figure without it', () => {
+		expect(runCommand(['check', '--as', 'clip', writeFigure('figure.vrm', buildVrmGlb())], output)).toBe(1);
+		expect(stdout.map((line) => line.split(':')[0])).toContain('not_vrm_animation');
+		stdout = [];
+		expect(runCommand(['check', writeFigure('clip.vrma', buildClipGlb())], output)).toBe(1);
+		expect(stdout.map((line) => line.split(':')[0])).toContain('not_vrm');
+	});
+
 	it.each([
 		['no command', []],
 		['an unknown command', ['draw', 'a.glb']],
 		['no file', ['check']],
-		['more than one file', ['check', 'a.glb', 'b.glb']]
+		['more than one file', ['check', 'a.glb', 'b.glb']],
+		['--as without a value', ['check', '--as']],
+		['--as without a file', ['check', '--as', 'clip']],
+		['--as with a value that is not clip', ['check', '--as', 'room', 'a.glb']],
+		['--as after the file', ['check', 'a.glb', '--as', 'clip']],
+		['more than one file under --as clip', ['check', '--as', 'clip', 'a.vrma', 'b.vrma']]
 	])('exits 2 for %s', (_name, argv) => {
 		expect(runCommand(argv, output)).toBe(2);
 		expect(stdout).toEqual([]);
 		expect(stderr).toHaveLength(1);
+		expect(stderr[0]).toContain('usage: figure check [--as clip] <file>');
 	});
 });
