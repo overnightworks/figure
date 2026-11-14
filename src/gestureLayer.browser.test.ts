@@ -7,7 +7,7 @@ import { VRMUtils, type VRM, type VRMHumanBoneName } from '@pixiv/three-vrm';
 import { conformantTrack, identity, type ClipTrack, type Quaternion } from '../tests/clipBuilder.js';
 import { buildClipGlb } from '../tests/clipFixtures.js';
 import { buildConformantVrm } from '../tests/figureFixtures.js';
-import { idle, seed, seededRandom } from '../tests/figureMotionWatch.js';
+import { idle, ownClip, seed, seededRandom } from '../tests/figureMotionWatch.js';
 import { loadClip } from './clipLoader.js';
 import { createFigureMotion, type FigurePose } from './figureMotion.js';
 import { createFigureStage } from './figureFrame.js';
@@ -325,7 +325,7 @@ describe('the frame with a clip a persona wrote', () => {
 		renderer = new WebGLRenderer({ canvas, alpha: true });
 		vrm = await loadFigure(buildConformantVrm());
 		stage = createFigureStage(renderer, canvas, vrm);
-		resting = createFigureMotion(seededRandom(seed)).advance(idle, 0.01, false, null, null);
+		resting = createFigureMotion(seededRandom(seed), ownClip).advance(idle, 0.01, false, null, null);
 	});
 
 	afterEach(() => {

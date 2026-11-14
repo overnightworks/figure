@@ -1,5 +1,5 @@
 import { figureMood, mouthShape, type FigureMood } from './expressions.js';
-import { armShare, gestureClips, gestureLengthSeconds, type ClipTiming } from './gestureClips.js';
+import { armShare, gestureLengthSeconds, type ClipTiming } from './gestureClips.js';
 import type { FigureGesture } from './gestures.js';
 import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.js';
 import type { VowelWeights } from './vowelWeights.js';
@@ -378,8 +378,8 @@ function createGestureMotion(clipOf: ClipOf): GestureMotion {
 	};
 }
 
-/** The motion for one figure; `clipOf` names the clip a gesture starts with, by default the figure's own. */
-export function createFigureMotion(random: () => number, clipOf: ClipOf = (name) => gestureClips[name]): FigureMotion {
+/** The motion for one figure; `clipOf` names the clip a gesture starts with. */
+export function createFigureMotion(random: () => number, clipOf: ClipOf): FigureMotion {
 	const idle = createIdleMotion(random);
 	const nodding = createNod(random);
 	const mouthMotion = createMouth();

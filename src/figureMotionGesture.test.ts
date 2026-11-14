@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameSeconds, idle, seed, seededRandom, speaking, thinking } from '../tests/figureMotionWatch.js';
+import { frameSeconds, idle, ownClip, seed, seededRandom, speaking, thinking } from '../tests/figureMotionWatch.js';
 import { gestureClips, gestureLengthSeconds, type ClipTiming } from './gestureClips.js';
 import { createFigureMotion, type FigureFacts, type FigurePose, type GesturePlay } from './figureMotion.js';
 import { figureGesture, type FigureGesture } from './gestures.js';
@@ -13,7 +13,7 @@ interface Frame {
 
 /** The poses at each of `frames` frames of 10 ms, given what happens at the frames `at` selects. */
 function posesOf(frames: number, at: (frame: number) => Frame = () => ({})): FigurePose[] {
-	const motion = createFigureMotion(seededRandom(seed));
+	const motion = createFigureMotion(seededRandom(seed), ownClip);
 	return Array.from({ length: frames }, (_, frame) => {
 		const { facts = idle, reducedMotion = false, calls = [] } = at(frame);
 		calls.forEach((call) => motion.gesture(call));

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { figureMood, mouthShape, type FigureMood, type MouthShape } from './expressions.js';
 import { eyeJumpReach } from './idleMotion.js';
 import { createFigureMotion, spreadPosture, type FigureFacts, type FigurePose } from './figureMotion.js';
-import { atSecond, frameSeconds, idle, seededRandom, seed, speaking, speakerLeft, thinking, thinkingAndSpeaking, thinkingHead, thinkingLook, watch } from '../tests/figureMotionWatch.js';
+import { atSecond, frameSeconds, idle, ownClip, seededRandom, seed, speaking, speakerLeft, thinking, thinkingAndSpeaking, thinkingHead, thinkingLook, watch } from '../tests/figureMotionWatch.js';
 import type { VowelWeights } from './vowelWeights.js';
 
 /** The turn the thinking look adds to the head, from the picture, in radians. */
@@ -134,15 +134,15 @@ describe('the figure motion', () => {
 
 	it('does not restart the ease when the same fact is given again', () => {
 		const given = watch(200, () => thinking);
-		const motion = createFigureMotion(seededRandom(seed));
+		const motion = createFigureMotion(seededRandom(seed), ownClip);
 		const again = Array.from({ length: 200 }, () => motion.advance(thinking, frameSeconds, false, null, null));
 
 		expect(again).toEqual(given);
 	});
 
 	it('counts a step longer than a tenth of a second as a tenth, so a page that was hidden does not jump', () => {
-		const stepped = createFigureMotion(seededRandom(seed));
-		const returned = createFigureMotion(seededRandom(seed));
+		const stepped = createFigureMotion(seededRandom(seed), ownClip);
+		const returned = createFigureMotion(seededRandom(seed), ownClip);
 
 		expect(returned.advance(thinking, 30, false, null, null)).toEqual(stepped.advance(thinking, 0.1, false, null, null));
 	});
@@ -291,7 +291,7 @@ describe('the figure motion while someone speaks', () => {
 
 	it('does not restart the ease when the same speaker is given again', () => {
 		const given = watch(200, () => idle, false, () => speakerLeft);
-		const motion = createFigureMotion(seededRandom(seed));
+		const motion = createFigureMotion(seededRandom(seed), ownClip);
 		const again = Array.from({ length: 200 }, () => motion.advance(idle, frameSeconds, false, { across: -0.5, down: 0 }, null));
 
 		expect(again).toEqual(given);
@@ -357,7 +357,7 @@ describe('the figure motion while someone speaks', () => {
 		[0, 2.5],
 		[0.999999, 5]
 	])('takes the gap between nods from the source of chance: a source giving %s gaps of %s seconds', (share, gap) => {
-		const motion = createFigureMotion(() => share);
+		const motion = createFigureMotion(() => share, ownClip);
 		const starts = nodStartsOf(Array.from({ length: 6000 }, () => motion.advance(idle, frameSeconds, false, speakerLeft, null).posture.pitch));
 
 		expect(starts[1]! - starts[0]!).toBeCloseTo(gap, 1);
