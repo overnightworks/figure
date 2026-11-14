@@ -133,14 +133,14 @@ const secondAnimation = (track: Partial<ClipTrack>): readonly (readonly ClipTrac
 /** A clip whose second animation differs from the conformant one: the check judges it as it judges the first, except for the length budget, which only the first animation answers to. */
 export const secondAnimationCases: readonly (readonly [name: string, variant: ClipVariant, codes: readonly string[]])[] = [
 	[
-		'a second animation past the length budget',
+		'passes a second animation past the length budget',
 		{ animations: secondAnimation({ times: [0, 1, clipProfile.maxSeconds + 1] }) },
 		[]
 	],
 	[
-		'a second animation with a channel the profile does not allow',
+		'refuses a second animation with a channel the profile does not allow as clip_track_not_allowed',
 		{ animations: secondAnimation({}), change: (json) => retarget(json, nodeOf('spine'), 'scale', 1) },
 		['clip_track_not_allowed']
 	],
-	['a second animation with keys that descend', { animations: secondAnimation({ times: [0, 2, 1] }) }, ['clip_keys_invalid']]
+	['refuses a second animation with keys that descend as clip_keys_invalid', { animations: secondAnimation({ times: [0, 2, 1] }) }, ['clip_keys_invalid']]
 ];

@@ -102,7 +102,7 @@ describe('runCommand', () => {
 		expect(stderr).toEqual([]);
 	});
 
-	it.each(secondAnimationCases)('judges %s under --as clip as the check does', (_name, variant, codes) => {
+	it.each(secondAnimationCases)('%s under --as clip', (_name, variant, codes) => {
 		const path = writeFigure('second.vrma', buildClipGlb(variant));
 		expect(runCommand(['check', '--as', 'clip', path], output)).toBe(codes.length === 0 ? 0 : 1);
 		expect(stdout.map((line) => line.split(':')[0])).toEqual(codes.length === 0 ? [path] : codes);

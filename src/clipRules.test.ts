@@ -178,7 +178,7 @@ describe('the clip rules', () => {
 			expect(codesOf(change)).toEqual(['gltf_invalid']);
 		});
 
-		it.each(secondAnimationCases)('judge %s', (_name, variant, codes) => {
+		it.each(secondAnimationCases)('%s', (_name, variant, codes) => {
 			expect(checkClip(buildClipGlb(variant)).map(({ code }) => code)).toEqual(codes);
 		});
 	});
