@@ -82,7 +82,7 @@ function contentRefusals(json: JsonObject, refusals: Refusal[]): void {
 	}
 }
 
-/** The loader reads the default scene, so a clip needs one, and a `scene` index must name one. */
+/** The loader reads the default scene, so a clip needs one, a `scene` index must name one, and every scene must be an object naming nodes that exist. */
 function sceneRefusals(json: JsonObject, refusals: Refusal[]): void {
 	attemptRead(refusals, 'scenes', () => {
 		const scenes = listOf(json['scenes']);
@@ -90,6 +90,14 @@ function sceneRefusals(json: JsonObject, refusals: Refusal[]): void {
 			refusals.push({ code: 'clip_scene_missing' });
 		} else if (json['scene'] !== undefined && indexOf(json['scene']) >= scenes.length) {
 			unreadable('scene names no entry of scenes');
+		}
+		const nodes = listOf(json['nodes']);
+		for (const scene of scenes) {
+			for (const node of listOf(objectOf(scene)['nodes'])) {
+				if (!isJsonObject(nodes[indexOf(node)])) {
+					unreadable('a scene names a node that is no entry of nodes');
+				}
+			}
 		}
 	});
 }

@@ -90,7 +90,11 @@ describe('the clip rules', () => {
 
 	it.each([
 		['scenes that is not a list', (json: Json) => (json.scenes = {})],
-		['a scene index that names no scene', (json: Json) => (json.scene = json.scenes.length)]
+		['a scene index that names no scene', (json: Json) => (json.scene = json.scenes.length)],
+		['a scene that is not an object', (json: Json) => (json.scenes = [null])],
+		['a scene whose nodes is not a list', (json: Json) => (json.scenes[0].nodes = 0)],
+		['a scene that names a node that is no entry of nodes', (json: Json) => json.scenes[0].nodes.push(json.nodes.length)],
+		['a scene that names a node by an index that is not an integer', (json: Json) => (json.scenes[0].nodes[0] = '0')]
 	])('refuse %s as gltf_invalid', (_name, change) => {
 		expect(codesOf(change)).toEqual(['gltf_invalid']);
 	});
