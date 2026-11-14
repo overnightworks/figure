@@ -46,7 +46,7 @@ interface PlayedBone {
 export interface GestureLayer {
 	/** The clip a gesture started now would play: figure's own until a loaded clip replaces it. */
 	clipOf(name: FigureGesture): ClipTiming;
-	/** Replaces the clip of `name` for the gestures that start after this call, with the owned bones of `loaded` the figure has, on the fades of figure's own clip. */
+	/** Replaces the clip of `name` for the gestures that start after this call, with the owned bones of `loaded` the figure has, on the fades of figure's own clip. A second replace for the same name must keep resting the bones a running gesture's earlier clip turns; today each name is replaced at most once per mount. */
 	replace(name: FigureGesture, loaded: LoadedClip): void;
 	/** The nodes of every bone any clip of the layer turns now, which the frame brings to the base pose before the layer applies. */
 	readonly nodes: readonly Object3D[];
