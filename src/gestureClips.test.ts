@@ -17,7 +17,7 @@ describe.each(Object.values(figureGesture))('the clip of %s', (name) => {
 		times.slice(1).forEach((seconds, index) => expect(seconds).toBeGreaterThan(times[index]!));
 	});
 
-	it.each(tracks)('reaches the pose held between the fades of %s at the end of the fade in and leaves it at the start of the fade out', (_, track) => {
+	it.each(tracks)('is in the same pose of %s at the end of the fade in and at the start of the fade out', (_, track) => {
 		const fadeInEnd = track.keys.find(({ seconds }) => seconds === clip.fadeSeconds.in);
 		const fadeOutStart = track.keys.find(({ seconds }) => seconds === clip.durationSeconds - clip.fadeSeconds.out);
 
