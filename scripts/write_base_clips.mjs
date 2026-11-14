@@ -17,7 +17,7 @@ if (outputDirectory === undefined) {
 }
 mkdirSync(outputDirectory, { recursive: true });
 for (const [name, clip] of Object.entries(gestureClips)) {
-	const tracks = Object.entries(clip.bones).map(([bone, { keys }]) => ({
+	const tracks = Object.entries(clip.keys).map(([bone, keys]) => ({
 		bone,
 		times: keys.map(({ seconds }) => seconds),
 		rotations: keys.map(({ turn }) => quaternionOfTurn(turn, new Quaternion()).toArray())

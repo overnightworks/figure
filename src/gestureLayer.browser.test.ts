@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp } from 'vitest/browser';
 import { centreOf, emulateReducedMotion, restorePageVisibility, setPageVisibility, type FaceFeature, type Spot } from '../tests/browserCanvas.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
-import { gestureLengthSeconds } from './gestureClips.js';
+import { gestureClips, gestureLengthSeconds } from './gestureClips.js';
 import { figureGesture, type FigureGesture } from './gestures.js';
 import { figureSignal } from './signals.js';
 
@@ -75,7 +75,7 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 	}
 
 	/** The seconds an ignored call is watched: the whole of what a wave would take. */
-	const ignoredWatchSeconds = gestureLengthSeconds(figureGesture.wave) + ignoredWatchMarginSeconds;
+	const ignoredWatchSeconds = gestureLengthSeconds(gestureClips[figureGesture.wave]) + ignoredWatchMarginSeconds;
 
 	/** No picture of the next whole wave's length shows the hand waving. */
 	async function expectNoWaveOver(canvas: HTMLCanvasElement, resting: Features): Promise<void> {

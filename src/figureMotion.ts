@@ -1,5 +1,5 @@
 import { figureMood, mouthShape, type FigureMood } from './expressions.js';
-import { armShare, gestureLengthSeconds } from './gestureClips.js';
+import { armShare, gestureClips, gestureLengthSeconds, type ClipTiming } from './gestureClips.js';
 import type { FigureGesture } from './gestures.js';
 import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.js';
 import type { VowelWeights } from './vowelWeights.js';
@@ -83,11 +83,15 @@ export interface FigurePose {
 	readonly gesture: GesturePlay | null;
 }
 
-/** A gesture under way: its name and the seconds its clock has run, from 0 to `gestureLengthSeconds(name)`. */
+/** A gesture under way: its name, the clip that started it and the seconds its clock has run, from 0 to the clip's `gestureLengthSeconds`. */
 export interface GesturePlay {
 	readonly name: FigureGesture;
 	readonly seconds: number;
+	readonly clip: ClipTiming;
 }
+
+/** The clip that plays for a gesture started now. */
+export type ClipOf = (name: FigureGesture) => ClipTiming;
 
 /** The turns of the arms' bones in radians, as the base pose sets them; the left lower arm, the hands and the fingers stay at rest. */
 export interface Arms {
@@ -349,9 +353,10 @@ interface GestureMotion {
 
 /**
  * The gesture clock. A call is kept until the next step starts it at 0, unless a gesture plays then or the page asks for reduced motion;
- * a gesture ends when its clock reaches the clip's length, and reduced motion ends one at once.
+ * a gesture ends when its clock reaches the length of the clip it started with, whatever replaces that clip meanwhile, and reduced motion
+ * ends one at once.
  */
-function createGestureMotion(): GestureMotion {
+function createGestureMotion(clipOf: ClipOf): GestureMotion {
 	let playing: GesturePlay | null = null;
 	let asked: FigureGesture | null = null;
 	return {
@@ -363,9 +368,9 @@ function createGestureMotion(): GestureMotion {
 				playing = null;
 			} else if (playing !== null) {
 				const seconds = playing.seconds + step;
-				playing = seconds < gestureLengthSeconds(playing.name) ? { name: playing.name, seconds } : null;
+				playing = seconds < gestureLengthSeconds(playing.clip) ? { ...playing, seconds } : null;
 			} else if (asked !== null) {
-				playing = { name: asked, seconds: 0 };
+				playing = { name: asked, seconds: 0, clip: clipOf(asked) };
 			}
 			asked = null;
 			return playing;
@@ -373,12 +378,13 @@ function createGestureMotion(): GestureMotion {
 	};
 }
 
-export function createFigureMotion(random: () => number): FigureMotion {
+/** The motion for one figure; `clipOf` names the clip a gesture starts with, by default the figure's own. */
+export function createFigureMotion(random: () => number, clipOf: ClipOf = (name) => gestureClips[name]): FigureMotion {
 	const idle = createIdleMotion(random);
 	const nodding = createNod(random);
 	const mouthMotion = createMouth();
 	const moodMotion = createMood();
-	const gestureMotion = createGestureMotion();
+	const gestureMotion = createGestureMotion(clipOf);
 	let gaze: Gaze = { yaw: 0, pitch: 0 };
 	let eyeGaze: Gaze = { yaw: 0, pitch: 0 };
 	let previousGoal: Gaze = gaze;
@@ -410,7 +416,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 			leanWeight = ease(leanWeight, listening ? 1 : 0, easing.lean);
 			const gesture = gestureMotion.advance(step, reducedMotion);
 			// Under reduced motion no gesture plays, yet the share a wave cut short had taken from the chin returns at the thinking look's rate, not in one frame.
-			const armShown = gesture === null ? 0 : armShare(gesture.name, gesture.seconds);
+			const armShown = gesture === null ? 0 : armShare(gesture.clip, gesture.seconds);
 			armGiven = reducedMotion ? easeToward(armGiven, armShown, easing.thinking, step, false) : armShown;
 			return {
 				blink: thinking ? base.blink * thinkingLook.blinkWeight : base.blink,
