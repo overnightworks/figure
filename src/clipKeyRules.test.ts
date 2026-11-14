@@ -44,6 +44,7 @@ describe('the accessors of a clip’s keys', () => {
 		}],
 		['float times that are normalised', (json: Json) => (json.accessors[times].normalized = true)],
 		['float rotations that are normalised', (json: Json) => (json.accessors[rotations].normalized = true)],
+		['no buffers', (json: Json) => delete json.buffers],
 		['a component type that is no number', (json: Json) => (json.accessors[rotations].componentType = 'FLOAT')],
 		['a count that is not a positive integer', (json: Json) => (json.accessors[times].count = 0)],
 		['a buffer view that names none', (json: Json) => (json.accessors[times].bufferView = 99)],
@@ -70,6 +71,13 @@ describe('the accessors of a clip’s keys', () => {
 		['normalised integer rotations', (json: Json) => (json.accessors[rotations].componentType = SHORT)]
 	])('refuse %s as clip_track_not_allowed alone', (_name, change) => {
 		expect(codesOfJson(change)).toEqual(['clip_track_not_allowed']);
+	});
+
+	it.each([
+		['names none', (json: Json) => (json.bufferViews[times].buffer = 99)],
+		['is left out', (json: Json) => delete json.bufferViews[times].buffer]
+	])('refuse a key buffer view whose buffer %s as gltf_invalid, besides the buffer_outside_glb the container rules give', (_name, change) => {
+		expect(codesOfJson(change)).toEqual(['buffer_outside_glb', 'gltf_invalid']);
 	});
 
 	it('accept an accessor offset that is a multiple of 4', () => {

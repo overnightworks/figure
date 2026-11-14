@@ -1,5 +1,5 @@
 import type { Refusal } from './codes.js';
-import { attemptRead, indexOf, objectOf, requiredListOf, unreadable, type JsonObject } from './json.js';
+import { attemptRead, indexOf, isJsonObject, objectOf, requiredListOf, unreadable, type JsonObject } from './json.js';
 import { clipProfile } from './profile.js';
 
 const FLOAT = 5126;
@@ -93,6 +93,9 @@ function locate(json: JsonObject, binary: Uint8Array, accessorIndex: unknown, ty
 		return undefined;
 	}
 	const bufferView = objectOf(requiredListOf(json['bufferViews'])[indexOf(accessor['bufferView'])]);
+	if (!isJsonObject(requiredListOf(json['buffers'])[indexOf(bufferView['buffer'])])) {
+		unreadable(`accessor ${index} sits in a buffer view whose buffer is no entry of buffers`);
+	}
 	if (Object.hasOwn(bufferView, 'byteStride')) {
 		unreadable(`accessor ${index} sits in a buffer view with a stride`);
 	}
