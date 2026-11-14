@@ -47,6 +47,9 @@ export interface FigureHandle {
 /** What the agent speaks: the voice its mouth follows and the mood its face shows. */
 type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood } | null;
 
+/** Parses the bytes of a clip that passed `checkClip`. */
+export type ClipLoad = (bytes: Uint8Array) => Promise<LoadedClip>;
+
 /** What the mount's work gave: the signal, what to free when the app is done with it, and how the facts the host reports reach the figure. */
 interface Outcome {
 	readonly signal: FigureSignal;
@@ -230,16 +233,21 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 
 /**
  * Judges each clip of `gestures` under a key that names a gesture with `checkClip`, parses what passes, and hands the parsed clip to
- * `replaceClip` unless `isDisposed` by then. Whatever goes wrong with a clip, or with the option itself, drops it: nothing is signalled
+ * `replaceClip` unless `isDisposed` by then. `load` parses the bytes of a clip that passed. Whatever goes wrong with a clip, or with the option itself, drops it: nothing is signalled
  * and nothing rejects.
  */
-async function adoptClips(gestures: MountOptions['gestures'], replaceClip: Outcome['replaceClip'], isDisposed: () => boolean): Promise<void> {
+async function adoptClips(
+	load: ClipLoad,
+	options: MountOptions | undefined,
+	replaceClip: Outcome['replaceClip'],
+	isDisposed: () => boolean
+): Promise<void> {
 	try {
 		await Promise.all(
-			Object.entries(gestures ?? {}).map(async ([name, bytes]) => {
+			Object.entries(options?.gestures ?? {}).map(async ([name, bytes]) => {
 				try {
 					if (!isFigureGesture(name) || checkClip(bytes).length > 0) return;
-					const clip = await loadClip(bytes);
+					const clip = await load(bytes);
 					if (!isDisposed()) replaceClip(name, clip);
 				} catch {
 					// A clip that cannot be judged or loaded leaves figure's own clip playing.
@@ -259,7 +267,12 @@ async function adoptClips(gestures: MountOptions['gestures'], replaceClip: Outco
  * slow to keep gives `slow`; either ends it for good, with no restore: a remount needs a fresh canvas.
  * It resolves to a handle holding the first signal, which `onSignal` has had by then. It never rejects: an error `onSignal` throws is reported to the window's error handlers.
  */
-export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
+export function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
+	return mountLoadingClips(loadClip, canvas, bytes, options);
+}
+
+/** What `mount` does, with `load` as the parse of a clip's bytes: the seam through which a test controls when a clip parse ends and how. */
+export async function mountLoadingClips(load: ClipLoad, canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
 	let current: FigureSignal = figureSignal.refused;
 	const give = (signal: FigureSignal) => {
 		current = signal;
@@ -272,7 +285,7 @@ export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, option
 	const { signal, release, think, listen, speak, gesture, replaceClip } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
 	give(signal);
 	let disposed = false;
-	if (signal === figureSignal.drawn) void adoptClips(options?.gestures, replaceClip, () => disposed);
+	if (signal === figureSignal.drawn) void adoptClips(load, options, replaceClip, () => disposed);
 	return {
 		get signal() {
 			return current;
