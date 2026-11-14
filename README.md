@@ -120,6 +120,8 @@ The package brings `three`, `@pixiv/three-vrm` and `@pixiv/three-vrm-animation` 
 dependencies. Only `overnightworks-figure/draw` imports them: a consumer that only checks (the package root,
 `overnightworks-figure/codes`, `overnightworks-figure/profile` or the command) loads nothing of three.
 
+`overnightworks-figure/vocabulary.json` is the one list of the names an agent's figure tools offer, for a consumer that does not run the package's TypeScript (a Python service that generates its enums, say): `{"version": 1, "gestures": [...], "moods": [...]}`, the keys of `figureGesture` and the values of `figureMood` in their declared order. The build writes it from those sets (`dist/figure-vocabulary.json`), so a token added or removed is a figure release; `version` is the file's shape and changes only with the shape. Read it from the installed release tarball through the export, for example `import vocabulary from 'overnightworks-figure/vocabulary.json' with { type: 'json' }`, or at `node_modules/overnightworks-figure/dist/figure-vocabulary.json`.
+
 Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } from 'overnightworks-figure'` in code; `pnpm exec figure check --as clip path/to/gesture.vrma` and `checkClip` judge a clip, `pnpm exec figure check --as room path/to/room.glb` and `checkRoom` a room.
 
 ## Exit codes

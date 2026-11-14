@@ -27,10 +27,11 @@
     "./draw": {
       "types": "./dist/draw.d.ts",
       "default": "./dist/draw.js"
-    }
+    },
+    "./vocabulary.json": "./dist/figure-vocabulary.json"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/write_vocabulary.mjs",
     "prepack": "pnpm run build",
     "check": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.node.json && tsc --noEmit -p tests",
     "test": "vitest run --project node",

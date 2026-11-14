@@ -3,7 +3,7 @@
 # to exit 0 on the test builder's conformant file, 1 on a file that is not GLB and 2 on a missing file; expects `figure check --as clip`
 # to exit 0 on each of figure's base clips, written from the keys of the built gestures, and 1 on the conformant figure; expects
 # `figure check --as room` to exit 0 on the test builder's conformant room and 1 on the conformant figure; expects the declarations
-# of ./draw, and every declaration they reach through relative imports, to name no three type; then removes three and the @pixiv packages (three-vrm and three-vrm-animation) and expects the check, all three of its kinds, and the package's root, ./codes and ./profile to work without them.
+# of ./draw, and every declaration they reach through relative imports, to name no three type; then removes three and the @pixiv packages (three-vrm and three-vrm-animation) and expects the check, all three of its kinds, and the package's root, ./codes and ./profile to work without them; expects `overnightworks-figure/vocabulary.json` to equal, key for key and in order, the gesture keys of the installed root's `figureGesture`, the values of the installed `dist/expressions.js`' `figureMood` and version 1.
 # Usage: scripts/check_packed_tarball.sh <tarball>; run it from the repository after `pnpm run build`.
 # Exit codes: 2 for a missing tarball argument, non-zero for any failed expectation or command.
 set -euo pipefail
@@ -70,3 +70,16 @@ done
 npx figure check --as room synthetic-room.glb
 node --input-type=module -e "for (const entry of ['', '/codes', '/profile']) await import('overnightworks-figure' + entry)"
 node --input-type=module -e "const root = await import('overnightworks-figure'); const profile = await import('overnightworks-figure/profile'); if (typeof root.checkRoom !== 'function' || root.roomProfile === undefined || profile.roomProfile === undefined) process.exit(1)"
+node --input-type=module -e '
+import { isDeepStrictEqual } from "node:util";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+const { figureGesture } = await import("overnightworks-figure");
+const { figureMood } = await import(pathToFileURL(join(process.argv[1], "dist", "expressions.js")).href);
+const { default: vocabulary } = await import("overnightworks-figure/vocabulary.json", { with: { type: "json" } });
+const expected = { version: 1, gestures: Object.keys(figureGesture), moods: Object.values(figureMood) };
+if (!isDeepStrictEqual(vocabulary, expected)) {
+  console.error("vocabulary.json disagrees with the installed figureGesture and figureMood:", JSON.stringify(vocabulary), JSON.stringify(expected));
+  process.exit(1);
+}
+' "${installed}"
