@@ -3,7 +3,7 @@ import { checkClip, checkFigure, checkRoom } from './check.js';
 import { clipProfile, figureProfile, roomProfile } from './profile.js';
 import { buildVrmGlb, vrmJson, vrmParts } from '../tests/figureFixtures.js';
 import { buildClipGlb, buildClipGlbOfSize, type ClipJson } from '../tests/clipFixtures.js';
-import { buildGlb, buildHeaderOnlyGlb, buildPng } from '../tests/glbBuilder.js';
+import { buildGlb, buildHeaderOnlyGlb, buildPng, imageSizesFilling } from '../tests/glbBuilder.js';
 import { buildRoomGlb, buildRoomGlbOfSize } from '../tests/roomBuilder.js';
 
 function codesOf(bytes: Uint8Array): string[] {
@@ -278,6 +278,12 @@ describe('checkRoom', () => {
 		const rowsAtBudget = Math.floor(roomProfile.maxTexels / side);
 		expect(roomCodesOf(buildRoomGlb({ images: [buildPng(side, rowsAtBudget)] }))).toEqual([]);
 		expect(roomCodesOf(buildRoomGlb({ images: [buildPng(side, rowsAtBudget + 1)] }))).toEqual(['too_many_texels']);
+	});
+
+	it('passes textures that add up to exactly the room texel budget and refuses one texel more as too_many_texels alone', () => {
+		const atBudget = imageSizesFilling(roomProfile.maxTexels, roomProfile.maxTextureSidePixels).map(([width, height]) => buildPng(width, height));
+		expect(roomCodesOf(buildRoomGlb({ images: atBudget }))).toEqual([]);
+		expect(roomCodesOf(buildRoomGlb({ images: [...atBudget, buildPng(1, 1)] }))).toEqual(['too_many_texels']);
 	});
 
 	it('refuses a buffer that names a URI and a second buffer', () => {
