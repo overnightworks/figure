@@ -4,12 +4,12 @@ import { clipProfile } from './profile.js';
 
 const FLOAT = 5126;
 /** The component types glTF gives a rotation besides float; each stores a normalised integer. */
-const NORMALISED_INTEGERS = [5120, 5121, 5122, 5123];
+const NORMALISED_INTEGERS: ReadonlySet<unknown> = new Set([5120, 5121, 5122, 5123]);
 const BYTES_PER_COMPONENT = 4;
 const ALIGNMENT_BYTES = 4;
 const COMPONENTS_OF_TYPE = { SCALAR: 1, VEC3: 3, VEC4: 4 } as const;
 const ROTATION_COMPONENTS = COMPONENTS_OF_TYPE.VEC4;
-const INTERPOLATIONS = ['LINEAR', 'STEP', 'CUBICSPLINE'];
+const INTERPOLATIONS: ReadonlySet<unknown> = new Set(['LINEAR', 'STEP', 'CUBICSPLINE']);
 /** A cubic spline key holds an in tangent, the value and an out tangent. */
 const CUBIC_KEY_VALUES = 3;
 
@@ -42,7 +42,7 @@ export function keyRefusals(
 	let lastSeconds: number | undefined;
 	attemptRead(refusals, place, () => {
 		const interpolation = channel.sampler['interpolation'] ?? 'LINEAR';
-		if (!INTERPOLATIONS.includes(interpolation as string)) {
+		if (!INTERPOLATIONS.has(interpolation)) {
 			unreadable('the sampler names an interpolation glTF does not give');
 		}
 		const isRotation = channel.path === 'rotation';
@@ -77,7 +77,7 @@ function locate(json: JsonObject, binary: Uint8Array, accessorIndex: unknown, ty
 		unreadable(`accessor ${index} is not ${type}`);
 	}
 	const componentType = accessor['componentType'];
-	if (componentType !== FLOAT && !(type === 'VEC4' && NORMALISED_INTEGERS.includes(componentType as number))) {
+	if (componentType !== FLOAT && !(type === 'VEC4' && NORMALISED_INTEGERS.has(componentType))) {
 		unreadable(`accessor ${index} has a component type glTF does not give this data`);
 	}
 	if (accessor['normalized'] === true && componentType === FLOAT) {
