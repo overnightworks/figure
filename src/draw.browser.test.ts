@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng, buildPng } from '../tests/glbBuilder.js';
-import { centreOf, coversSomething, emulateReducedMotion, readPixels, spotsOf } from '../tests/browserCanvas.js';
+import { centreOf, coversSomething, emulateReducedMotion, readPixels, restorePageVisibility, setPageVisibility, spotsOf } from '../tests/browserCanvas.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 
@@ -641,17 +641,6 @@ async function emulateDevicePixelRatio(ratio: number): Promise<void> {
 		deviceScaleFactor: ratio,
 		mobile: false
 	});
-}
-
-/** Sets the document's visibility state and fires its `visibilitychange` event, as a tab switch does. */
-function setPageVisibility(state: 'hidden' | 'visible'): void {
-	Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
-	document.dispatchEvent(new Event('visibilitychange'));
-}
-
-/** Gives the document its own visibility state back, so the next test sees the browser's. */
-function restorePageVisibility(): void {
-	Reflect.deleteProperty(document, 'visibilityState');
 }
 
 interface FrameClock {

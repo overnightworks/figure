@@ -12,6 +12,8 @@ const stageConfig = fileURLToPath(new URL('../stage/vite.config.ts', import.meta
 const drawingTimeout = 30_000;
 /** The pixels of a canvas a shown mood changes at least: the brows and the mouth lie well beyond it, a sleeve's spring or a blink does not reach it. */
 const shownPixels = 300;
+/** The pixels of the phone-wide canvas a raised arm changes at least: the arm lies well beyond it, the idle glance and a blink do not reach it. */
+const wavedPixels = 3000;
 
 interface BuiltStage {
 	readonly bundleDirectory: string;
@@ -96,6 +98,21 @@ test.describe('the demo stage under the script policy', () => {
 		await page.getByRole('button', { name: 'think' }).click();
 		await expect(page.getByRole('button', { name: 'think' })).toHaveAttribute('aria-pressed', 'true');
 		await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	test('the wave control plays the wave on the figures with no request, and they stay drawn', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		const requests: string[] = [];
+		page.on('request', (request) => requests.push(request.url()));
+		const figure = page.locator('canvas').nth(0);
+		const resting = await figure.screenshot();
+
+		await page.getByRole('button', { name: 'wave', exact: true }).click();
+		await expect.poll(async () => differingPixels(page, resting, await figure.screenshot()), { timeout: drawingTimeout }).toBeGreaterThan(wavedPixels);
+		expect(requests).toEqual([]);
 		await expectTwoDrawings(page);
 		await expectNoViolations(page, pageErrors);
 	});

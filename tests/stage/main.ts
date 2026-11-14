@@ -1,3 +1,4 @@
+import { figureGesture } from '../../src/gestures.js';
 import { figureSignal, mount, type FigureHandle, type FigureMood, type FigureSignal } from '../../src/draw.js';
 import type { MouthShape } from '../../src/expressions.js';
 import { buildConformantVrm } from '../figureFixtures.js';
@@ -148,6 +149,10 @@ thinkButton.addEventListener('click', () => {
 	thinking = !thinking;
 	thinkButton.setAttribute('aria-pressed', String(thinking));
 	slots.forEach((slot) => slot.handle?.think(thinking));
+});
+
+document.querySelector<HTMLButtonElement>('#wave')!.addEventListener('click', () => {
+	slots.forEach((slot) => slot.handle?.gesture(figureGesture.wave));
 });
 
 /** Reports the sentence to every figure and shows it. */

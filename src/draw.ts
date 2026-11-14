@@ -6,11 +6,13 @@ import { loadFigure } from './figureLoader.js';
 import type { FigureMood } from './expressions.js';
 import { createFigureMotion, type FigureFacts, type SpeakerOffset } from './figureMotion.js';
 import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
+import { isFigureGesture, type FigureGesture } from './gestures.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 import { createVoiceTap } from './voiceTap.js';
 
 export { figureSignal, type FigureSignal } from './signals.js';
 export type { FigureMood } from './expressions.js';
+export type { FigureGesture } from './gestures.js';
 
 export interface MountOptions {
 	/** Called with every signal the figure gives, the first one before `mount` resolves. */
@@ -30,6 +32,10 @@ export interface FigureHandle {
 	 * The agent speaks a sentence: the mouth follows `voice`, an audio node of the host's graph, and the face shows `mood`; null: it stopped. An object means the agent speaks, with a still mouth when it has no `voice` and a neutral face when it has no `mood`; a field the figure does not know is ignored. Each call replaces the sentence: another mood replaces the last one and a sentence without a mood lets it fade, as does `speak(null)`. A mood shows only while the agent speaks, with the mouth a little smaller, and a value that is no `FigureMood` shows no mood and throws nothing. While the agent speaks the figure neither thinks nor listens: the gaze is the idle glance, and when it stops the state the other facts name shows, thinking before listening. The figure taps a voice with one analyser of the voice's own context, which it connects to the voice and nothing else, and disconnects, and only it, when another voice, `speak({})`, `speak(null)`, `dispose` or the figure's end releases it; the same node again keeps its tap. It plays nothing and creates no context. A voice it cannot tap (a value that is no audio node, a closed context, a `connect` or `createAnalyser` that throws) speaks with a still mouth and nothing is thrown, and a suspended context reads silence until it runs. A figure that ended or was disposed ignores the call and taps nothing.
 	 */
 	speak(sentence: { readonly voice?: AudioNode; readonly mood?: FigureMood } | null): void;
+	/**
+	 * The agent waves, or does whatever else `name` names: the figure plays its own motion on the arm from the next drawn frame, with no bytes from the host, and the other motions, the moods and the voice go on under it. It returns nothing, gives no signal and reports no completion, and it never throws. One gesture shows at a time and calls never queue: a call for the gesture that plays is dropped. A value that is no `FigureGesture` is dropped, and so is a call made while the page is hidden: a gesture is a moment, not a state, and none starts when the page shows again. A figure that ended or was disposed ignores the call, and so does a page that asks for reduced motion, which also ends a gesture that runs, at once. While the figure thinks, the wave lifts the hand from the chin and gives it back.
+	 */
+	gesture(name: FigureGesture): void;
 }
 
 /** What the agent speaks: the voice its mouth follows and the mood its face shows. */
@@ -42,12 +48,13 @@ interface Outcome {
 	readonly think: (working: boolean) => void;
 	readonly listen: (speaker: Element | null) => void;
 	readonly speak: (sentence: Sentence) => void;
+	readonly gesture: (name: unknown) => void;
 }
 
 /** The facts of a figure that is not drawn: nothing reads them. */
 const ignoreFacts = () => {};
 
-const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts };
+const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts, gesture: ignoreFacts };
 
 function ended(signal: FigureSignal): Outcome {
 	return { signal, release: () => {}, ...endedFacts };
@@ -59,6 +66,7 @@ interface Loop {
 	readonly think: (working: boolean) => void;
 	readonly listen: (speaker: Element | null) => void;
 	readonly speak: (sentence: Sentence) => void;
+	readonly gesture: (name: unknown) => void;
 }
 
 /** The browser's own rectangle read: it throws for anything that is not an element, whatever properties that value supplies, of any realm. */
@@ -180,7 +188,10 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 		facts = { ...facts, speaking, mood: speaking ? sentence.mood : undefined };
 		voiceTap.follow(speaking ? sentence.voice : undefined);
 	};
-	return { stop, think, listen, speak };
+	const gesture = (name: unknown) => {
+		if (!stopped && document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);
+	};
+	return { stop, think, listen, speak, gesture };
 }
 
 async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal: FigureSignal) => void): Promise<Outcome> {
@@ -202,7 +213,7 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 		// A loss during the load fired its event before the loop listens for it, so the state is read here.
 		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release, ...endedFacts };
 		loop = runLoop(createFigureStage(renderer, canvas, figure), canvas, give);
-		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen, speak: loop.speak };
+		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen, speak: loop.speak, gesture: loop.gesture };
 	} catch {
 		release();
 		return ended(figureSignal.refused);
@@ -227,7 +238,7 @@ export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, option
 			reportError(error);
 		}
 	};
-	const { signal, release, think, listen, speak } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
+	const { signal, release, think, listen, speak, gesture } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
 	give(signal);
 	let disposed = false;
 	return {
@@ -241,6 +252,7 @@ export async function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, option
 		},
 		think,
 		listen,
-		speak
+		speak,
+		gesture
 	};
 }
