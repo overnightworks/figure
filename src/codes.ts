@@ -21,6 +21,13 @@ export const refusalDescriptions = {
 	texture_too_large: 'an embedded image is wider or taller than the profile’s side budget',
 	too_many_texels: 'the embedded images hold more texels together than the profile’s budget',
 	image_invalid: 'an image’s bytes reach past the binary chunk, or are not an image whose header the check can size',
+	not_vrm_animation: 'the file has no VRMC_vrm_animation extension object of specification version 1.0',
+	clip_content_not_allowed: 'a clip holds meshes, skins, materials, textures, images, samplers or cameras; it holds animation alone',
+	clip_scene_missing: 'the clip has no scene; the loader reads the default scene',
+	clip_animation_missing: 'the clip has no animation',
+	clip_track_not_allowed: 'a track the profile does not allow: a channel without a target node, a weights channel, a path the target bone does not take, or key data that is sparse, has no buffer view or holds rotations that are not float',
+	clip_keys_invalid: 'the bytes of a track’s keys reach past their buffer view or the binary chunk, its times are not finite, 0 or later and strictly ascending, or a rotation is not finite or not of unit length',
+	clip_too_long: 'the clip’s first animation runs longer than the profile’s budget in seconds',
 	gltf_invalid: 'a part of the JSON that a rule must read does not have the shape glTF gives it'
 } as const;
 

@@ -1,8 +1,9 @@
 import { budgetRefusals } from './budgetRules.js';
+import { clipRefusals } from './clipRules.js';
 import { textureRefusals } from './textureRules.js';
 import type { Refusal } from './codes.js';
 import { type JsonObject, isJsonObject } from './json.js';
-import { figureProfile } from './profile.js';
+import { clipProfile, figureProfile } from './profile.js';
 import { vrmRefusals } from './vrmRules.js';
 
 const GLB_HEADER_BYTES = 12;
@@ -17,10 +18,34 @@ interface Chunk {
 	readonly content: Uint8Array;
 }
 
+/** What the container step needs of a profile: the file budget and the extensions the file may name. */
+interface ContainerProfile {
+	readonly fileBudgetBytes: number;
+	readonly allowedExtensions: readonly string[];
+}
+
 /** Judges a figure file from its raw bytes; the file is untrusted input and nothing in it runs. */
 export function checkFigure(bytes: Uint8Array): Refusal[] {
+	return checkContainer(bytes, figureProfile, (json, binaryChunk) => [
+		...vrmRefusals(json),
+		...budgetRefusals(json),
+		...textureRefusals(json, binaryChunk)
+	]);
+}
+
+/** Judges a clip file (a `.vrma`) from its raw bytes against the clip profile; the file is untrusted input and nothing in it runs. */
+export function checkClip(bytes: Uint8Array): Refusal[] {
+	return checkContainer(bytes, clipProfile, clipRefusals);
+}
+
+/** The GLB container rules against `profile`, then the rules of the file's kind, which read the JSON and the binary chunk. */
+function checkContainer(
+	bytes: Uint8Array,
+	profile: ContainerProfile,
+	kindRefusals: (json: JsonObject, binaryChunk: Uint8Array | undefined) => Refusal[]
+): Refusal[] {
 	const refusals: Refusal[] = [];
-	if (bytes.length > figureProfile.fileBudgetBytes) {
+	if (bytes.length > profile.fileBudgetBytes) {
 		refusals.push({ code: 'too_large' });
 	}
 	const hasGlbHeader =
@@ -46,12 +71,10 @@ export function checkFigure(bytes: Uint8Array): Refusal[] {
 	const binaryChunk = chunks[1]?.type === BINARY_CHUNK_TYPE ? chunks[1].content : undefined;
 	return [
 		...refusals,
-		...extensionRefusals(json),
+		...extensionRefusals(json, profile),
 		...uriRefusals(json),
 		...bufferRefusals(json),
-		...vrmRefusals(json),
-		...budgetRefusals(json),
-		...textureRefusals(json, binaryChunk)
+		...kindRefusals(json, binaryChunk)
 	];
 }
 
@@ -94,11 +117,11 @@ function namesIn(value: unknown): unknown[] {
 	return Array.isArray(value) ? value : [value];
 }
 
-function extensionRefusals(json: JsonObject): Refusal[] {
+function extensionRefusals(json: JsonObject, profile: ContainerProfile): Refusal[] {
 	const refusals: Refusal[] = [];
 	for (const key of ['extensionsUsed', 'extensionsRequired']) {
 		for (const name of namesIn(json[key])) {
-			if (!(figureProfile.allowedExtensions as readonly unknown[]).includes(name)) {
+			if (!(profile.allowedExtensions as readonly unknown[]).includes(name)) {
 				refusals.push({ code: 'extension_not_allowed', detail: `${key} names ${JSON.stringify(name)}` });
 			}
 		}

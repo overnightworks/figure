@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { checkFigure } from './check.js';
-import { figureProfile } from './profile.js';
+import { checkClip, checkFigure } from './check.js';
+import { clipProfile, figureProfile } from './profile.js';
 import { buildVrmGlb, vrmJson, vrmParts } from '../tests/figureFixtures.js';
+import { clipParts } from '../tests/clipBuilder.js';
+import { buildClipGlb, type ClipJson } from '../tests/clipFixtures.js';
 import { buildGlb, buildHeaderOnlyGlb } from '../tests/glbBuilder.js';
 
 function codesOf(bytes: Uint8Array): string[] {
@@ -175,5 +177,63 @@ describe('checkFigure', () => {
 
 	it('reports too_large beside not_glb for a large file that is not GLB', () => {
 		expect(codesOf(new Uint8Array(figureProfile.fileBudgetBytes + 1))).toEqual(['too_large', 'not_glb']);
+	});
+});
+
+describe('checkClip', () => {
+	const clipCodesOf = (bytes: Uint8Array) => checkClip(bytes).map(({ code }) => code);
+
+	it('passes the conformant clip', () => {
+		expect(checkClip(buildClipGlb())).toEqual([]);
+	});
+
+	it.each([
+		['a text file', new TextEncoder().encode('this is not a clip'), ['not_glb']],
+		['a version other than 2', buildClipGlb({ glb: { version: 1 } }), ['glb_version']],
+		['a header length that is not the file’s', buildClipGlb({ glb: { declaredLength: 20 } }), ['glb_length']],
+		['a chunk that reaches past the end', buildClipGlb({ glb: { jsonChunkLengthField: 0xffffffff } }), ['glb_chunk']],
+		['a JSON chunk that is not a JSON object', buildClipGlb({ glb: { json: [] } }), ['glb_json']]
+	])('refuses %s with the container code', (_name, bytes, codes) => {
+		expect(clipCodesOf(bytes)).toEqual(codes);
+	});
+
+	it('refuses an extension the clip profile does not allow, and one only the figure profile allows', () => {
+		for (const extension of ['KHR_draco_mesh_compression', ...figureProfile.allowedExtensions]) {
+			const change = (clip: ClipJson) => (clip.extensionsRequired = [extension]);
+			expect(clipCodesOf(buildClipGlb({ change }))).toEqual(['extension_not_allowed']);
+		}
+	});
+
+	it('passes the extension the clip profile allows, used and required', () => {
+		const change = (clip: ClipJson) => (clip.extensionsRequired = [...clipProfile.allowedExtensions]);
+		expect(clipCodesOf(buildClipGlb({ change }))).toEqual([]);
+	});
+
+	it('refuses a buffer that names a URI as uri_not_allowed', () => {
+		const change = (clip: ClipJson) => (clip.buffers[0].uri = 'clip.bin');
+		expect(clipCodesOf(buildClipGlb({ change }))).toEqual(['uri_not_allowed']);
+	});
+
+	it('refuses a second buffer as buffer_outside_glb', () => {
+		const change = (clip: ClipJson) => clip.buffers.push({ byteLength: 1 });
+		expect(clipCodesOf(buildClipGlb({ change }))).toEqual(['buffer_outside_glb']);
+	});
+
+	it('refuses a file one byte over the clip budget as too_large alone, and passes one at the budget', () => {
+		const { json, binary } = clipParts(clipProfile);
+		const withFileSize = (size: number) => {
+			const padded = new Uint8Array(size - buildGlb({ json, binary }).length + binary.length);
+			padded.set(binary);
+			return buildGlb({ json, binary: padded });
+		};
+		const atBudget = withFileSize(clipProfile.fileBudgetBytes);
+		expect(atBudget).toHaveLength(clipProfile.fileBudgetBytes);
+		expect(checkClip(atBudget)).toEqual([]);
+		expect(clipCodesOf(withFileSize(clipProfile.fileBudgetBytes + 1))).toEqual(['too_large']);
+	});
+
+	it('refuses a figure as not_vrm_animation, and a clip is not a figure', () => {
+		expect(clipCodesOf(buildVrmGlb())).toContain('not_vrm_animation');
+		expect(codesOf(buildClipGlb())).toContain('not_vrm');
 	});
 });
