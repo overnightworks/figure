@@ -1,7 +1,0 @@
-claim_id = "96c722f9a1a24e178cc8935266000c11"
-agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
-role = "builder"
-base = "e7d614c3e623fb75b5dae68d635addfebbb4120f"
-branch = "claude/issue-88-bring-docs-architecture-md-back-within-i"
-scope = ["docs/ARCHITECTURE.md"]
-opened_commit = "20f95aa3f0ed0eb8f1fe6ad8620ba5e8ee29c0b0"
