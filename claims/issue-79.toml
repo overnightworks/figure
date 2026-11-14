@@ -1,0 +1,8 @@
+claim_id = "661e0ac2e73b48a5b0848e13e006d1b7"
+agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
+role = "builder"
+base = "d27efee180bc3dc3be2aed228caf949a4411cb66"
+branch = "claude/issue-79-play-a-persona-s-own-clip-through-the-ge"
+scope = [".github/dependabot.yml", "AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "package.json", "pnpm-lock.yaml", "scripts/check_packed_tarball.sh", "scripts/measure_budget_figure.mjs", "scripts/measure_bundle_size.mjs", "src/clipLoader.browser.test.ts", "src/clipLoader.ts", "src/draw.browser.test.ts", "src/draw.ts", "src/figureFrame.ts", "src/figureLoader.ts", "src/figureMotion.ts", "src/figureMotionGesture.test.ts", "src/gestureClips.test.ts", "src/gestureClips.ts", "src/gestureLayer.browser.test.ts", "src/gestureLayer.ts", "src/profile.ts", "tests/clipBuilder.ts", "tests/e2e/stage.spec.ts", "tests/stage/index.html", "tests/stage/main.ts"]
+opened_commit = "d769775c15ff6a4d78c02c5238879dda8f7b4d77"
+whole_reason = "The dependency has no use without the loader, the loader none without the option, and the option no proof without the stage and the measurement."
