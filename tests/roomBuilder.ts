@@ -181,3 +181,13 @@ export function buildRoomGlbOfSize(size: number): Uint8Array {
 	padded.set(binary);
 	return buildGlb({ json, binary: padded });
 }
+
+/** Turns the room's meshes into: the first draws `triangles` triangles in `primitives` primitives, all sharing its one index accessor, and `drawnBy` nodes under a root draw it; the second mesh is drawn by no node. */
+export function drawing({ triangles, primitives = 1, drawnBy = 1 }: { triangles: number; primitives?: number; drawnBy?: number }) {
+	return (json: Record<string, any>): void => {
+		const primitive = json.meshes[0].primitives[0];
+		json.accessors[primitive.indices].count = 3 * triangles;
+		json.meshes[0].primitives = new Array<object>(primitives).fill(primitive);
+		json.nodes = [{ children: Array.from({ length: drawnBy }, (_, index) => index + 1) }, ...Array.from({ length: drawnBy }, () => ({ mesh: 0 }))];
+	};
+}

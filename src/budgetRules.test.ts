@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkFigure, checkRoom } from './check.js';
 import { figureProfile, roomProfile } from './profile.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
-import { buildRoomGlb } from '../tests/roomBuilder.js';
+import { buildRoomGlb, drawing } from '../tests/roomBuilder.js';
 
 type Json = Record<string, any>;
 
@@ -157,16 +157,6 @@ describe('gltf_invalid', () => {
 describe('the room draw budgets', () => {
 	const roomCodesOf = (change: (json: Json) => void) => checkRoom(buildRoomGlb({ change })).map(({ code }) => code);
 	const { maxTriangles, maxPrimitives } = roomProfile;
-
-	/** The room's meshes after `change`: the first draws `triangles` triangles in `primitives` primitives, the second none. */
-	function drawing({ triangles, primitives = 1, drawnBy = 1 }: { triangles: number; primitives?: number; drawnBy?: number }) {
-		return (json: Json) => {
-			const primitive = json.meshes[0].primitives[0];
-			json.accessors[primitive.indices].count = 3 * triangles;
-			json.meshes[0].primitives = new Array<object>(primitives).fill(primitive);
-			json.nodes = [{ children: Array.from({ length: drawnBy }, (_, index) => index + 1) }, ...Array.from({ length: drawnBy }, () => ({ mesh: 0 }))];
-		};
-	}
 
 	it('passes exactly the triangle budget and refuses one more as too_many_triangles alone', () => {
 		expect(roomCodesOf(drawing({ triangles: maxTriangles }))).toEqual([]);
