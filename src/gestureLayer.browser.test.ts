@@ -77,6 +77,13 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 	/** The seconds an ignored call is watched: the whole of what a wave would take. */
 	const ignoredWatchSeconds = gestureLengthSeconds(figureGesture.wave) + ignoredWatchMarginSeconds;
 
+	/** No picture of the next whole wave's length shows the hand waving. */
+	async function expectNoWaveOver(canvas: HTMLCanvasElement, resting: Features): Promise<void> {
+		const trace = await traceFor(canvas, ignoredWatchSeconds);
+
+		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
+	}
+
 	it('raises the hand beside the face with the nose in view and lowers it to rest', async () => {
 		const { canvas, handle } = await watch.mountFigure();
 		const resting = await watch.featuresNow(canvas);
@@ -109,9 +116,7 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 			const resting = await watch.featuresNow(canvas);
 
 			expect(() => handle.gesture(value as FigureGesture)).not.toThrow();
-			const trace = await traceFor(canvas, ignoredWatchSeconds);
-
-			trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
+			await expectNoWaveOver(canvas, resting);
 		}
 	);
 
@@ -122,9 +127,7 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 
 		expect(() => handle.gesture(figureGesture.wave)).not.toThrow();
 		setPageVisibility('visible');
-		const trace = await traceFor(canvas, ignoredWatchSeconds);
-
-		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
+		await expectNoWaveOver(canvas, resting);
 	});
 
 	it('plays none under reduced motion', async () => {
@@ -132,9 +135,7 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 		const { canvas, handle } = await watch.mountFigure();
 		const resting = await watch.featuresNow(canvas);
 		handle.gesture(figureGesture.wave);
-		const trace = await traceFor(canvas, ignoredWatchSeconds);
-
-		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
+		await expectNoWaveOver(canvas, resting);
 	});
 
 	it('plays none when the preference is lifted after a call made under reduced motion while the canvas was out of the viewport', async () => {
@@ -147,9 +148,7 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 		handle.gesture(figureGesture.wave);
 		await cdp().send('Emulation.setEmulatedMedia', { features: [] });
 		canvas.style.marginTop = '';
-		const trace = await traceFor(canvas, ignoredWatchSeconds);
-
-		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
+		await expectNoWaveOver(canvas, resting);
 	});
 
 	it('ignores a call on a disposed figure', async () => {
@@ -158,9 +157,7 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 		handle.dispose();
 
 		expect(() => handle.gesture(figureGesture.wave)).not.toThrow();
-		const trace = await traceFor(canvas, ignoredWatchSeconds);
-
-		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
+		await expectNoWaveOver(canvas, resting);
 	});
 
 	it('ignores a call on a figure that was refused', async () => {
