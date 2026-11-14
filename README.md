@@ -161,7 +161,7 @@ Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } fro
 | `clip_track_not_allowed` | a channel has no target node, animates `weights`, or takes a path its node does not (a humanoid bone takes rotation, the hips also translation, an expression node translation, the look-at node rotation); or its key data is sparse, has no buffer view, or holds rotations that are not float |
 | `clip_keys_invalid` | a channel's keys reach past their buffer view or the binary chunk, its times are not finite, 0 or later and strictly ascending, or a rotation is not finite or not of unit length within the profile's tolerance |
 | `clip_too_long` | a clip's first animation has a key later than the profile's seconds budget |
-| `gltf_invalid` | a mesh, primitive, accessor, index, image, buffer view, sampler, channel or node a rule must read does not have glTF's shape, so it cannot judge |
+| `gltf_invalid` | a mesh, primitive, accessor, index, image, buffer view, buffer, scene, sampler, channel or node a rule must read does not have glTF's shape, so it cannot judge |
 
 The container codes (`not_glb` to `buffer_outside_glb`, `too_large`), `humanoid_bone_missing` and `gltf_invalid` apply to a figure
 and to a clip; the seven clip codes to a clip alone; the other VRM, budget and texture codes to a figure alone.
