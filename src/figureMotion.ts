@@ -1,5 +1,5 @@
 import { figureMood, mouthShape, type FigureMood } from './expressions.js';
-import { gestureLengthSeconds } from './gestureClips.js';
+import { armShare, gestureLengthSeconds } from './gestureClips.js';
 import type { FigureGesture } from './gestures.js';
 import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.js';
 import type { VowelWeights } from './vowelWeights.js';
@@ -26,7 +26,7 @@ import type { VowelWeights } from './vowelWeights.js';
  * a second and away at 4, the mouth's weights shrink to 0.72 of themselves while any mood is shown, and each mood leans the head, the
  * trunk and the shoulders by its share of the picture's offsets. A gesture the host asks for starts at the next frame and runs its clip's
  * length on the clock the motion owns, the step of every other blend; the pose names it and its seconds, and the clip over the base pose
- * is the frame's. Under reduced motion none starts and a running one ends at the next frame.
+ * is the frame's, and while one plays the base pose's arm leaves the chin by the share its clip shows, so the hand travels below the frame instead of across the face. Under reduced motion none starts and a running one ends at the next frame.
  */
 
 /** What the host reports about its agent. */
@@ -73,7 +73,7 @@ export interface FigurePose {
 	readonly mouth: VowelWeights;
 	/** The look-at's angles in degrees. */
 	readonly look: { readonly yaw: number; readonly pitch: number };
-	/** The base pose of the arms, absolute: both lowered at rest, and while the figure thinks the right hand at the chin, by the thinking look's weight. */
+	/** The base pose of the arms, absolute: both lowered at rest, and while the figure thinks the right hand at the chin, by the thinking look's weight less the share of the gesture that plays. */
 	readonly arms: Arms;
 	/** What the shoulders add to their rest, a delta: they rise and fall with the breath and take the moods' lean. */
 	readonly shoulders: Shoulders;
@@ -390,6 +390,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 			const breathShare = base.breath / breathLean;
 			thinkingWeight = ease(thinkingWeight, thinking ? 1 : 0, easing.thinking);
 			leanWeight = ease(leanWeight, listening ? 1 : 0, easing.lean);
+			const gesture = gestureMotion.advance(step, reducedMotion);
 			return {
 				blink: thinking ? base.blink * thinkingLook.blinkWeight : base.blink,
 				breath: base.breath,
@@ -408,9 +409,9 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				moodTrunk: { spine: mood.chest * trunkShare.spine, chest: mood.chest * trunkShare.chest },
 				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
 				look: { yaw: clamp(eyeGaze.yaw * lookGain + jump * base.eyes.yaw, lookReachDegrees), pitch: clamp(eyeGaze.pitch * lookGain + jump * base.eyes.pitch, lookReachDegrees) },
-				arms: baseArms(breathShare, thinkingWeight),
+				arms: baseArms(breathShare, thinkingWeight * (1 - (gesture === null ? 0 : armShare(gesture.name, gesture.seconds)))),
 				shoulders: shoulderDeltas(breathShare, mood.shoulder * shoulderShare),
-				gesture: gestureMotion.advance(step, reducedMotion)
+				gesture
 			};
 		}
 	};

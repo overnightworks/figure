@@ -34,8 +34,8 @@ const turn = (pitch: number, yaw: number, roll: number): Turn => ({ pitch, yaw, 
 /** The wave's poses: the raised hand beside the face, palm forward, the two turning points of its swing, and the pose the rise starts from and the fall ends at, the arm and the hand each. */
 type WavePose = Readonly<Record<'upperArm' | 'lowerArm' | 'hand', Turn>>;
 const raised: WavePose = { upperArm: turn(-1.3, 0.01, 1.38), lowerArm: turn(0.05, 2.51, 0), hand: turn(0, 0, 0) };
-/** The elbow tucked in and the hand's turn about it leaning inward, so the hand comes up and goes down inside the picture's side. */
-const lifting: WavePose = { upperArm: turn(-1.3, 0.01, 1.6), lowerArm: turn(0.6, 2.51, 0), hand: turn(0, 0, 0) };
+/** The elbow tucked in, the hand turned about the forearm so the palm shows early and leaning outward so its fingers stay off the wig's curl, and it comes up and goes down inside the picture's side. */
+const lifting: WavePose = { upperArm: turn(-1.3, 0.01, 1.6), lowerArm: turn(0.05, 2.51, 0), hand: turn(1.6, 0, -0.5) };
 const swungOut: WavePose = { upperArm: turn(-1.3, -0.07, 1.38), lowerArm: turn(-0.21, 2.51, 0), hand: turn(0, 0, 0.2) };
 const swungIn: WavePose = { upperArm: turn(-1.3, -0.02, 1.38), lowerArm: turn(-0.05, 2.51, 0), hand: turn(0, 0, -0.2) };
 
@@ -85,4 +85,10 @@ const unitRange = (value: number) => Math.max(0, Math.min(1, value));
 /** The share of the clip a bone shows over the base pose at `clock` seconds on its own clock: exactly 0 at the start and the end, exactly 1 between the fades, a smoothstep inside them. */
 export function clipWeight(clip: GestureClip, clock: number): number {
 	return smoothstep(unitRange(clock / clip.fadeSeconds.in)) * smoothstep(unitRange((clip.durationSeconds - clock) / clip.fadeSeconds.out));
+}
+
+/** The share of its clip that the gesture's bones show at the most when the gesture's clock reads `seconds`: the base pose's arm gives way by this share, so the hand leaves the chin with the first bone and comes back to it after the last. */
+export function armShare(name: FigureGesture, seconds: number): number {
+	const clip = gestureClips[name];
+	return Math.max(...Object.values(clip.bones).map((track) => clipWeight(clip, boneClock(track, seconds))));
 }
