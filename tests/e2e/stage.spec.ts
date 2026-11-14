@@ -19,6 +19,8 @@ const wavedPixels = 3000;
 
 /** The seconds a picked clip holds the arm up: longer than the figure's own wave and within what a clip may last, so the check passes it. */
 const clipHoldSeconds = clipProfile.maxSeconds - 1;
+/** The milliseconds between two pictures that must agree for a figure to count as still: longer than a blink (0.28 s under reduced motion, which the figure keeps), so no blink fills both and a picture in one never passes for the face at rest. */
+const beyondABlinkMilliseconds = 500;
 /** The milliseconds after a wave at which the figure's own wave is over. */
 const afterNeutralWaveMilliseconds = 4000;
 
@@ -248,16 +250,20 @@ test.describe('the demo stage under the script policy', () => {
 		await pickFigure();
 		await expectTwoDrawings(page);
 		await page.getByRole('button', { name: 'speak without a voice' }).click();
-		// A figure settles after its mount (its spring bones restart at the pose), so a picture counts once two successive ones no longer differ.
+		// A figure settles after its mount (its spring bones restart at the pose), and it blinks on its own schedule, so a picture counts once the next one, beyond a blink later, no longer differs.
 		const settledPicture = async () => {
 			let latest = await pictures();
 			await expect
-				.poll(async () => {
-					const next = await pictures();
-					const moved = await differs(latest, next);
-					latest = next;
-					return moved;
-				})
+				.poll(
+					async () => {
+						await untilFramesHaveRunFor(page, beyondABlinkMilliseconds);
+						const next = await pictures();
+						const moved = await differs(latest, next);
+						latest = next;
+						return moved;
+					},
+					{ timeout: drawingTimeout }
+				)
 				.toBeLessThan(shownPixels / 10);
 			return latest;
 		};
@@ -265,7 +271,7 @@ test.describe('the demo stage under the script policy', () => {
 
 		await page.getByLabel('surprised', { exact: true }).check();
 		await expect.poll(async () => differs(neutral, await pictures())).toBeGreaterThan(shownPixels);
-		const surprised = await pictures();
+		const surprised = await settledPicture();
 		await page.getByLabel('none', { exact: true }).check();
 		await expect.poll(async () => differs(surprised, await pictures())).toBeGreaterThan(shownPixels);
 		await expect.poll(async () => differs(neutral, await pictures())).toBeLessThan(shownPixels);
@@ -275,7 +281,8 @@ test.describe('the demo stage under the script policy', () => {
 		await expectTwoDrawings(page);
 		const fresh = await settledPicture();
 		expect(await differs(neutral, fresh)).toBeGreaterThan(shownPixels);
-		expect(await differs(surprised, fresh)).toBeLessThan(shownPixels);
+		// The head sways with the breath, a pixel or so, so the fresh face is compared as the sway passes the pose of the earlier picture.
+		await expect.poll(async () => differs(surprised, await pictures()), { timeout: drawingTimeout }).toBeLessThan(shownPixels);
 		await expectTwoDrawings(page);
 		await expectNoViolations(page, pageErrors);
 	});
