@@ -31,13 +31,15 @@ export interface GestureClip {
 
 const turn = (pitch: number, yaw: number, roll: number): Turn => ({ pitch, yaw, roll });
 
-/** The wave's poses: the raised hand beside the face, palm forward, and the two turning points of its swing, the arm and the hand each. */
+/** The wave's poses: the raised hand beside the face, palm forward, the two turning points of its swing, and the pose the rise starts from and the fall ends at, the arm and the hand each. */
 type WavePose = Readonly<Record<'upperArm' | 'lowerArm' | 'hand', Turn>>;
 const raised: WavePose = { upperArm: turn(-1.3, 0.01, 1.38), lowerArm: turn(0.05, 2.51, 0), hand: turn(0, 0, 0) };
+/** The elbow tucked in and the hand's turn about it leaning inward, so the hand comes up and goes down inside the picture's side. */
+const lifting: WavePose = { upperArm: turn(-1.3, 0.01, 1.6), lowerArm: turn(0.6, 2.51, 0), hand: turn(0, 0, 0) };
 const swungOut: WavePose = { upperArm: turn(-1.3, -0.07, 1.38), lowerArm: turn(-0.21, 2.51, 0), hand: turn(0, 0, 0.2) };
-const swungIn: WavePose = { upperArm: turn(-1.3, 0.09, 1.38), lowerArm: turn(0.31, 2.51, 0), hand: turn(0, 0, -0.2) };
+const swungIn: WavePose = { upperArm: turn(-1.3, 0.04, 1.38), lowerArm: turn(0.1, 2.51, 0), hand: turn(0, 0, -0.2) };
 
-/** The seconds of the wave's keys: the rise, the swing out, in, out, in, and the fall; the raised pose holds through both fades. */
+/** The seconds of the wave's keys: the rise, the swing out, in, out, in, and the fall; the raised pose is reached at the end of the fade in and left at the start of the fade out. */
 const waveSeconds = { raised: 0.45, firstOut: 0.75, firstIn: 1.05, secondOut: 1.35, secondIn: 1.65, lowering: 1.85, end: 2.3 };
 
 function waveTrack(part: keyof WavePose, lagSeconds: number): BoneTrack {
@@ -45,14 +47,14 @@ function waveTrack(part: keyof WavePose, lagSeconds: number): BoneTrack {
 	return {
 		lagSeconds,
 		keys: [
-			keyed(0, raised),
+			keyed(0, lifting),
 			keyed(waveSeconds.raised, raised),
 			keyed(waveSeconds.firstOut, swungOut),
 			keyed(waveSeconds.firstIn, swungIn),
 			keyed(waveSeconds.secondOut, swungOut),
 			keyed(waveSeconds.secondIn, swungIn),
 			keyed(waveSeconds.lowering, raised),
-			keyed(waveSeconds.end, raised)
+			keyed(waveSeconds.end, lifting)
 		]
 	};
 }

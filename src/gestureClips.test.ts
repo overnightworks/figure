@@ -17,14 +17,12 @@ describe.each(Object.values(figureGesture))('the clip of %s', (name) => {
 		times.slice(1).forEach((seconds, index) => expect(seconds).toBeGreaterThan(times[index]!));
 	});
 
-	it.each(tracks)('holds the first pose of the track of %s through the fade in and the last through the fade out', (_, track) => {
-		const first = track.keys[0]!;
-		const last = track.keys.at(-1)!;
+	it.each(tracks)('reaches the pose held between the fades of %s at the end of the fade in and leaves it at the start of the fade out', (_, track) => {
+		const fadeInEnd = track.keys.find(({ seconds }) => seconds === clip.fadeSeconds.in);
+		const fadeOutStart = track.keys.find(({ seconds }) => seconds === clip.durationSeconds - clip.fadeSeconds.out);
 
-		track.keys.filter(({ seconds }) => seconds <= clip.fadeSeconds.in).forEach((key) => expect(key.turn).toEqual(first.turn));
-		track.keys.filter(({ seconds }) => seconds >= clip.durationSeconds - clip.fadeSeconds.out).forEach((key) => expect(key.turn).toEqual(last.turn));
-		expect(track.keys.some(({ seconds }) => seconds === clip.fadeSeconds.in)).toBe(true);
-		expect(track.keys.some(({ seconds }) => seconds === clip.durationSeconds - clip.fadeSeconds.out)).toBe(true);
+		expect(fadeInEnd).toBeDefined();
+		expect(fadeOutStart?.turn).toEqual(fadeInEnd?.turn);
 	});
 
 	it('has a weight of exactly 0 at the start and the end and exactly 1 between the fades', () => {
