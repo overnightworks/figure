@@ -186,7 +186,7 @@ function forearmFoldShare(armWeight: number): number {
  * The arms' base pose: lowered, the left upper arm swinging with `breathShare`, the breath as a share of its largest lean, and the
  * right arm on its way to the chin by `thinkingWeight`, less `armGiven`, the share of the way back to rest that a gesture takes it.
  * While a gesture plays, the forearm gives way by that share of its own fold, so a wave from the chin rises as the clip lifts it; once
- * the page's reduced motion has ended the gesture, `armGiven` is the arm's return, and the forearm folds ahead on it as on the way up.
+ * no gesture plays, `armGiven` is the arm's return, and the forearm folds ahead on it as on the way up.
  */
 function baseArms(breathShare: number, thinkingWeight: number, armGiven: number, armReturning: boolean): Arms {
 	const restingRightUpperArm: Turn = { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll };
@@ -415,9 +415,8 @@ export function createFigureMotion(random: () => number, clipOf: ClipOf): Figure
 			thinkingWeight = ease(thinkingWeight, thinking ? 1 : 0, easing.thinking);
 			leanWeight = ease(leanWeight, listening ? 1 : 0, easing.lean);
 			const gesture = gestureMotion.advance(step, reducedMotion);
-			// Under reduced motion no gesture plays, yet the share a wave cut short had taken from the chin returns at the thinking look's rate, not in one frame.
-			const armShown = gesture === null ? 0 : armShare(gesture.clip, gesture.seconds);
-			armGiven = reducedMotion ? easeToward(armGiven, armShown, easing.thinking, step, false) : armShown;
+			// The share a gesture took from the chin returns at the thinking look's rate when none plays, also once the page lifts reduced motion mid-return, not in one frame.
+			armGiven = gesture === null ? easeToward(armGiven, 0, easing.thinking, step, false) : armShare(gesture.clip, gesture.seconds);
 			return {
 				blink: thinking ? base.blink * thinkingLook.blinkWeight : base.blink,
 				breath: base.breath,
@@ -436,7 +435,7 @@ export function createFigureMotion(random: () => number, clipOf: ClipOf): Figure
 				moodTrunk: { spine: mood.chest * trunkShare.spine, chest: mood.chest * trunkShare.chest },
 				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
 				look: { yaw: clamp(eyeGaze.yaw * lookGain + jump * base.eyes.yaw, lookReachDegrees), pitch: clamp(eyeGaze.pitch * lookGain + jump * base.eyes.pitch, lookReachDegrees) },
-				arms: baseArms(breathShare, thinkingWeight, armGiven, reducedMotion),
+				arms: baseArms(breathShare, thinkingWeight, armGiven, gesture === null),
 				shoulders: shoulderDeltas(breathShare, mood.shoulder * shoulderShare),
 				gesture
 			};
