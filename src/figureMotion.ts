@@ -171,8 +171,8 @@ function blendedTurn(from: Turn, to: Turn, weight: number): Turn {
 }
 
 /**
- * The share of the way to the chin that the forearm has folded when the arm is `armWeight` of the way there: it leads the upper arm, so the hand rises close to
- * the body and stays inside the picture's side, where a forearm still hanging straight would swing out beyond it.
+ * The share of the way to the chin that the forearm has folded when the arm is `armWeight` of the way there: it leads the upper arm, so
+ * the hand rises close to the body and stays inside the picture's side, where a forearm still hanging straight would swing out beyond it.
  */
 function forearmFoldShare(armWeight: number): number {
 	return 1 - (1 - armWeight) ** 4;
@@ -181,14 +181,17 @@ function forearmFoldShare(armWeight: number): number {
 /**
  * The arms' base pose: lowered, the left upper arm swinging with `breathShare`, the breath as a share of its largest lean, and the
  * right arm on its way to the chin by `thinkingWeight`, less `armGiven`, the share of the way back to rest that a gesture takes it.
+ * While a gesture plays, the forearm gives way by that share of its own fold, so a wave from the chin rises as the clip lifts it; once
+ * the page's reduced motion has ended the gesture, `armGiven` is the arm's return, and the forearm folds ahead on it as on the way up.
  */
-function baseArms(breathShare: number, thinkingWeight: number, armGiven: number): Arms {
+function baseArms(breathShare: number, thinkingWeight: number, armGiven: number, armReturning: boolean): Arms {
 	const restingRightUpperArm: Turn = { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll };
 	const keptWeight = thinkingWeight * (1 - armGiven);
+	const forearmShare = armReturning ? forearmFoldShare(keptWeight) : forearmFoldShare(thinkingWeight) * (1 - armGiven);
 	return {
 		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * breathShare, roll: -restingArm.upperArmRoll },
 		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, keptWeight),
-		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, forearmFoldShare(keptWeight))
+		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, forearmShare)
 	};
 }
 
@@ -427,7 +430,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				moodTrunk: { spine: mood.chest * trunkShare.spine, chest: mood.chest * trunkShare.chest },
 				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
 				look: { yaw: clamp(eyeGaze.yaw * lookGain + jump * base.eyes.yaw, lookReachDegrees), pitch: clamp(eyeGaze.pitch * lookGain + jump * base.eyes.pitch, lookReachDegrees) },
-				arms: baseArms(breathShare, thinkingWeight, armGiven),
+				arms: baseArms(breathShare, thinkingWeight, armGiven, reducedMotion),
 				shoulders: shoulderDeltas(breathShare, mood.shoulder * shoulderShare),
 				gesture
 			};
