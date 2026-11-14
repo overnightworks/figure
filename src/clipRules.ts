@@ -7,7 +7,7 @@ import { clipProfile } from './profile.js';
 const FORBIDDEN_PROPERTIES = ['meshes', 'skins', 'materials', 'textures', 'images', 'samplers', 'cameras'];
 /** The node properties that point at geometry or a skeleton; a node of a clip holds none. */
 const FORBIDDEN_NODE_PROPERTIES = ['mesh', 'camera', 'skin'];
-const CHANNEL_PATHS = ['translation', 'rotation', 'scale', 'weights'];
+const CHANNEL_PATHS: ReadonlySet<string> = new Set(['translation', 'rotation', 'scale', 'weights']);
 
 /** What a node is to the clip, which decides the one kind of channel it takes. */
 type NodeRole = 'bone' | 'hips' | 'expression' | 'lookAt';
@@ -173,7 +173,7 @@ function channelRefusals(
 		const channelObject = objectOf(channel);
 		const target = objectOf(channelObject['target']);
 		const path = target['path'] as string;
-		if (!CHANNEL_PATHS.includes(path)) {
+		if (!CHANNEL_PATHS.has(path)) {
 			unreadable('the target names a path glTF does not give');
 		}
 		const sampler = objectOf(samplers[indexOf(channelObject['sampler'])]);
