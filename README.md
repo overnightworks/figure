@@ -3,7 +3,8 @@
 The fleet's VRM 1.0 profile as a check: the framework-free TypeScript ESM package `overnightworks-figure`.
 
 Today figure ships two things: the check, `figure check <file>` and `checkFigure(bytes)`, which tell whether a figure
-file meets the profile's container, VRM and budget rules; and the drawing, `mount` from `overnightworks-figure/draw`,
+file meets the profile's container, VRM and budget rules, and its sibling for a gesture clip, `figure check --as clip <file>` and
+`checkClip(bytes)`; and the drawing, `mount` from `overnightworks-figure/draw`,
 which draws a figure that passes into an app's canvas, rests it with its arms lowered, keeps it alive with its idle motion, shows it thinking or listening when the app reports so,
 waves when the app asks, and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
 mood of the sentence, until the app disposes it.
@@ -17,10 +18,11 @@ Needs Node 24 or 26 and pnpm (the versions `package.json` pins).
 pnpm install --frozen-lockfile
 pnpm run build
 node dist/bin.js check path/to/figure.vrm
+node dist/bin.js check --as clip path/to/gesture.vrma
 ```
 
 In an app or a release check, `checkFigure(bytes)` from the package root returns the list of refusals for a file's
-bytes; it runs in a browser and in Node.
+bytes; it runs in a browser and in Node. `checkClip(bytes)` does the same for a `.vrma` gesture clip, against the clip profile below.
 
 ## Mount a figure
 
@@ -115,7 +117,7 @@ The package brings `three` and `@pixiv/three-vrm` as dependencies, so the lockfi
 dependencies. Only `overnightworks-figure/draw` imports them: a consumer that only checks (the package root,
 `overnightworks-figure/codes`, `overnightworks-figure/profile` or the command) loads nothing of three.
 
-Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } from 'overnightworks-figure'` in code.
+Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } from 'overnightworks-figure'` in code; `pnpm exec figure check --as clip path/to/gesture.vrma` and `checkClip` judge a clip.
 
 ## Exit codes
 
@@ -123,9 +125,9 @@ Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } fro
 |---|---|---|
 | 0 | the file passes every rule | one line on stdout |
 | 1 | the file is refused | one line per refusal on stdout, starting with its code |
-| 2 | no verdict: no file named, a file that cannot be read, an unknown command | the reason on stderr |
+| 2 | no verdict: no file named, a file that cannot be read, an unknown command, an `--as` that is not `clip` | the reason, or the usage line `usage: figure check [--as clip] <file>`, on stderr |
 
-The codes and the exit codes are the contract; the wording of a line is not.
+`--as` sits between `check` and the file and its only value is `clip`; without it the file is a figure. The codes and the exit codes are the contract; the wording of a line is not.
 
 ## Refusal codes
 
@@ -152,7 +154,26 @@ The codes and the exit codes are the contract; the wording of a line is not.
 | `texture_too_large` | an embedded image is wider or taller than the profile's side budget; one refusal per image, naming it |
 | `too_many_texels` | the embedded images' widths times heights, added up (each image once), are over the profile's texel budget |
 | `image_invalid` | an embedded image's bytes reach past the binary chunk, or are not a PNG, JPEG or WebP (lossy, lossless or extended) whose header the check can size (zero sides included) |
-| `gltf_invalid` | a mesh, primitive, accessor, index, image or buffer view a rule must read does not have glTF's shape, so it cannot judge |
+| `not_vrm_animation` | a clip has no `extensions.VRMC_vrm_animation` object, or its `specVersion` is not `1.0` |
+| `clip_content_not_allowed` | a clip holds `meshes`, `skins`, `materials`, `textures`, `images`, `samplers` or `cameras`; one refusal per property, naming it |
+| `clip_scene_missing` | a clip's `scenes` is absent or empty |
+| `clip_animation_missing` | a clip has no animation |
+| `clip_track_not_allowed` | a channel has no target node, animates `weights`, or takes a path its node does not (a humanoid bone takes rotation, the hips also translation, an expression node translation, the look-at node rotation); or its key data is sparse, has no buffer view, or holds rotations that are not float |
+| `clip_keys_invalid` | a channel's keys reach past their buffer view or the binary chunk, its times are not finite, 0 or later and strictly ascending, or a rotation is not finite or not of unit length within the profile's tolerance |
+| `clip_too_long` | a clip's first animation has a key later than the profile's seconds budget |
+| `gltf_invalid` | a mesh, primitive, accessor, index, image, buffer view, sampler, channel or node a rule must read does not have glTF's shape, so it cannot judge |
+
+The container codes (`not_glb` to `buffer_outside_glb`, `too_large`), `humanoid_bone_missing` and `gltf_invalid` apply to a figure
+and to a clip; the seven clip codes to a clip alone; the other VRM, budget and texture codes to a figure alone.
+
+### The clip profile
+
+A clip is a `.vrma` file: a GLB of `VRMC_vrm_animation` 1.0 with a humanoid of the 15 required bones, a scene, at least one animation
+and nothing else, no mesh or image. It accepts LINEAR, STEP and CUBICSPLINE tracks and several animations (the first plays), and
+channels on other nodes, which are never played. It is narrower than the specification in two places: the humanoid is required, and
+key data is float and not sparse. The profile's values (extension, version, file budget, seconds budget, rotation length tolerance)
+live in `src/profile.ts` as `clipProfile`; the budgets are proposals until a measurement in a browser confirms them. A track for
+head, neck, eyes, jaw, expressions, look-at or hips translation passes the check and is dropped when a clip plays.
 
 A refusal may also carry a text naming what it found (the extension, the place of the URI); the command prints it
 after the code. The profile's values (allowed extensions, file budget, presets, licence values, triangle, morph-target, texture-side and texel budgets) live in `src/profile.ts` and are exported as
