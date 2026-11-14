@@ -1,0 +1,7 @@
+claim_id = "817d03fc69f649df83d7b0150d5c8405"
+agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
+role = "builder"
+base = "faae6034dd45b755e5f3f7f8bb1c1e0a80e2f93a"
+branch = "claude/issue-89-fresh-figure-mood-late"
+scope = ["src/draw.ts", "src/figureMount.ts", "tests/e2e/stage.spec.ts"]
+opened_commit = "b30657590c29e84b99a4909651617dc5563db263"
