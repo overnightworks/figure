@@ -230,7 +230,7 @@ describe('mount with the clips of a persona', { timeout: 60_000 }, () => {
 		await new Promise((resolve) => setTimeout(resolve, 300));
 
 		expect(() => handle.gesture(figureGesture.wave)).not.toThrow();
-		expect(frameRequest.mock.calls.length).toBe(requestedAtDispose);
+		expect(frameRequest.mock.calls).toHaveLength(requestedAtDispose);
 		expect(signals).toEqual([figureSignal.drawn]);
 		expect(problems).toEqual([]);
 	});

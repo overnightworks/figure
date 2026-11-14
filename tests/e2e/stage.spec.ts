@@ -48,6 +48,19 @@ async function expectTwoDrawings(page: Page): Promise<void> {
 	await expect(page.locator('canvas[data-signal="drawn"]')).toHaveCount(2, { timeout: drawingTimeout });
 }
 
+/** Resolves once the frames the figure animates on have run for the given milliseconds, so the wait ends when the figure's own clock has passed, not when a timer fires. */
+async function untilFrameClockPasses(page: Page, milliseconds: number): Promise<void> {
+	await page.evaluate(
+		(duration) =>
+			new Promise<void>((resolve) => {
+				const start = performance.now();
+				const advance = (): void => (performance.now() - start >= duration ? resolve() : void requestAnimationFrame(advance));
+				advance();
+			}),
+		milliseconds
+	);
+}
+
 async function pickNotAFigure(page: Page): Promise<void> {
 	await page.locator('#picker').setInputFiles({
 		name: 'not-glb.txt',
@@ -148,7 +161,7 @@ test.describe('the demo stage under the script policy', () => {
 			.poll(
 				async () => {
 					await page.getByRole('button', { name: 'wave', exact: true }).click();
-					await page.waitForTimeout(afterNeutralWaveMilliseconds);
+					await untilFrameClockPasses(page, afterNeutralWaveMilliseconds);
 					const waved = await Promise.all(figures.map((figure, index) => figure.screenshot().then((shown) => differingPixels(page, resting[index]!, shown, raisedArmArea))));
 					return Math.min(...waved);
 				},
