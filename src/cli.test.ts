@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCommand } from './cli.js';
 import { clipProfile, figureProfile } from './profile.js';
 import { conformantTrack, type ClipTrack } from '../tests/clipBuilder.js';
-import { buildClipGlb, buildClipGlbOfSize, nodeOf, retarget, secondAnimationCases } from '../tests/clipFixtures.js';
+import { buildClipGlb, buildClipGlbOfSize, nodeOf, rejectedAccessorShapes, retarget, secondAnimationCases } from '../tests/clipFixtures.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 
 describe('runCommand', () => {
@@ -100,6 +100,11 @@ describe('runCommand', () => {
 		expect(runCommand(['check', '--as', 'clip', writeFigure('ok.vrma', bytes)], output)).toBe(0);
 		expect(stdout).toHaveLength(1);
 		expect(stderr).toEqual([]);
+	});
+
+	it.each(rejectedAccessorShapes)('exits 1 with only its code for a clip with %s under --as clip', (_name, change, code) => {
+		expect(runCommand(['check', '--as', 'clip', writeFigure('shape.vrma', buildClipGlb({ change }))], output)).toBe(1);
+		expect(codesPrinted()).toEqual([code]);
 	});
 
 	it.each(secondAnimationCases)('%s under --as clip', (_name, variant, codes) => {
