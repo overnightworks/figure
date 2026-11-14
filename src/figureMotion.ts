@@ -160,12 +160,20 @@ const radiansPerDegree = Math.PI / 180;
  */
 const restingArm = { upperArmRoll: 1.38, shoulderRise: 0.012, upperArmSwing: 0.01 };
 const restTurn: Turn = { yaw: 0, pitch: 0, roll: 0 };
-/** The right arm at the full thinking look, the hand at the chin: the values of the picture's THINK_POSE; the arm blends from rest to it linearly in these angles, as the picture does. */
+/** The right arm at the full thinking look, the hand at the chin: the values of the picture's THINK_POSE; the arm blends from rest to it in these angles. */
 const chinArm = { upperArm: { pitch: -0.6, yaw: 0.5, roll: 0.6 }, lowerArm: { pitch: 0, yaw: 2.4, roll: 0 } };
 
 /** The turn `weight` of the way from `from` to `to`, each angle on its own. */
 function blendedTurn(from: Turn, to: Turn, weight: number): Turn {
 	return { yaw: from.yaw + (to.yaw - from.yaw) * weight, pitch: from.pitch + (to.pitch - from.pitch) * weight, roll: from.roll + (to.roll - from.roll) * weight };
+}
+
+/**
+ * The share of the way to the chin that the forearm has folded at `thinkingWeight`: it leads the upper arm, so the hand rises close to
+ * the body and stays inside the picture's side, where a forearm still hanging straight would swing out beyond it.
+ */
+function forearmFoldShare(thinkingWeight: number): number {
+	return 1 - (1 - thinkingWeight) ** 3;
 }
 
 /** The arms' base pose: lowered, the left upper arm swinging with `breathShare`, the breath as a share of its largest lean, and the right arm on its way to the chin by `thinkingWeight`. */
@@ -174,7 +182,7 @@ function baseArms(breathShare: number, thinkingWeight: number): Arms {
 	return {
 		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * breathShare, roll: -restingArm.upperArmRoll },
 		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, thinkingWeight),
-		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, thinkingWeight)
+		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, forearmFoldShare(thinkingWeight))
 	};
 }
 
