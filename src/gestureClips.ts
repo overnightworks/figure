@@ -34,8 +34,8 @@ const turn = (pitch: number, yaw: number, roll: number): Turn => ({ pitch, yaw, 
 /** The wave's poses: the raised hand beside the face, palm forward, the two turning points of its swing, and the pose the rise starts from and the fall ends at, the arm and the hand each. */
 type WavePose = Readonly<Record<'upperArm' | 'lowerArm' | 'hand', Turn>>;
 const raised: WavePose = { upperArm: turn(-1.3, 0.01, 1.38), lowerArm: turn(0.05, 2.51, 0), hand: turn(0, 0, 0) };
-/** The elbow tucked in and the hand's turn about it leaning inward, so the hand comes up and goes down inside the picture's side. */
-const lifting: WavePose = { upperArm: turn(-1.3, 0.01, 1.6), lowerArm: turn(0.6, 2.51, 0), hand: turn(0, 0, 0) };
+/** The elbow tucked in, the hand turned about the forearm so the palm shows early and leaning outward so its fingers stay off the wig's curl, and it comes up and goes down inside the picture's side. */
+const lifting: WavePose = { upperArm: turn(-1.3, 0.01, 1.6), lowerArm: turn(0.05, 2.51, 0), hand: turn(1.6, 0, -0.5) };
 const swungOut: WavePose = { upperArm: turn(-1.3, -0.07, 1.38), lowerArm: turn(-0.21, 2.51, 0), hand: turn(0, 0, 0.2) };
 const swungIn: WavePose = { upperArm: turn(-1.3, -0.02, 1.38), lowerArm: turn(-0.05, 2.51, 0), hand: turn(0, 0, -0.2) };
 
