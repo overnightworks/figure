@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Quaternion } from 'three';
 import { buildGlb } from '../tests/glbBuilder.ts';
-import { clipParts } from '../tests/clipBuilder.ts';
+import { clipParts, tracksOfKeys } from '../tests/clipBuilder.ts';
 import { gestureClips } from '../dist/gestureClips.js';
 import { quaternionOfTurn } from '../dist/gestureLayer.js';
 import { clipProfile } from '../dist/profile.js';
@@ -17,10 +17,6 @@ if (outputDirectory === undefined) {
 }
 mkdirSync(outputDirectory, { recursive: true });
 for (const [name, clip] of Object.entries(gestureClips)) {
-	const tracks = Object.entries(clip.keys).map(([bone, keys]) => ({
-		bone,
-		times: keys.map(({ seconds }) => seconds),
-		rotations: keys.map(({ turn }) => quaternionOfTurn(turn, new Quaternion()).toArray())
-	}));
+	const tracks = tracksOfKeys(clip.keys, (turn) => quaternionOfTurn(turn, new Quaternion()).toArray());
 	writeFileSync(join(outputDirectory, `${name}.vrma`), buildGlb(clipParts(clipProfile, [tracks])));
 }

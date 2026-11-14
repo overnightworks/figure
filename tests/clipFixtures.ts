@@ -153,3 +153,10 @@ export const secondAnimationCases: readonly (readonly [name: string, variant: Cl
 	],
 	['refuses a second animation with keys that descend as clip_keys_invalid', { animations: secondAnimation({ times: [0, 2, 1] }) }, ['clip_keys_invalid']]
 ];
+
+/** The three files `@pixiv/three-vrm-animation` throws on, which the check refuses before the library sees them: each changes the conformant clip. */
+export const filesTheLibraryThrowsOn: readonly (readonly [name: string, change: (json: ClipJson) => void])[] = [
+	['a rotation channel on an expression node', (json) => retarget(json, expressionNode(json), 'rotation')],
+	['a translation channel on the look-at node', (json) => retarget(json, lookAtNode(json), 'translation')],
+	['no scene', (json) => delete json.scenes]
+];
