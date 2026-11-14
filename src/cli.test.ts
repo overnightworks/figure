@@ -7,7 +7,19 @@ import { clipProfile, figureProfile, roomProfile } from './profile.js';
 import { conformantTrack, type ClipTrack } from '../tests/clipBuilder.js';
 import { buildClipGlb, buildClipGlbOfSize, nodeOf, rejectedAccessorShapes, retarget, secondAnimationCases } from '../tests/clipFixtures.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
-import { buildRoomGlb, buildRoomGlbOfSize } from '../tests/roomBuilder.js';
+import { buildPng, imageSizesFilling } from '../tests/glbBuilder.js';
+import { buildBudgetRoom, buildRoomGlb, buildRoomGlbOfSize, type RoomLook } from '../tests/roomBuilder.js';
+import { invalidNodeCases, invalidSceneCases, missingSceneCases } from '../tests/sceneCases.js';
+
+/** Leaves the room drawing only its first mesh, with `triangles` triangles in each of `primitives` primitives, all sharing the one index accessor. */
+function drawing(triangles: number, primitives = 1) {
+	return (json: Record<string, any>) => {
+		const primitive = json.meshes[0].primitives[0];
+		json.accessors[primitive.indices].count = 3 * triangles;
+		json.meshes[0].primitives = new Array<object>(primitives).fill(primitive);
+		json.nodes = [{ children: [1] }, { mesh: 0 }];
+	};
+}
 
 describe('runCommand', () => {
 	let directory: string;
@@ -155,23 +167,52 @@ describe('runCommand', () => {
 		expect(runCommand(['check', '--as', 'room', writeFigure('ok.glb', buildRoomGlbOfSize(roomProfile.fileBudgetBytes))], output)).toBe(0);
 	});
 
+	it.each<[RoomLook]>([['textured'], ['vertexColoured']])('exits 0 for a room painted only %s under --as room', (look) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('look.glb', buildRoomGlb({ look }))], output)).toBe(0);
+		expect(stderr).toEqual([]);
+	});
+
+	const side = roomProfile.maxTextureSidePixels;
+	const texelsAtBudget = imageSizesFilling(roomProfile.maxTexels, side).map(([width, height]) => buildPng(width, height));
+
+	it.each<[string, Uint8Array]>([
+		['a texture at the side budget', buildRoomGlb({ images: [buildPng(side, 1), buildPng(1, side)] })],
+		['textures at the texel budget', buildRoomGlb({ images: texelsAtBudget })],
+		['triangles at the budget', buildRoomGlb({ change: drawing(roomProfile.maxTriangles) })],
+		['primitives at the budget', buildRoomGlb({ change: drawing(1, roomProfile.maxPrimitives) })],
+		['every budget filled together', buildBudgetRoom(roomProfile).glb]
+	])('exits 0 for a room with %s under --as room', (_name, bytes) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('limit.glb', bytes)], output)).toBe(0);
+		expect(stdout).toHaveLength(1);
+	});
+
 	it.each<[string, Uint8Array, string]>([
 		['a skin', buildRoomGlb({ change: (json) => (json.skins = []) }), 'room_content_not_allowed'],
 		['no scene', buildRoomGlb({ change: (json) => delete json.scenes }), 'room_scene_missing'],
 		['a lit material', buildRoomGlb({ change: (json) => delete json.materials[0].extensions }), 'room_material_not_unlit'],
-		[
-			'more primitives than the budget',
-			buildRoomGlb({
-				change: (json) => (json.meshes[0].primitives = new Array<object>(roomProfile.maxPrimitives + 1).fill(json.meshes[0].primitives[0]))
-			}),
-			'too_many_primitives'
-		],
-		['a mesh that no node names', buildRoomGlb({ change: (json) => (json.nodes[1].mesh = json.meshes.length) }), 'gltf_invalid'],
+		['more primitives than the budget', buildRoomGlb({ change: drawing(1, roomProfile.maxPrimitives + 1) }), 'too_many_primitives'],
+		['more triangles than the budget', buildRoomGlb({ change: drawing(roomProfile.maxTriangles + 1) }), 'too_many_triangles'],
+		['a texture over the side budget', buildRoomGlb({ images: [buildPng(side + 1, 1)] }), 'texture_too_large'],
+		['one texel over the texel budget', buildRoomGlb({ images: [...texelsAtBudget, buildPng(1, 1)] }), 'too_many_texels'],
+		['a node whose mesh names no mesh', buildRoomGlb({ change: (json) => (json.nodes[1].mesh = json.meshes.length) }), 'gltf_invalid'],
+		['a primitive whose material names no material', buildRoomGlb({ change: (json) => (json.meshes[0].primitives[0].material = json.materials.length) }), 'gltf_invalid'],
+		['a primitive whose POSITION names no accessor', buildRoomGlb({ change: (json) => (json.meshes[0].primitives[0].attributes.POSITION = json.accessors.length) }), 'gltf_invalid'],
+		['a texture whose source names no image', buildRoomGlb({ change: (json) => (json.textures[0].source = json.images.length) }), 'gltf_invalid'],
 		['an extension the room does not allow', buildRoomGlb({ change: (json) => (json.extensionsRequired = ['VRMC_vrm']) }), 'extension_not_allowed'],
 		['a file over the byte budget', buildRoomGlbOfSize(roomProfile.fileBudgetBytes + 1), 'too_large']
 	])('exits 1 with the code on its line for a room with %s under --as room', (_name, bytes, code) => {
 		expect(runCommand(['check', '--as', 'room', writeFigure('bad.glb', bytes)], output)).toBe(1);
 		expect(codesPrinted()).toEqual([code]);
+	});
+
+	it.each(missingSceneCases)('exits 1 with room_scene_missing for a room with %s under --as room', (_name, change) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('scene.glb', buildRoomGlb({ change }))], output)).toBe(1);
+		expect(codesPrinted()).toEqual(['room_scene_missing']);
+	});
+
+	it.each([...invalidSceneCases, ...invalidNodeCases])('exits 1 with gltf_invalid among the codes for a room with %s under --as room', (_name, change) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('shape.glb', buildRoomGlb({ change }))], output)).toBe(1);
+		expect(codesPrinted()).toContain('gltf_invalid');
 	});
 
 	it('exits 1 with the room code and the text it found for a room that breaks a room rule', () => {
