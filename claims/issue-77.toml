@@ -1,0 +1,8 @@
+claim_id = "1a25b0b6618043fea6b9b3fbc192c010"
+agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
+role = "builder"
+base = "265738ea1c247fbc5bb8bae8e5428470aaa6a96d"
+branch = "claude/issue-77-smooth-the-wave-s-lifting-pose-and-the-t"
+scope = ["src/figureFrame.ts", "src/figureMotion.ts", "src/gestureClips.ts", "src/gestureLayer.ts"]
+opened_commit = "f0bad582cc7034abe99c414070f562bb7d282ce5"
+whole_reason = "The three findings are the one right arm's poses and the blend between the thinking base and the wave; each retune is judged on the same persona drive."
