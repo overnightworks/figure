@@ -1,6 +1,7 @@
 // What the browser tests share to watch drawn figures: mounting on canvases, reading each canvas in the task that drew it, and ending the figures.
 import { expect, vi } from 'vitest';
-import { mount, type FigureHandle } from '../src/draw.js';
+import { mount, type FigureHandle, type MountOptions } from '../src/draw.js';
+import { mountWithClipLoad, type ClipLoad } from '../src/figureMount.js';
 import { buildConformantVrm } from './figureFixtures.js';
 import { slowMedianMilliseconds } from '../src/frameTimeGuard.js';
 import { coversSomething, readPixels, spotsOf, type FaceFeature, type Spot } from './browserCanvas.js';
@@ -21,8 +22,8 @@ export interface WatchedFigure {
 }
 
 export interface FigureWatch {
-	/** Mounts a 200 by 250 pixel canvas into the page and draws the figure of `bytes` on it. */
-	mountFigure(bytes?: Uint8Array): Promise<WatchedFigure>;
+	/** Mounts a 200 by 250 pixel canvas into the page and draws the figure of `bytes` on it, with the mount `options`; with `load` the parse of a clip's bytes is `load`, otherwise it is figure's own. */
+	mountFigure(bytes?: Uint8Array, options?: MountOptions, load?: ClipLoad): Promise<WatchedFigure>;
 	/** The face features of the next picture `canvas` shows after the frames the watch has seen by now, read in the task that drew it. */
 	featuresNow(canvas: HTMLCanvasElement): Promise<Record<FaceFeature, Spot[]>>;
 	/** The face features of the picture the first frame drawn after this call shows on `canvas`, with no frames waited for beyond it. */
@@ -55,13 +56,13 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 	}
 
 	return {
-		async mountFigure(bytes = buildConformantVrm()) {
+		async mountFigure(bytes = buildConformantVrm(), options, load) {
 			const canvas = document.createElement('canvas');
 			canvas.style.width = '200px';
 			canvas.style.height = '250px';
 			document.body.append(canvas);
 			canvases.push(canvas);
-			const handle = await mount(canvas, bytes);
+			const handle = await (load === undefined ? mount(canvas, bytes, options) : mountWithClipLoad(load, canvas, bytes, options));
 			// The figure draws once before `mount` returns; the buffer still holds that first frame in the task that drew it.
 			readIfDrawn(canvas);
 			handles.push(handle);

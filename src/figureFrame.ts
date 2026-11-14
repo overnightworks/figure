@@ -1,7 +1,7 @@
 import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Quaternion, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
 import { figureMood } from './expressions.js';
-import { createGestureLayer, quaternionOfTurn } from './gestureLayer.js';
+import { createGestureLayer, quaternionOfTurn, type GestureLayer } from './gestureLayer.js';
 import { spreadPosture, type FigurePose, type Turn } from './figureMotion.js';
 
 /** The picture's camera, lights and clear colour are the values of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html. */
@@ -79,6 +79,8 @@ function startSpringBonesAtPose(vrm: VRM): void {
 
 /** A figure's lights and camera, built once, and the frame that draws it. */
 export interface FigureStage {
+	/** The layer of gestures the stage draws, whose clips a loaded clip replaces. */
+	readonly gestures: GestureLayer;
 	/** Sets the figure to `pose` and draws it, the drawing buffer first following the canvas when its size or the pixel ratio changed. */
 	draw(pose: FigurePose, elapsedSeconds: number): void;
 }
@@ -103,12 +105,14 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	const rightLowerArm = vrm.humanoid.getNormalizedBoneNode('rightLowerArm')!;
 	const rightHand = vrm.humanoid.getNormalizedBoneNode('rightHand')!;
 	const gestures = createGestureLayer(vrm.humanoid);
-	const restedBones = [spine, chest, leftShoulder, rightShoulder];
+	const restedTrunk = [spine, chest, leftShoulder, rightShoulder];
+	const armBones = new Set<Object3D>([leftUpperArm, rightUpperArm, rightLowerArm, rightHand]);
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;
 	let view: PerspectiveCamera;
 	let posed = false;
 	return {
+		gestures,
 		draw(pose, elapsedSeconds) {
 			const size = currentSize(canvas);
 			if (drawn === undefined || !isSameSize(drawn, size)) {
@@ -121,8 +125,10 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 			turnBone(rightUpperArm, pose.arms.rightUpperArm);
 			turnBone(rightLowerArm, pose.arms.rightLowerArm);
 			restBone(rightHand);
+			// The layer turns a bone from the turn it holds, so each bone it may turn starts from the base pose, the trunk's deltas coming after it.
+			restedTrunk.forEach(restBone);
+			for (const bone of gestures.nodes) if (!armBones.has(bone)) restBone(bone);
 			if (pose.gesture !== null) gestures.apply(pose.gesture);
-			restedBones.forEach(restBone);
 			const spread = spreadPosture(pose.posture, bones);
 			addTurn(spine, { pitch: pose.breath + pose.trunkLean + pose.moodTrunk.spine, yaw: 0, roll: 0 });
 			addTurn(chest, { pitch: spread.chest.pitch + pose.trunkLean + pose.moodTrunk.chest, yaw: spread.chest.yaw, roll: spread.chest.roll });

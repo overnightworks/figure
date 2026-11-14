@@ -1,3 +1,6 @@
+import type { GestureClip } from '../src/gestureClips.js';
+import type { Turn } from '../src/figureMotion.js';
+
 const FLOAT = 5126;
 const BYTES_PER_FLOAT = 4;
 
@@ -17,6 +20,15 @@ export interface ClipTrack {
 }
 
 export const identity: Quaternion = [0, 0, 0, 1];
+
+/** The tracks that write a clip authored as keys: per bone its keys at their own seconds, each turn as the rotation `rotationOf` gives. Node reads this file with its types stripped, so the type imports above are all it imports. */
+export function tracksOfKeys(keys: GestureClip['keys'], rotationOf: (turn: Turn) => Quaternion): ClipTrack[] {
+	return Object.entries(keys).map(([bone, boneKeys]) => ({
+		bone,
+		times: boneKeys.map(({ seconds }) => seconds),
+		rotations: boneKeys.map(({ turn }) => rotationOf(turn))
+	}));
+}
 
 /** The conformant clip's one track: the right upper arm turning about X from rest to a quarter turn and back, three keys. */
 export function conformantTrack(): ClipTrack {

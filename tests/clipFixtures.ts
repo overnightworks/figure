@@ -1,5 +1,5 @@
 import { clipProfile } from '../src/profile.js';
-import { clipParts, conformantTrack, type ClipTrack } from './clipBuilder.js';
+import { clipParts, conformantTrack, type ClipTrack, type Quaternion } from './clipBuilder.js';
 import { buildGlb, type GlbOptions } from './glbBuilder.js';
 
 export type ClipJson = ReturnType<typeof clipParts>['json'];
@@ -153,3 +153,18 @@ export const secondAnimationCases: readonly (readonly [name: string, variant: Cl
 	],
 	['refuses a second animation with keys that descend as clip_keys_invalid', { animations: secondAnimation({ times: [0, 2, 1] }) }, ['clip_keys_invalid']]
 ];
+
+/** The three files `@pixiv/three-vrm-animation` throws on, which the check refuses before the library sees them: each changes the conformant clip. */
+export const filesTheLibraryThrowsOn: readonly (readonly [name: string, change: (json: ClipJson) => void])[] = [
+	['a rotation channel on an expression node', (json) => retarget(json, expressionNode(json), 'rotation')],
+	['a translation channel on the look-at node', (json) => retarget(json, lookAtNode(json), 'translation')],
+	['no scene', (json) => delete json.scenes]
+];
+
+/** A quarter turn about Z that carries the right arm from its place along the shoulder line to straight up. */
+const armUp: Quaternion = [0, 0, -Math.SQRT1_2, Math.SQRT1_2];
+
+/** A clip that holds the right upper arm straight up for `seconds`: the figure's own wave is over long before a long one. */
+export function buildArmUpClip(seconds: number): Uint8Array {
+	return buildClipGlb({ animations: [[{ bone: 'rightUpperArm', times: [0, seconds], rotations: [armUp, armUp] }]] });
+}

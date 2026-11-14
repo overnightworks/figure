@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { frameSeconds, idle, seed, seededRandom, speaking, thinking } from '../tests/figureMotionWatch.js';
-import { gestureClips, gestureLengthSeconds } from './gestureClips.js';
+import { frameSeconds, idle, ownClip, seed, seededRandom, speaking, thinking } from '../tests/figureMotionWatch.js';
+import { gestureClips, gestureLengthSeconds, type ClipTiming } from './gestureClips.js';
 import { createFigureMotion, type FigureFacts, type FigurePose, type GesturePlay } from './figureMotion.js';
 import { figureGesture, type FigureGesture } from './gestures.js';
 
@@ -13,7 +13,7 @@ interface Frame {
 
 /** The poses at each of `frames` frames of 10 ms, given what happens at the frames `at` selects. */
 function posesOf(frames: number, at: (frame: number) => Frame = () => ({})): FigurePose[] {
-	const motion = createFigureMotion(seededRandom(seed));
+	const motion = createFigureMotion(seededRandom(seed), ownClip);
 	return Array.from({ length: frames }, (_, frame) => {
 		const { facts = idle, reducedMotion = false, calls = [] } = at(frame);
 		calls.forEach((call) => motion.gesture(call));
@@ -27,7 +27,7 @@ function gesturesOf(frames: number, at: (frame: number) => Frame = () => ({})): 
 }
 
 describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
-	const framesToEnd = Math.ceil(gestureLengthSeconds(name) / frameSeconds);
+	const framesToEnd = Math.ceil(gestureLengthSeconds(gestureClips[name]) / frameSeconds);
 	const calledAt = 20;
 	const callAtFrame = (first: number) => (frame: number): Frame => ({ calls: frame === first ? [name] : [] });
 	const played = (run: (GesturePlay | null)[]) => run.filter((play): play is GesturePlay => play !== null);
@@ -41,10 +41,10 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 		const plays = played(run);
 
 		expect(run.slice(0, calledAt)).toEqual(Array(calledAt).fill(null));
-		expect(plays[0]).toEqual({ name, seconds: 0 });
+		expect(plays[0]).toEqual({ name, seconds: 0, clip: gestureClips[name] });
 		plays.forEach((play, index) => expect(play.seconds).toBeCloseTo(index * frameSeconds, 9));
-		expect(plays.at(-1)!.seconds).toBeLessThan(gestureLengthSeconds(name));
-		expect(plays.at(-1)!.seconds + frameSeconds).toBeGreaterThanOrEqual(gestureLengthSeconds(name));
+		expect(plays.at(-1)!.seconds).toBeLessThan(gestureLengthSeconds(gestureClips[name]));
+		expect(plays.at(-1)!.seconds + frameSeconds).toBeGreaterThanOrEqual(gestureLengthSeconds(gestureClips[name]));
 		expect(run.slice(calledAt + plays.length)).toEqual(Array(run.length - calledAt - plays.length).fill(null));
 	});
 
@@ -59,7 +59,7 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 		const second = calledAt + framesToEnd + 5;
 		const run = gesturesOf(second + 10, (frame) => ({ calls: frame === calledAt || frame === second ? [name] : [] }));
 
-		expect(run[second]).toEqual({ name, seconds: 0 });
+		expect(run[second]).toEqual({ name, seconds: 0, clip: gestureClips[name] });
 	});
 
 	it.each([
@@ -144,5 +144,74 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 				expect(chinShares.at(-1)).toBeCloseTo(1, 3);
 			});
 		});
+	});
+});
+
+describe('the clock of a gesture whose clip can be replaced', () => {
+	const name = figureGesture.wave;
+	const timingOf = (durationSeconds: number): ClipTiming => ({ ...gestureClips[name], durationSeconds });
+	const original = timingOf(gestureClips[name].durationSeconds);
+	const longer = timingOf(gestureClips[name].durationSeconds * 2);
+	const shorter = timingOf(gestureClips[name].durationSeconds / 2);
+
+	const played = (plays: (GesturePlay | null)[]) => plays.filter((play): play is GesturePlay => play !== null);
+	/** The gesture's clock runs to the clip's length: its last second shown is within one frame of it. */
+	const expectRunsToLengthOf = (plays: GesturePlay[], clip: ClipTiming) => {
+		expect(plays.at(-1)!.seconds).toBeLessThan(gestureLengthSeconds(clip));
+		expect(plays.at(-1)!.seconds + frameSeconds).toBeGreaterThanOrEqual(gestureLengthSeconds(clip));
+	};
+
+	it.each([
+		['a longer one', longer],
+		['a shorter one', shorter]
+	])('plays the clip it started with to its own length when %s replaces it during the gesture', (_, replacement) => {
+		let current = original;
+		const motion = createFigureMotion(seededRandom(seed), () => current);
+		motion.gesture(name);
+		const plays = Array.from({ length: 1000 }, (_, frame) => {
+			if (frame === 50) current = replacement;
+			return motion.advance(idle, frameSeconds, false, null, null).gesture;
+		});
+
+		played(plays).forEach((play) => expect(play.clip).toBe(original));
+		expectRunsToLengthOf(played(plays), original);
+	});
+
+	it('starts the next gesture with the clip that replaced it, for that clip\'s own length', () => {
+		let current = original;
+		const motion = createFigureMotion(seededRandom(seed), () => current);
+		const advance = () => motion.advance(idle, frameSeconds, false, null, null).gesture;
+		motion.gesture(name);
+		for (let frame = 0; frame < 400; frame++) advance();
+		current = longer;
+		motion.gesture(name);
+		const plays = played(Array.from({ length: 1000 }, advance));
+
+		expect(plays[0]).toEqual({ name, seconds: 0, clip: longer });
+		plays.forEach((play) => expect(play.clip).toBe(longer));
+		expectRunsToLengthOf(plays, longer);
+	});
+
+	it('lets the base pose\'s arm give way only when the clip that plays has an arm bone', () => {
+		const rightUpperArmRolls = (clip: ClipTiming, call: boolean) => {
+			const motion = createFigureMotion(seededRandom(seed), () => clip);
+			for (let frame = 0; frame < 400; frame++) motion.advance(thinking, frameSeconds, false, null, null);
+			if (call) motion.gesture(name);
+			return Array.from({ length: 60 }, () => motion.advance(thinking, frameSeconds, false, null, null).arms.rightUpperArm.roll);
+		};
+		const withoutArm: ClipTiming = { ...original, bones: ['spine'] };
+
+		expect(rightUpperArmRolls(withoutArm, true)).toEqual(rightUpperArmRolls(withoutArm, false));
+		expect(rightUpperArmRolls(original, true)).not.toEqual(rightUpperArmRolls(original, false));
+	});
+
+	it('runs a clip without bones for its duration alone', () => {
+		const bare: ClipTiming = { ...original, bones: [] };
+		const motion = createFigureMotion(seededRandom(seed), () => bare);
+		motion.gesture(name);
+		const plays = played(Array.from({ length: 400 }, () => motion.advance(idle, frameSeconds, false, null, null).gesture));
+
+		expectRunsToLengthOf(plays, bare);
+		expect(gestureLengthSeconds(bare)).toBe(bare.durationSeconds);
 	});
 });

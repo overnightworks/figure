@@ -1,7 +1,12 @@
 // What the figure motion's tests share to watch a figure frame by frame: a seeded source of chance, the facts, and the poses of a run.
 import { createFigureMotion, type FigureFacts, type FigurePose, type SpeakerOffset } from '../src/figureMotion.js';
+import { gestureClips } from '../src/gestureClips.js';
+import type { FigureGesture } from '../src/gestures.js';
 import { createIdleMotion } from '../src/idleMotion.js';
 import type { VowelWeights } from '../src/vowelWeights.js';
+
+/** The clip a gesture starts with when the figure plays its own. */
+export const ownClip = (name: FigureGesture) => gestureClips[name];
 
 /** A small seeded source of numbers in [0, 1) (mulberry32), so a run is the same every time. */
 export function seededRandom(seed: number): () => number {
@@ -36,7 +41,7 @@ export function watch(
 	speakerAt: (frame: number) => SpeakerOffset | null = () => null,
 	mouthAt: (frame: number) => VowelWeights | null = () => null
 ): FigurePose[] {
-	const motion = createFigureMotion(seededRandom(seed));
+	const motion = createFigureMotion(seededRandom(seed), ownClip);
 	return Array.from({ length: frames }, (_, frame) => motion.advance(factsAt(frame), frameSeconds, reducedMotion, speakerAt(frame), mouthAt(frame)));
 }
 

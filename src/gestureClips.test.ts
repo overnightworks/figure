@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boneClock, clipWeight, gestureClips, gestureLengthSeconds, type BoneTrack, type ClipBone } from './gestureClips.js';
+import { boneClock, clipWeight, gestureClips, gestureLengthSeconds, isClipBone, lagSecondsOf, type ClipBone, type TurnKey } from './gestureClips.js';
 import { figureGesture } from './gestures.js';
 
 /** The seconds a weight is read at, per second of a clip, around the fades and between them. */
@@ -7,19 +7,19 @@ const weightSamples = 200;
 
 describe.each(Object.values(figureGesture))('the clip of %s', (name) => {
 	const clip = gestureClips[name];
-	const tracks = Object.entries(clip.bones) as [ClipBone, BoneTrack][];
+	const tracks = Object.entries(clip.keys) as [ClipBone, readonly TurnKey[]][];
 
-	it.each(tracks)('keys the track of %s in ascending time from 0 to the clip\'s duration', (_, track) => {
-		const times = track.keys.map(({ seconds }) => seconds);
+	it.each(tracks)('keys the track of %s in ascending time from 0 to the clip\'s duration', (_, keys) => {
+		const times = keys.map(({ seconds }) => seconds);
 
 		expect(times[0]).toBe(0);
 		expect(times.at(-1)).toBe(clip.durationSeconds);
 		times.slice(1).forEach((seconds, index) => expect(seconds).toBeGreaterThan(times[index]!));
 	});
 
-	it.each(tracks)('is in the same pose of %s at the end of the fade in and at the start of the fade out', (_, track) => {
-		const fadeInEnd = track.keys.find(({ seconds }) => seconds === clip.fadeSeconds.in);
-		const fadeOutStart = track.keys.find(({ seconds }) => seconds === clip.durationSeconds - clip.fadeSeconds.out);
+	it.each(tracks)('is in the same pose of %s at the end of the fade in and at the start of the fade out', (_, keys) => {
+		const fadeInEnd = keys.find(({ seconds }) => seconds === clip.fadeSeconds.in);
+		const fadeOutStart = keys.find(({ seconds }) => seconds === clip.durationSeconds - clip.fadeSeconds.out);
 
 		expect(fadeInEnd).toBeDefined();
 		expect(fadeOutStart?.turn).toEqual(fadeInEnd?.turn);
@@ -51,9 +51,9 @@ describe.each(Object.values(figureGesture))('the clip of %s', (name) => {
 	});
 
 	it('has the upper arm ahead of the lower arm and that ahead of the hand during the rise, and the same order of ending', () => {
-		const risen = (bone: ClipBone, gestureSeconds: number) => clipWeight(clip, boneClock(clip.bones[bone], gestureSeconds));
+		const risen = (bone: ClipBone, gestureSeconds: number) => clipWeight(clip, boneClock(bone, gestureSeconds));
 		const mid = clip.fadeSeconds.in / 2;
-		const lateFall = gestureLengthSeconds(name) - clip.fadeSeconds.out / 4;
+		const lateFall = gestureLengthSeconds(clip) - clip.fadeSeconds.out / 4;
 
 		expect(risen('rightUpperArm', mid)).toBeGreaterThan(risen('rightLowerArm', mid));
 		expect(risen('rightLowerArm', mid)).toBeGreaterThan(risen('rightHand', mid));
@@ -62,6 +62,43 @@ describe.each(Object.values(figureGesture))('the clip of %s', (name) => {
 	});
 
 	it('is over for every bone, back at the base pose, when the gesture\'s length is reached', () => {
-		tracks.forEach(([, track]) => expect(clipWeight(clip, boneClock(track, gestureLengthSeconds(name)))).toBe(0));
+		clip.bones.forEach((bone) => expect(clipWeight(clip, boneClock(bone, gestureLengthSeconds(clip)))).toBe(0));
+	});
+
+	it('names exactly the bones it keys, and every one of them is a bone a clip owns', () => {
+		expect([...clip.bones].sort()).toEqual(tracks.map(([bone]) => bone).sort());
+		clip.bones.forEach((bone) => expect(isClipBone(bone)).toBe(true));
+	});
+
+	it('runs for its duration and the longest lag among its bones', () => {
+		expect(gestureLengthSeconds(clip)).toBe(clip.durationSeconds + Math.max(...clip.bones.map(lagSecondsOf)));
+	});
+});
+
+describe('the bones a clip owns', () => {
+	const owned = ['leftShoulder', 'rightUpperArm', 'leftLowerArm', 'rightHand', 'leftThumbMetacarpal', 'rightIndexIntermediate', 'leftLittleDistal', 'spine', 'chest', 'upperChest'];
+
+	it.each(owned)('includes %s', (bone) => {
+		expect(isClipBone(bone)).toBe(true);
+	});
+
+	it.each(['head', 'neck', 'hips', 'leftUpperLeg', 'rightFoot', 'leftEye', 'jaw', 'constructor', 'toString', ''])('leaves out %s', (bone) => {
+		expect(isClipBone(bone)).toBe(false);
+	});
+
+	it('lets the parts of a limb trail down the chain: the lower arm after the upper arm, the hand after the lower arm', () => {
+		expect(lagSecondsOf('rightLowerArm')).toBeGreaterThan(lagSecondsOf('rightUpperArm'));
+		expect(lagSecondsOf('rightHand')).toBeGreaterThan(lagSecondsOf('rightLowerArm'));
+	});
+
+	it.each(['Thumb', 'Index', 'Middle', 'Ring', 'Little'])('lets the fingers of the %s trail with their hand', (finger) => {
+		expect(lagSecondsOf(`right${finger}Proximal` as ClipBone)).toBe(lagSecondsOf('rightHand'));
+		expect(lagSecondsOf(`left${finger}Distal` as ClipBone)).toBe(lagSecondsOf('leftHand'));
+	});
+
+	it('lags both sides alike and leaves the shoulders and the trunk with the upper arm\'s clock', () => {
+		expect(lagSecondsOf('leftLowerArm')).toBe(lagSecondsOf('rightLowerArm'));
+		expect(lagSecondsOf('leftHand')).toBe(lagSecondsOf('rightHand'));
+		(['leftShoulder', 'rightShoulder', 'spine', 'chest', 'upperChest'] as const).forEach((bone) => expect(lagSecondsOf(bone)).toBe(lagSecondsOf('rightUpperArm')));
 	});
 });

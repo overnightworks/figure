@@ -58,6 +58,12 @@ class NoFileReadsPlugin implements GLTFLoaderPlugin {
 	}
 }
 
+/** Registers the plugins that keep a file from causing a request: an image is read from its own bytes through an `<img>` element, and a buffer outside the GLB fails the load. */
+export function registerRefusingPlugins(loader: GLTFLoader, onTextureFailure: () => void): void {
+	loader.register((parser) => new ImageElementTexturesPlugin(parser, onTextureFailure));
+	loader.register((parser) => new NoFileReadsPlugin(parser));
+}
+
 /** The check holds the licence to the profile, so the loader accepts the licence URL the file names instead of three-vrm's one default. */
 function loaderPluginFor(parser: GLTFParser): VRMLoaderPlugin {
 	const acceptLicenseUrls = [parser.json.extensions.VRMC_vrm.meta.licenseUrl];
@@ -74,8 +80,7 @@ function letMoodsKeepTheMouth(vrm: VRM): void {
 export async function loadFigure(bytes: Uint8Array): Promise<VRM> {
 	let textureFailed = false;
 	const loader = new GLTFLoader();
-	loader.register((parser) => new ImageElementTexturesPlugin(parser, () => (textureFailed = true)));
-	loader.register((parser) => new NoFileReadsPlugin(parser));
+	registerRefusingPlugins(loader, () => (textureFailed = true));
 	loader.register(loaderPluginFor);
 	const gltf = await loader.parseAsync(bytes.slice().buffer, '');
 	const vrm = gltf.userData.vrm as VRM;
