@@ -3,6 +3,7 @@ import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng, buildPng } from '../tests/glbBuilder.js';
 import { centreOf, coversSomething, emulateReducedMotion, readPixels, restorePageVisibility, setPageVisibility, spotsOf } from '../tests/browserCanvas.js';
+import * as draw from './draw.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal, type FigureSignal } from './signals.js';
 
@@ -707,3 +708,9 @@ function loseContext(canvas: HTMLCanvasElement): WEBGL_lose_context {
 	extension.loseContext();
 	return extension;
 }
+
+describe('the drawing export', () => {
+	it('gives the host mount and the signals alone', () => {
+		expect(Object.keys(draw).sort()).toEqual(['figureSignal', 'mount']);
+	});
+});

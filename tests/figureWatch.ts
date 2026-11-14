@@ -1,6 +1,7 @@
 // What the browser tests share to watch drawn figures: mounting on canvases, reading each canvas in the task that drew it, and ending the figures.
 import { expect, vi } from 'vitest';
-import { mount, mountLoadingClips, type ClipLoad, type FigureHandle, type MountOptions } from '../src/draw.js';
+import { mount, type FigureHandle, type MountOptions } from '../src/draw.js';
+import { mountWithClipLoad, type ClipLoad } from '../src/figureMount.js';
 import { buildConformantVrm } from './figureFixtures.js';
 import { slowMedianMilliseconds } from '../src/frameTimeGuard.js';
 import { coversSomething, readPixels, spotsOf, type FaceFeature, type Spot } from './browserCanvas.js';
@@ -61,7 +62,7 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 			canvas.style.height = '250px';
 			document.body.append(canvas);
 			canvases.push(canvas);
-			const handle = await (load === undefined ? mount(canvas, bytes, options) : mountLoadingClips(load, canvas, bytes, options));
+			const handle = await (load === undefined ? mount(canvas, bytes, options) : mountWithClipLoad(load, canvas, bytes, options));
 			// The figure draws once before `mount` returns; the buffer still holds that first frame in the task that drew it.
 			readIfDrawn(canvas);
 			handles.push(handle);
