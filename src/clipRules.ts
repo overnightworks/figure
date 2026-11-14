@@ -9,6 +9,9 @@ const FORBIDDEN_PROPERTIES = ['meshes', 'skins', 'materials', 'textures', 'image
 const FORBIDDEN_NODE_PROPERTIES = ['mesh', 'camera', 'skin'];
 const CHANNEL_PATHS: ReadonlySet<string> = new Set(['translation', 'rotation', 'scale', 'weights']);
 
+/** The humanoid bones every clip names. */
+const requiredBones: ReadonlySet<string> = new Set(clipProfile.requiredHumanBones);
+
 /** What a node is to the clip, which decides the one kind of channel it takes. */
 type NodeRole = 'bone' | 'hips' | 'expression' | 'lookAt';
 
@@ -47,30 +50,39 @@ function extensionRefusals(json: JsonObject, refusals: Refusal[]): ReadonlyMap<n
 			}
 			roles.set(node, [...(roles.get(node) ?? []), role]);
 		});
-	const humanoid = extension['humanoid'];
-	const humanBones = entriesOf(isJsonObject(humanoid) ? humanoid['humanBones'] : undefined);
-	const namesNode = (entry: unknown) => isJsonObject(entry) && 'node' in entry;
-	for (const bone of clipProfile.requiredHumanBones) {
-		if (!namesNode(humanBones.get(bone))) {
-			refusals.push({ code: 'humanoid_bone_missing', detail: `the bone ${bone} is missing` });
-		}
-	}
+	const humanBones = entriesOf(isJsonObject(extension['humanoid']) ? extension['humanoid']['humanBones'] : undefined);
+	missingBoneRefusals(humanBones, refusals);
 	for (const [bone, entry] of humanBones) {
-		const isMissingRequiredBone = (clipProfile.requiredHumanBones as readonly string[]).includes(bone) && !namesNode(entry);
+		const isMissingRequiredBone = requiredBones.has(bone) && !namesNode(entry);
 		if (!isMissingRequiredBone) {
 			assign(`humanoid bone ${bone}`, entry, bone === 'hips' ? 'hips' : 'bone');
 		}
 	}
-	const expressions = extension['expressions'];
-	for (const group of ['preset', 'custom']) {
-		for (const [name, entry] of entriesOf(isJsonObject(expressions) ? expressions[group] : undefined)) {
-			assign(`expression ${name}`, entry, 'expression');
-		}
+	for (const [name, entry] of expressionEntries(extension['expressions'])) {
+		assign(`expression ${name}`, entry, 'expression');
 	}
 	if (extension['lookAt'] !== undefined) {
 		assign('lookAt', extension['lookAt'], 'lookAt');
 	}
 	return roles;
+}
+
+function namesNode(entry: unknown): boolean {
+	return isJsonObject(entry) && 'node' in entry;
+}
+
+function missingBoneRefusals(humanBones: ReadonlyMap<string, unknown>, refusals: Refusal[]): void {
+	for (const bone of clipProfile.requiredHumanBones) {
+		if (!namesNode(humanBones.get(bone))) {
+			refusals.push({ code: 'humanoid_bone_missing', detail: `the bone ${bone} is missing` });
+		}
+	}
+}
+
+function* expressionEntries(expressions: unknown): Generator<[string, unknown]> {
+	for (const group of ['preset', 'custom']) {
+		yield* entriesOf(isJsonObject(expressions) ? expressions[group] : undefined);
+	}
 }
 
 function entriesOf(value: unknown): ReadonlyMap<string, unknown> {
