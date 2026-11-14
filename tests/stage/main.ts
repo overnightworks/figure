@@ -21,6 +21,9 @@ interface Slot {
 /** The figure every drawing mounts: the synthetic one until the visitor picks a file. */
 let figureBytes: Uint8Array = buildConformantVrm();
 
+/** The clip the visitor picked for the wave: none until picked, and then every drawing mounts with it. */
+let clipBytes: Uint8Array | undefined;
+
 /** Whether the stage reports its agent as thinking: a freshly mounted figure is told at once. */
 let thinking = false;
 
@@ -72,7 +75,8 @@ async function mountSlot(slot: Slot): Promise<void> {
 	slot.mountPoint.replaceChildren(canvas);
 	slot.signalText.textContent = 'mounting';
 	slot.mountAgain.hidden = true;
-	const handle = await mount(canvas, figureBytes, { onSignal: (signal) => showSignal(slot, canvas, signal) });
+	const gestures = clipBytes === undefined ? undefined : { [figureGesture.wave]: clipBytes };
+	const handle = await mount(canvas, figureBytes, { gestures, onSignal: (signal) => showSignal(slot, canvas, signal) });
 	// A mount that resolves after a newer one replaced its canvas is released here, so its context and loop do not leak.
 	if (!slot.mountPoint.contains(canvas)) {
 		handle.dispose();
@@ -104,6 +108,7 @@ function createSlot(cssWidth: number, stage: HTMLElement): Slot {
 const stage = document.querySelector<HTMLElement>('#stage')!;
 const thinkButton = document.querySelector<HTMLButtonElement>('#think')!;
 const picker = document.querySelector<HTMLInputElement>('#picker')!;
+const clipPicker = document.querySelector<HTMLInputElement>('#clip-picker')!;
 const voiceStatus = document.querySelector<HTMLElement>('#voice-status')!;
 const voicePicker = document.querySelector<HTMLInputElement>('#voice-picker')!;
 const moodChoice = document.querySelector<HTMLFieldSetElement>('#mood')!;
@@ -261,6 +266,13 @@ document.querySelector<HTMLButtonElement>('#speak-without-voice')!.addEventListe
 document.querySelector<HTMLButtonElement>('#stop')!.addEventListener('click', () => {
 	takeControl();
 	replaceSentence(null, 'quiet');
+});
+
+clipPicker.addEventListener('change', async () => {
+	const picked = clipPicker.files?.[0];
+	if (picked === undefined) return;
+	clipBytes = new Uint8Array(await picked.arrayBuffer());
+	await Promise.all(slots.map((slot) => mountSlot(slot)));
 });
 
 picker.addEventListener('change', async () => {

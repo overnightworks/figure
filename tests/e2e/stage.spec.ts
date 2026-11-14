@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { build } from 'vite';
+import { buildArmUpClip } from '../clipFixtures.js';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './serve-consumer.js';
 
@@ -14,6 +15,11 @@ const drawingTimeout = 30_000;
 const shownPixels = 300;
 /** The pixels of the phone-wide canvas a raised arm changes at least: the arm lies well beyond it, the idle glance and a blink do not reach it. */
 const wavedPixels = 3000;
+
+/** The seconds a picked clip holds the arm up: longer than the figure's own wave. */
+const clipHoldSeconds = 20;
+/** The milliseconds after a wave at which the figure's own wave is over. */
+const afterNeutralWaveMilliseconds = 4000;
 
 interface BuiltStage {
 	readonly bundleDirectory: string;
@@ -112,6 +118,35 @@ test.describe('the demo stage under the script policy', () => {
 
 		await page.getByRole('button', { name: 'wave', exact: true }).click();
 		await expect.poll(async () => differingPixels(page, resting, await figure.screenshot()), { timeout: drawingTimeout }).toBeGreaterThan(wavedPixels);
+		expect(requests).toEqual([]);
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	test('a picked clip replaces the wave on both drawings with no request, and the figures stay drawn', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		const requests: string[] = [];
+		page.on('request', (request) => requests.push(request.url()));
+		const previousCanvas = await page.locator('canvas').nth(0).elementHandle();
+
+		await page.locator('#clip-picker').setInputFiles({ name: 'hold.vrma', mimeType: 'model/gltf-binary', buffer: Buffer.from(buildArmUpClip(clipHoldSeconds)) });
+		await expect.poll(() => previousCanvas!.evaluate((canvas) => canvas.isConnected), { timeout: drawingTimeout }).toBe(false);
+		await expectTwoDrawings(page);
+		const figure = page.locator('canvas').nth(0);
+		const resting = await figure.screenshot();
+
+		// A wave made before the clip has parsed is the neutral one, which is over by the time the picked clip still holds the arm up; waves are made until the clip plays.
+		await expect
+			.poll(
+				async () => {
+					await page.getByRole('button', { name: 'wave', exact: true }).click();
+					await page.waitForTimeout(afterNeutralWaveMilliseconds);
+					return differingPixels(page, resting, await figure.screenshot());
+				},
+				{ timeout: drawingTimeout, intervals: [0] }
+			)
+			.toBeGreaterThan(wavedPixels);
 		expect(requests).toEqual([]);
 		await expectTwoDrawings(page);
 		await expectNoViolations(page, pageErrors);

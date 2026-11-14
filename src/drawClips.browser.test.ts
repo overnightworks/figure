@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { buildClipGlb, buildClipGlbOfSize, filesTheLibraryThrowsOn } from '../tests/clipFixtures.js';
-import { type ClipTrack, type Quaternion } from '../tests/clipBuilder.js';
+import { buildArmUpClip, buildClipGlb, buildClipGlbOfSize, filesTheLibraryThrowsOn } from '../tests/clipFixtures.js';
 import { type FaceFeature, type Spot } from '../tests/browserCanvas.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
 import { gestureClips, gestureLengthSeconds } from './gestureClips.js';
@@ -17,12 +16,9 @@ const raisedPixels = 20;
 const armTop = (features: Features) => Math.min(...features.arm.map((spot) => spot.y));
 const isRaised = (features: Features, resting: Features) => armTop(features) < armTop(resting) - raisedPixels;
 
-/** A quarter turn about Z that carries the right arm from its place along the shoulder line to straight up. */
-const armUp: Quaternion = [0, 0, -Math.SQRT1_2, Math.SQRT1_2];
 /** The seconds the persona's clip holds the arm up: more than a neutral wave takes. */
 const holdSeconds = 6;
-const holdArmUp: ClipTrack = { bone: 'rightUpperArm', times: [0, holdSeconds], rotations: [armUp, armUp] };
-const holdingClip = () => buildClipGlb({ animations: [[holdArmUp]] });
+const holdingClip = () => buildArmUpClip(holdSeconds);
 
 /** The seconds after a call at which a neutral wave is over and the persona's clip still holds the arm: the length of the neutral wave and a margin. */
 const afterNeutralWaveSeconds = gestureLengthSeconds(gestureClips[figureGesture.wave]) + 1;
