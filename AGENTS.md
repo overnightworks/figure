@@ -13,7 +13,7 @@
 - `scripts/run_consumer_check.sh`: the browser layer (`pnpm run test:consumer`) through the fleet's `probe-run`.
 - `scripts/run_browser_tests.sh [vitest arguments]`: the whole vitest suite, whose browser project runs headless Chromium, through `probe-run` with one worker; add `--coverage` for the merged `lcov.info`. `pnpm run test` runs the Node project alone; CI runs `pnpm run test:coverage`. Needs `pnpm exec playwright install chromium` once; never in watch or UI mode.
 - `pnpm run stage`: builds and serves the demo stage on 127.0.0.1:4173 under the script policy, where a figure mounts at 390 and 1280 px, with file inputs for another figure and a clip.
-- Release: the operator dispatches `.github/workflows/release.yml` with the version, which must equal `package.json`'s. An agent dispatches it only on his yes for that one version (quality's `docs/release.md`).
+- Release: dispatch `.github/workflows/release.yml` with the version, which must equal `package.json`'s, once the commit's review and CI are green (quality's `docs/release.md`).
 - `quality check`: the shared static check. Run it at the release `.github/workflows/ci.yml` pins, after `git add` (it reads the index).
 
 ## Rules
