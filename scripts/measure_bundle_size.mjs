@@ -2,7 +2,7 @@
 // also mounts (`mount` from `overnightworks-figure/draw`), both built with Vite from a packed figure tarball installed into a
 // temporary directory that the script removes. A size is the sum of the gzip sizes (level 9) of the bundle's JavaScript files.
 // Usage: node scripts/measure_bundle_size.mjs <tarball>; run it from the repository after `pnpm install`; the tarball is installed without install scripts,
-// and that install reads the registry for three and @pixiv/three-vrm. The release build calls it and puts both lines into the release notes.
+// and that install reads the registry for three, @pixiv/three-vrm and @pixiv/three-vrm-animation. The release build calls it and puts both lines into the release notes.
 // Exit codes: 0 with the two lines on stdout, 2 for a missing tarball argument, non-zero for a failed install or build.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

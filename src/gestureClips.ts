@@ -49,6 +49,9 @@ const lagSecondsByBone: Readonly<Record<ClipBone, number>> = Object.fromEntries(
 	...(['spine', 'chest', 'upperChest'] as const).map((bone) => [bone, lagSecondsByPart.trunk])
 ]) as Record<ClipBone, number>;
 
+/** Every bone a clip owns. */
+export const clipBones = Object.keys(lagSecondsByBone) as readonly ClipBone[];
+
 /** Whether a clip owns the bone named `name`: an own key of the lag table, so `'constructor'` and every other inherited name is none. */
 export function isClipBone(name: string): name is ClipBone {
 	return Object.hasOwn(lagSecondsByBone, name);

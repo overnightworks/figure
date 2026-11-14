@@ -69,6 +69,7 @@ to 40 ms.
 `handle.gesture(name)` asks the figure for one of its own gestures, which the package plays on the figure: the host hands no bytes and nothing is fetched. `name` is a
 key of `figureGesture`, exported from the package root `overnightworks-figure` with the type `FigureGesture`; today it is `wave`, a neutral wave of the right arm that eases in and out, with the lower arm and the hand trailing the upper arm.
 The call starts the gesture at the next drawn frame, returns nothing, gives no signal and never throws, and the figure's breath, moods, gaze, blink and mouth go on under it; while the figure thinks, the wave lifts the hand from the chin and gives it back.
+A persona may play its own motion for a base name: `mount(canvas, bytes, { gestures: { wave: clipBytes } })` takes the bytes of a `.vrma` file for a key of `figureGesture`. After `drawn`, each clip is judged by `checkClip`, the check `figure check --as clip` runs, and only a clip that passes is parsed; `mount` does not wait for it. A gesture started before the clip has parsed plays figure's own clip to its end, and the next one plays the persona's. A clip turns the arms, hands, fingers, shoulders, spine, chest and upper chest it keys, with linear, step or cubic-spline tracks, on figure's own fades and over the base pose; the lower arm, the hand and the fingers trail the upper arm by a small lag that figure adds, so an author writes the pose. Every other track is dropped. A key that is no `FigureGesture`, a clip that is refused or fails to load, and one that finishes parsing after `dispose` are dropped: nothing is signalled and nothing throws. The option is read once, at mount.
 One gesture shows at a time and calls never queue: a call for the gesture that plays does nothing, and neither does a value that is no `FigureGesture`, a call made while the page is hidden (it does not play when the page shows again), and a call on a figure that ended or was disposed. Under reduced motion no gesture plays, and one that runs ends at the next frame.
 `mount` never rejects, and the first signal has reached `onSignal` before it resolves.
 
@@ -113,7 +114,7 @@ pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it down
 at the top of the release's notes, below it the gzip size of a bundle that only checks and of one that also mounts.
 npm takes the same URL and records the same integrity.
 
-The package brings `three` and `@pixiv/three-vrm` as dependencies, so the lockfile gains them with their own
+The package brings `three`, `@pixiv/three-vrm` and `@pixiv/three-vrm-animation` as dependencies, so the lockfile gains them with their own
 dependencies. Only `overnightworks-figure/draw` imports them: a consumer that only checks (the package root,
 `overnightworks-figure/codes`, `overnightworks-figure/profile` or the command) loads nothing of three.
 
@@ -172,8 +173,8 @@ A clip is a `.vrma` file: a GLB of `VRMC_vrm_animation` 1.0 with a humanoid of t
 and nothing else, no mesh or image. It accepts LINEAR, STEP and CUBICSPLINE tracks and several animations (the first plays), and
 channels on other nodes, which are never played. It is narrower than the specification in two places: the humanoid is required, and
 key data is float and not sparse. The profile's values (extension, version, file budget, seconds budget, rotation length tolerance)
-live in `src/profile.ts` as `clipProfile`; the budgets are proposals until a measurement in a browser confirms them. A track for
-head, neck, eyes, jaw, expressions, look-at or hips translation passes the check and is dropped when a clip plays.
+live in `src/profile.ts` as `clipProfile`; the budgets stand on a measurement in headless Chromium (`scripts/measure_budget_figure.mjs`). A track for
+the head, neck, eyes, jaw, legs, expressions, look-at or hips passes the check and is dropped when a clip plays.
 
 A refusal may also carry a text naming what it found (the extension, the place of the URI); the command prints it
 after the code. The profile's values (allowed extensions, file budget, presets, licence values, triangle, morph-target, texture-side and texel budgets) live in `src/profile.ts` and are exported as
@@ -184,5 +185,5 @@ The closed set lives in `src/codes.ts` and is exported as `overnightworks-figure
 ## Develop
 
 `pnpm run check` type-checks, `pnpm exec vitest run --coverage` runs the tests (build first), and `quality check` runs
-the shared static check. `pnpm run stage` serves a demo page on localhost, where a figure mounts at 390 and 1280 px and waves on a button.
+the shared static check. `pnpm run stage` serves a demo page on localhost, where a figure mounts at 390 and 1280 px, waves on a button and plays a clip picked from a file for the wave.
 [AGENTS.md](AGENTS.md) lists the commands and rules for agents.
