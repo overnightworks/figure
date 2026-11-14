@@ -192,10 +192,10 @@ describe('the room draw budgets', () => {
 
 	it('counts a node that no scene reaches', () => {
 		const unreached = (json: Json) => {
-			drawing({ triangles: maxTriangles + 1 })(json);
+			drawing({ triangles: maxTriangles + 1, primitives: maxPrimitives + 1 })(json);
 			json.scenes[0].nodes = [];
 		};
-		expect(roomCodesOf(unreached)).toEqual(['too_many_triangles']);
+		expect(roomCodesOf(unreached)).toEqual(['too_many_triangles', 'too_many_primitives']);
 	});
 
 	it('counts no mesh that no node draws', () => {
