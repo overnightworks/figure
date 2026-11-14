@@ -79,6 +79,29 @@ describe('the clip rules', () => {
 		expect(codesOf(change)).toEqual(['gltf_invalid']);
 	});
 
+	it.each([
+		['a nodes entry that is not an object', (json: Json) => json.nodes.push(null)],
+		['nodes that is not a list', (json: Json) => (json.nodes = {})],
+		['a children that is not a list', (json: Json) => (json.nodes[0].children = 1)],
+		['a children index that names no node', (json: Json) => (json.nodes[0].children = [json.nodes.length])],
+		['a children index that names an entry of nodes that is not an object', (json: Json) => {
+			json.nodes.push(null);
+			json.nodes[0].children = [json.nodes.length - 1];
+		}],
+		['a children index that is not an integer', (json: Json) => (json.nodes[0].children = ['1'])]
+	])('refuse %s as gltf_invalid', (_name, change) => {
+		expect(codesOf(change)).toContain('gltf_invalid');
+	});
+
+	it('pass a node whose children name nodes', () => {
+		expect(codesOf((json) => (json.nodes[0].children = [1, 2]))).toEqual([]);
+	});
+
+	it.each(['mesh', 'camera', 'skin'])('refuse a node with a %s as clip_content_not_allowed naming it', (property) => {
+		const refusals = refusalsOf((json) => (json.nodes[0][property] = 0));
+		expect(refusals).toEqual([{ code: 'clip_content_not_allowed', detail: expect.stringContaining(property) }]);
+	});
+
 	it('pass a clip that names no default scene', () => {
 		expect(codesOf((json) => delete json.scene)).toEqual([]);
 	});

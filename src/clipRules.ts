@@ -5,6 +5,8 @@ import { clipProfile } from './profile.js';
 
 /** The glTF properties that hold anything but animation; a clip holds none. */
 const FORBIDDEN_PROPERTIES = ['meshes', 'skins', 'materials', 'textures', 'images', 'samplers', 'cameras'];
+/** The node properties that point at geometry or a skeleton; a node of a clip holds none. */
+const FORBIDDEN_NODE_PROPERTIES = ['mesh', 'camera', 'skin'];
 const CHANNEL_PATHS = ['translation', 'rotation', 'scale', 'weights'];
 
 /** What a node is to the clip, which decides the one kind of channel it takes. */
@@ -23,6 +25,7 @@ export function clipRefusals(json: JsonObject, binaryChunk: Uint8Array | undefin
 	const roles = extensionRefusals(json, refusals);
 	contentRefusals(json, refusals);
 	sceneRefusals(json, refusals);
+	nodeRefusals(json, refusals);
 	animationRefusals(json, binaryChunk, roles, refusals);
 	return refusals;
 }
@@ -99,6 +102,29 @@ function sceneRefusals(json: JsonObject, refusals: Refusal[]): void {
 				}
 			}
 		}
+	});
+}
+
+/** The loader reads every entry of `nodes` and follows its `children`, so each must be an object, name only nodes that exist and hold no mesh, camera or skin. */
+function nodeRefusals(json: JsonObject, refusals: Refusal[]): void {
+	attemptRead(refusals, 'nodes', () => {
+		const nodes = listOf(json['nodes']);
+		nodes.forEach((entry, nodeIndex) => {
+			const place = `nodes[${nodeIndex}]`;
+			attemptRead(refusals, place, () => {
+				const node = objectOf(entry);
+				for (const child of listOf(node['children'])) {
+					if (!isJsonObject(nodes[indexOf(child)])) {
+						unreadable('children names a node that is no entry of nodes');
+					}
+				}
+				for (const property of FORBIDDEN_NODE_PROPERTIES) {
+					if (node[property] !== undefined) {
+						refusals.push({ code: 'clip_content_not_allowed', detail: `${place} holds a ${property}` });
+					}
+				}
+			});
+		});
 	});
 }
 

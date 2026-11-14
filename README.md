@@ -155,7 +155,7 @@ Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } fro
 | `too_many_texels` | the embedded images' widths times heights, added up (each image once), are over the profile's texel budget |
 | `image_invalid` | an embedded image's bytes reach past the binary chunk, or are not a PNG, JPEG or WebP (lossy, lossless or extended) whose header the check can size (zero sides included) |
 | `not_vrm_animation` | a clip has no `extensions.VRMC_vrm_animation` object, or its `specVersion` is not `1.0` |
-| `clip_content_not_allowed` | a clip holds `meshes`, `skins`, `materials`, `textures`, `images`, `samplers` or `cameras`; one refusal per property, naming it |
+| `clip_content_not_allowed` | a clip holds `meshes`, `skins`, `materials`, `textures`, `images`, `samplers` or `cameras`, or a node holds a `mesh`, `camera` or `skin`; one refusal per property, naming it |
 | `clip_scene_missing` | a clip's `scenes` is absent or empty |
 | `clip_animation_missing` | a clip has no animation |
 | `clip_track_not_allowed` | a channel has no target node, animates `weights`, or takes a path its node does not (a humanoid bone takes rotation, the hips also translation, an expression node translation, the look-at node rotation); or its key data is sparse, has no buffer view, or holds rotations that are not float |
