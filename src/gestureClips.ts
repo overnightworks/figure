@@ -86,3 +86,9 @@ const unitRange = (value: number) => Math.max(0, Math.min(1, value));
 export function clipWeight(clip: GestureClip, clock: number): number {
 	return smoothstep(unitRange(clock / clip.fadeSeconds.in)) * smoothstep(unitRange((clip.durationSeconds - clock) / clip.fadeSeconds.out));
 }
+
+/** The share of its clip that the gesture's bones show at the most when the gesture's clock reads `seconds`: the base pose's arm gives way by this share, so the hand leaves the chin with the first bone and comes back to it after the last. */
+export function armShare(name: FigureGesture, seconds: number): number {
+	const clip = gestureClips[name];
+	return Math.max(...Object.values(clip.bones).map((track) => clipWeight(clip, boneClock(track, seconds))));
+}
