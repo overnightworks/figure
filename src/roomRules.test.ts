@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkRoom } from './check.js';
 import { buildRoomGlb, type RoomLook, type RoomVariant } from '../tests/roomBuilder.js';
+import { invalidReferenceCases } from '../tests/roomCases.js';
 import { nodeContentCode, nodeProperties } from '../tests/sceneCases.js';
 
 type Json = Record<string, any>;
@@ -85,16 +86,6 @@ describe('the room rules', () => {
 			expect(refusals).toEqual([{ code: 'room_material_not_unlit', detail: expect.stringContaining('meshes[0].primitives[0]') }]);
 		});
 
-		it.each([
-			['an extensionsUsed that does not name it', (json: Json) => (json.extensionsUsed = [])],
-			['no extensionsUsed', (json: Json) => delete json.extensionsUsed],
-			['an extensionsUsed that is not a list', (json: Json) => (json.extensionsUsed = 'KHR_materials_unlit')]
-		])('refuses an unlit material beside %s as gltf_invalid, since the loader builds its handlers from extensionsUsed', (_name, change) => {
-			const refusals = refusalsOf(change);
-			expect(refusals.map(({ code }) => code)).toContain('gltf_invalid');
-			expect(refusals.map(({ code }) => code)).not.toContain('room_material_not_unlit');
-		});
-
 		it('does not read the textures an unlit material never draws', () => {
 			const change = (json: Json) => {
 				json.materials[0].normalTexture = { index: json.textures.length };
@@ -106,38 +97,13 @@ describe('the room rules', () => {
 	});
 
 	describe('the references the rules walk', () => {
-		it.each([
-			['a node whose mesh names no mesh', (json: Json) => (json.nodes[1].mesh = json.meshes.length)],
-			['a node whose mesh is not an index', (json: Json) => (json.nodes[1].mesh = '0')],
-			['a node that draws a mesh while meshes is absent', (json: Json) => delete json.meshes],
-			['a primitive whose material names no material', (json: Json) => (json.meshes[0].primitives[0].material = json.materials.length)],
-			['a primitive whose material is not an index', (json: Json) => (json.meshes[0].primitives[0].material = '0')],
-			['a primitive that names a material while materials is absent', (json: Json) => delete json.materials],
-			['a primitive whose indices names no accessor', (json: Json) => (json.meshes[0].primitives[0].indices = json.accessors.length)],
-			['a primitive whose POSITION names no accessor', (json: Json) => (json.meshes[0].primitives[0].attributes.POSITION = json.accessors.length)],
-			['a primitive whose TEXCOORD_0 names no accessor', (json: Json) => (json.meshes[0].primitives[0].attributes.TEXCOORD_0 = json.accessors.length)],
-			['a primitive whose COLOR_0 names no accessor', (json: Json) => (json.meshes[1].primitives[0].attributes.COLOR_0 = json.accessors.length)],
-			['a primitive whose attribute is not an index', (json: Json) => (json.meshes[0].primitives[0].attributes.TEXCOORD_0 = '1')],
-			['a primitive that names accessors while accessors is absent', (json: Json) => delete json.accessors],
-			['a base colour texture whose index names no texture', (json: Json) => (json.materials[0].pbrMetallicRoughness.baseColorTexture.index = json.textures.length)],
-			['a base colour texture while textures is absent', (json: Json) => delete json.textures],
-			['a base colour texture without an index', (json: Json) => delete json.materials[0].pbrMetallicRoughness.baseColorTexture.index],
-			['a texture whose source names no image', (json: Json) => (json.textures[0].source = json.images.length)],
-			['a texture whose WebP source names no image', (json: Json) => (json.textures[0].extensions = { EXT_texture_webp: { source: json.images.length } })],
-			['a texture with neither source', (json: Json) => (json.textures[0] = {})],
-			['a texture with a source while images is absent', (json: Json) => delete json.images]
-		])('refuses %s as gltf_invalid', (_name, change) => {
+		it.each(invalidReferenceCases)('refuses %s as gltf_invalid', (_name, change) => {
 			expect(distinctCodesOf(change)).toEqual(['gltf_invalid']);
 		});
 
 		it('names the place that names no entry', () => {
 			const refusals = refusalsOf((json) => (json.nodes[2].mesh = json.meshes.length));
 			expect(refusals[0]?.detail).toContain('nodes[2]');
-		});
-
-		it('refuses an unlisted Draco object on a primitive as gltf_invalid, since the loader then decodes through an absent handler', () => {
-			const change = (json: Json) => (json.meshes[0].primitives[0].extensions = { KHR_draco_mesh_compression: { bufferView: 0, attributes: {} } });
-			expect(codesOf(change)).toEqual(['gltf_invalid']);
 		});
 
 		it('leaves a listed Draco object to the extension allowlist', () => {

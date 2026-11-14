@@ -9,6 +9,7 @@ import { buildClipGlb, buildClipGlbOfSize, nodeOf, rejectedAccessorShapes, retar
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 import { buildPng, imageSizesFilling } from '../tests/glbBuilder.js';
 import { buildBudgetRoom, buildRoomGlb, buildRoomGlbOfSize, drawing, type RoomLook } from '../tests/roomBuilder.js';
+import { invalidReferenceCases } from '../tests/roomCases.js';
 import { invalidNodeCases, invalidSceneCases, missingSceneCases } from '../tests/sceneCases.js';
 
 describe('runCommand', () => {
@@ -169,6 +170,7 @@ describe('runCommand', () => {
 		['a texture at the side budget', buildRoomGlb({ images: [buildPng(side, 1), buildPng(1, side)] })],
 		['textures at the texel budget', buildRoomGlb({ images: texelsAtBudget })],
 		['triangles at the budget', buildRoomGlb({ change: drawing({ triangles: roomProfile.maxTriangles }) })],
+		['a mesh drawn by two nodes holding the triangle budget together', buildRoomGlb({ change: drawing({ triangles: Math.floor(roomProfile.maxTriangles / 2), drawnBy: 2 }) })],
 		['primitives at the budget', buildRoomGlb({ change: drawing({ triangles: 1, primitives: roomProfile.maxPrimitives }) })],
 		['the draw and texture budgets filled together', buildBudgetRoom(roomProfile).glb]
 	])('exits 0 for a room with %s under --as room', (_name, bytes) => {
@@ -182,16 +184,28 @@ describe('runCommand', () => {
 		['more primitives than the budget', buildRoomGlb({ change: drawing({ triangles: 1, primitives: roomProfile.maxPrimitives + 1 }) }), 'too_many_primitives'],
 		['more triangles than the budget', buildRoomGlb({ change: drawing({ triangles: roomProfile.maxTriangles + 1 }) }), 'too_many_triangles'],
 		['a texture over the side budget', buildRoomGlb({ images: [buildPng(side + 1, 1)] }), 'texture_too_large'],
+		['a mesh drawn by two nodes holding more triangles than the budget together', buildRoomGlb({ change: drawing({ triangles: Math.floor(roomProfile.maxTriangles / 2) + 1, drawnBy: 2 }) }), 'too_many_triangles'],
+		['a mesh drawn by two nodes holding more primitives than the budget together', buildRoomGlb({ change: drawing({ triangles: 1, primitives: Math.floor(roomProfile.maxPrimitives / 2) + 1, drawnBy: 2 }) }), 'too_many_primitives'],
 		['one texel over the texel budget', buildRoomGlb({ images: [...texelsAtBudget, buildPng(1, 1)] }), 'too_many_texels'],
-		['a node whose mesh names no mesh', buildRoomGlb({ change: (json) => (json.nodes[1].mesh = json.meshes.length) }), 'gltf_invalid'],
-		['a primitive whose material names no material', buildRoomGlb({ change: (json) => (json.meshes[0].primitives[0].material = json.materials.length) }), 'gltf_invalid'],
-		['a primitive whose POSITION names no accessor', buildRoomGlb({ change: (json) => (json.meshes[0].primitives[0].attributes.POSITION = json.accessors.length) }), 'gltf_invalid'],
-		['a texture whose source names no image', buildRoomGlb({ change: (json) => (json.textures[0].source = json.images.length) }), 'gltf_invalid'],
 		['an extension the room does not allow', buildRoomGlb({ change: (json) => (json.extensionsRequired = ['VRMC_vrm']) }), 'extension_not_allowed'],
 		['a file over the byte budget', buildRoomGlbOfSize(roomProfile.fileBudgetBytes + 1), 'too_large']
 	])('exits 1 with the code on its line for a room with %s under --as room', (_name, bytes, code) => {
 		expect(runCommand(['check', '--as', 'room', writeFigure('bad.glb', bytes)], output)).toBe(1);
 		expect(codesPrinted()).toEqual([code]);
+	});
+
+	it('exits 1 with both budget codes for a node that no scene reaches and that draws more than the budgets', () => {
+		const unreached = (json: Record<string, any>) => {
+			drawing({ triangles: roomProfile.maxTriangles + 1, primitives: roomProfile.maxPrimitives + 1 })(json);
+			json.scenes[0].nodes = [];
+		};
+		expect(runCommand(['check', '--as', 'room', writeFigure('unreached.glb', buildRoomGlb({ change: unreached }))], output)).toBe(1);
+		expect(codesPrinted()).toEqual(['too_many_triangles', 'too_many_primitives']);
+	});
+
+	it.each(invalidReferenceCases)('exits 1 with gltf_invalid alone for a room with %s under --as room', (_name, change) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('reference.glb', buildRoomGlb({ change }))], output)).toBe(1);
+		expect([...new Set(codesPrinted())]).toEqual(['gltf_invalid']);
 	});
 
 	it.each(missingSceneCases)('exits 1 with room_scene_missing for a room with %s under --as room', (_name, change) => {
