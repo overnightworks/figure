@@ -1,7 +1,0 @@
-claim_id = "db55c552d6cc4c0db73c5b14f6a32dab"
-agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
-role = "builder"
-base = "17d174d5ca5aa3019b05f6187da15603ac8ca1bb"
-branch = "claude/issue-100-release-0-7-0-carries-the-figure-vocabul"
-scope = ["README.md", "docs/ARCHITECTURE.md", "package.json"]
-opened_commit = "48bf24907892b416ccbe8b7fedff1fc89d5346f1"
