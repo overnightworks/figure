@@ -165,8 +165,7 @@ function firstNodeInCycle(childrenOf: ReadonlyMap<number, readonly number[]>): n
 		}
 		const path = new Set<number>([start]);
 		const pending: { node: number; next: number }[] = [{ node: start, next: 0 }];
-		while (pending.length > 0) {
-			const frame = pending[pending.length - 1];
+		for (let frame = pending.at(-1); frame !== undefined; frame = pending.at(-1)) {
 			const child = childrenOf.get(frame.node)?.[frame.next++];
 			if (child === undefined) {
 				path.delete(frame.node);
