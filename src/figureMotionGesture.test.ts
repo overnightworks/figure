@@ -109,5 +109,28 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 		it('brings the base pose\'s right arm back to the chin once the gesture ended', () => {
 			expect(withGesture.at(-1)!.arms).toEqual(thinkingOnly.at(-1)!.arms);
 		});
+
+		describe('when reduced motion ends it', () => {
+			const lastShownFrame = midClip;
+			const reducedFrom = (frame: number): Frame => ({ ...call(frame), reducedMotion: frame > lastShownFrame });
+			const reduced = posesOf(frames, reducedFrom);
+			const chinShares = reduced.slice(lastShownFrame).map(({ arms }, frame) => {
+				const [rest, chin] = [resting[lastShownFrame + frame]!.arms.rightUpperArm.roll, thinkingOnly[lastShownFrame + frame]!.arms.rightUpperArm.roll];
+				return (arms.rightUpperArm.roll - rest) / (chin - rest);
+			});
+
+			it('plays no gesture from the next frame', () => {
+				expect(reduced.slice(lastShownFrame + 1).map(({ gesture }) => gesture)).toEqual(Array(frames - lastShownFrame - 1).fill(null));
+			});
+
+			it('eases the base arm back to the chin without a jump', () => {
+				const steps = chinShares.slice(1).map((share, frame) => share - chinShares[frame]!);
+
+				expect(Math.max(...steps)).toBeLessThan(0.1);
+				expect(Math.min(...steps)).toBeGreaterThanOrEqual(0);
+				expect(chinShares[1]).toBeLessThan(0.1);
+				expect(chinShares.at(-1)).toBeCloseTo(1, 3);
+			});
+		});
 	});
 });

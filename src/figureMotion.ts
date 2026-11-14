@@ -173,16 +173,20 @@ function blendedTurn(from: Turn, to: Turn, weight: number): Turn {
  * the body and stays inside the picture's side, where a forearm still hanging straight would swing out beyond it.
  */
 function forearmFoldShare(thinkingWeight: number): number {
-	return 1 - (1 - thinkingWeight) ** 3;
+	return 1 - (1 - thinkingWeight) ** 4;
 }
 
-/** The arms' base pose: lowered, the left upper arm swinging with `breathShare`, the breath as a share of its largest lean, and the right arm on its way to the chin by `thinkingWeight`. */
-function baseArms(breathShare: number, thinkingWeight: number): Arms {
+/**
+ * The arms' base pose: lowered, the left upper arm swinging with `breathShare`, the breath as a share of its largest lean, and the
+ * right arm on its way to the chin by `thinkingWeight`, less `armGiven`, the share of the way back to rest that a gesture takes it.
+ */
+function baseArms(breathShare: number, thinkingWeight: number, armGiven: number): Arms {
 	const restingRightUpperArm: Turn = { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll };
+	const kept = 1 - armGiven;
 	return {
 		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * breathShare, roll: -restingArm.upperArmRoll },
-		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, thinkingWeight),
-		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, forearmFoldShare(thinkingWeight))
+		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, thinkingWeight * kept),
+		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, forearmFoldShare(thinkingWeight) * kept)
 	};
 }
 
@@ -375,6 +379,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 	let previousGoal: Gaze = gaze;
 	let thinkingWeight = 0;
 	let leanWeight = 0;
+	let armGiven = 0;
 
 	return {
 		gesture: gestureMotion.gesture,
@@ -399,6 +404,9 @@ export function createFigureMotion(random: () => number): FigureMotion {
 			thinkingWeight = ease(thinkingWeight, thinking ? 1 : 0, easing.thinking);
 			leanWeight = ease(leanWeight, listening ? 1 : 0, easing.lean);
 			const gesture = gestureMotion.advance(step, reducedMotion);
+			// Under reduced motion no gesture plays, yet the share a wave cut short had taken from the chin returns at the thinking look's rate, not in one frame.
+			const armShown = gesture === null ? 0 : armShare(gesture.name, gesture.seconds);
+			armGiven = reducedMotion ? easeToward(armGiven, armShown, easing.thinking, step, false) : armShown;
 			return {
 				blink: thinking ? base.blink * thinkingLook.blinkWeight : base.blink,
 				breath: base.breath,
@@ -417,7 +425,7 @@ export function createFigureMotion(random: () => number): FigureMotion {
 				moodTrunk: { spine: mood.chest * trunkShare.spine, chest: mood.chest * trunkShare.chest },
 				mouth: moodShown ? scaled(voice.weights, mouthUnderMood.factor) : voice.weights,
 				look: { yaw: clamp(eyeGaze.yaw * lookGain + jump * base.eyes.yaw, lookReachDegrees), pitch: clamp(eyeGaze.pitch * lookGain + jump * base.eyes.pitch, lookReachDegrees) },
-				arms: baseArms(breathShare, thinkingWeight * (1 - (gesture === null ? 0 : armShare(gesture.name, gesture.seconds)))),
+				arms: baseArms(breathShare, thinkingWeight, armGiven),
 				shoulders: shoulderDeltas(breathShare, mood.shoulder * shoulderShare),
 				gesture
 			};
