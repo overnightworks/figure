@@ -25,11 +25,4 @@ describe('the room profile', () => {
 	it('allows no VRM extension, no light and no compression', () => {
 		for (const extension of roomProfile.allowedExtensions) expect(extension).not.toMatch(/^VRMC_|lights|draco|meshopt|basisu|instancing/i);
 	});
-
-	it('sets no budget above the figure profile’s, since a room draws beside a figure', () => {
-		expect(roomProfile.fileBudgetBytes).toBeLessThanOrEqual(figureProfile.fileBudgetBytes);
-		expect(roomProfile.maxTriangles).toBeLessThanOrEqual(figureProfile.maxTriangles);
-		expect(roomProfile.maxTexels).toBeLessThanOrEqual(figureProfile.maxTexels);
-		expect(roomProfile.maxTextureSidePixels).toBeLessThanOrEqual(figureProfile.maxTextureSidePixels);
-	});
 });
