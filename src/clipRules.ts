@@ -108,6 +108,7 @@ function sceneRefusals(json: JsonObject, refusals: Refusal[]): void {
 		}
 		const nodes = listOf(json['nodes']);
 		for (const scene of scenes) {
+			nameMustBeText(objectOf(scene));
 			for (const node of listOf(objectOf(scene)['nodes'])) {
 				if (!isJsonObject(nodes[indexOf(node)])) {
 					unreadable('a scene names a node that is no entry of nodes');
@@ -117,19 +118,30 @@ function sceneRefusals(json: JsonObject, refusals: Refusal[]): void {
 	});
 }
 
-/** The loader reads every entry of `nodes` and follows its `children`, so each must be an object, name only nodes that exist and hold no mesh, camera or skin. */
+/** The loader sanitises a name with a string method, so a name that is present must be text. */
+function nameMustBeText(entry: JsonObject): void {
+	if (entry['name'] !== undefined && typeof entry['name'] !== 'string') {
+		unreadable('a name is not text');
+	}
+}
+
+/** The loader follows `children` recursively, so each must be an object, name only nodes that exist and hold no mesh, camera or skin, and the children must form no cycle. */
 function nodeRefusals(json: JsonObject, refusals: Refusal[]): void {
 	attemptRead(refusals, 'nodes', () => {
 		const nodes = listOf(json['nodes']);
+		const childrenOf = new Map<number, readonly number[]>();
 		nodes.forEach((entry, nodeIndex) => {
 			const place = `nodes[${nodeIndex}]`;
 			attemptRead(refusals, place, () => {
 				const node = objectOf(entry);
-				for (const child of listOf(node['children'])) {
+				nameMustBeText(node);
+				const children = listOf(node['children']).map((child) => {
 					if (!isJsonObject(nodes[indexOf(child)])) {
 						unreadable('children names a node that is no entry of nodes');
 					}
-				}
+					return indexOf(child);
+				});
+				childrenOf.set(nodeIndex, children);
 				for (const property of FORBIDDEN_NODE_PROPERTIES) {
 					if (node[property] !== undefined) {
 						refusals.push({ code: 'clip_content_not_allowed', detail: `${place} holds a ${property}` });
@@ -137,7 +149,38 @@ function nodeRefusals(json: JsonObject, refusals: Refusal[]): void {
 				}
 			});
 		});
+		const inCycle = firstNodeInCycle(childrenOf);
+		if (inCycle !== undefined) {
+			unreadable(`nodes[${inCycle}] is its own descendant`);
+		}
 	});
+}
+
+/** The first node, in index order, that a walk of `children` meets again on its own path, or undefined when the nodes form a forest. Iterative, since a clip may chain nodes deeper than the stack. */
+function firstNodeInCycle(childrenOf: ReadonlyMap<number, readonly number[]>): number | undefined {
+	const finished = new Set<number>();
+	for (const start of childrenOf.keys()) {
+		if (finished.has(start)) {
+			continue;
+		}
+		const path = new Set<number>([start]);
+		const pending: { node: number; next: number }[] = [{ node: start, next: 0 }];
+		while (pending.length > 0) {
+			const frame = pending[pending.length - 1];
+			const child = childrenOf.get(frame.node)?.[frame.next++];
+			if (child === undefined) {
+				path.delete(frame.node);
+				finished.add(frame.node);
+				pending.pop();
+			} else if (path.has(child)) {
+				return child;
+			} else if (!finished.has(child)) {
+				path.add(child);
+				pending.push({ node: child, next: 0 });
+			}
+		}
+	}
+	return undefined;
 }
 
 /** Judges every animation, since the loader parses each; only the first one's length counts against the profile. */
