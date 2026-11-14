@@ -166,7 +166,11 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 			});
 
 			it('keeps the forearm ahead of the upper arm from the frame it is lifted on', () => {
-				afterWave.forEach((frame) => expect(shareOf(frame, 'rightLowerArm', 'yaw')).toBeGreaterThanOrEqual(shareOf(frame, 'rightUpperArm', 'roll') - 1e-9));
+				const shares = afterWave.map((frame) => ({ frame, upper: shareOf(frame, 'rightUpperArm', 'roll'), fore: shareOf(frame, 'rightLowerArm', 'yaw') }));
+				const afterLift = shares.filter(({ frame }) => frame > liftedFrame);
+
+				shares.forEach(({ upper, fore }) => expect(fore).toBeGreaterThanOrEqual(upper - 1e-9));
+				expect(afterLift.some(({ upper, fore }) => upper > 0.05 && upper < 0.95 && fore > upper + 0.05)).toBe(true);
 			});
 		});
 	});
