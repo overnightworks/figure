@@ -25,7 +25,7 @@ flowchart TD
     cli --> check
     subgraph pure["pure: no Node, no three; a browser and Node both run them"]
         check["check.ts: container rules and their order"] --> rules["vrmRules, budgetRules, textureRules, clipRules"]
-        rules --> profile["profile.ts: the values the rules read"]
+        rules --> profile["profile.ts: the values the rules read"] --> expressions["expressions.ts: mouth shapes, moods"]
         check --> codes["codes.ts: the closed set of refusal codes"]
     end
     index["index.ts"] --> check
@@ -36,14 +36,14 @@ flowchart TD
     figureMount --> frame["figureFrame.ts, gestureLayer.ts: camera, lights, one frame"]
     figureMount --> voice["voiceTap.ts, vowelWeights.ts: the host's voice to mouth weights"]
     figureMount --> guard["frameTimeGuard.ts: the slow test, pure"]
-    draw --> signals["signals.ts, gestures.ts, expressions.ts: closed sets"] & clipLoader["clipLoader.ts: .vrma into three objects"]
+    draw --> signals["signals.ts, gestures.ts: closed sets"] & clipLoader["clipLoader.ts: .vrma into three objects"]
 ```
 
 *Module groups and their imports; derived from `src/`.*
 
-- `codes.ts` owns every refusal code and its description. `signals.ts`, `gestures.ts` (`wave`) and `expressions.ts` (mouth shapes, moods) own the other closed sets; each is the one place a member is written.
+- `codes.ts` owns every refusal code and its description. `signals.ts` (five signals: `drawn`, `unsupported`, `refused`, `lost`, `slow`, of which every one but `drawn` ends a figure), `gestures.ts` (`wave`) and `expressions.ts` (mouth shapes, moods) own the other closed sets; each is the one place a member is written.
 - `profile.ts` owns the values the rules read: `figureProfile` and `clipProfile` (allowed extensions, file budget, version, required bones, and the mesh, texture and seconds budgets).
-- `check.ts` owns the container rules and their order once for both profiles; `checkFigure` and `checkClip` differ in the profile and in the rules after the container. The rule modules judge parsed JSON and import only the codes, the profile and `json.ts`; `textureRules.ts` also reads the binary chunk through `imageSize.ts`. `clipRules.ts` and `clipKeyRules.ts` judge a clip, and are narrower than `VRMC_vrm_animation` where a gesture needs it.
+- `check.ts` owns the container rules and their order once for both profiles; `checkFigure` and `checkClip` differ in the profile and in the rules after the container. The rule modules judge parsed JSON and import only pure modules beside them (the codes, the profile, `json.ts`, and `clipRules.ts` also `clipKeyRules.ts`), no Node, three or @pixiv module; `textureRules.ts` also reads the binary chunk through `imageSize.ts`. `clipRules.ts` and `clipKeyRules.ts` judge a clip, and are narrower than `VRMC_vrm_animation` where a gesture needs it.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
 - `index.ts` exports `checkFigure`, `checkClip`, the codes, both profiles and `figureGesture`; `overnightworks-figure/codes` and `/profile` export a subset. No module they reach imports three or three-vrm.
 - `draw.ts` is the one module of `overnightworks-figure/draw`: it exports `mount`, `figureSignal` and the types of the handle, the options, the signal, the mood and the gesture. The handle is the last signal, an idempotent `dispose`, `think`, `listen`, `speak` and `gesture`. The types live in `mountOptions.ts`, so no declaration of the export names a three type (`scripts/check_packed_tarball.sh` follows them). `mount` is `figureMount.ts`' `mountWithClipLoad` given `clipLoader.ts`' `loadClip`; tests give it another parse.
@@ -161,7 +161,7 @@ A browser layer (`tests/e2e`, Playwright) packs the tarball, installs it into a 
 
 ## 6. Constraints and reasons
 
-- The check reads raw bytes and imports no module: a browser runs it before three parses a file, and personas' CI runs it in Node.
+- The check reads raw bytes and imports only the pure modules beside it, no Node, three or @pixiv module: a browser runs it before three parses a file, and personas' CI runs it in Node.
 - Every refusal is one value of one closed set: callers branch on codes, never on wording.
 - Exit codes are quality's (0 yes, 1 no, 2 could not answer), so a failure to judge is never read as a verdict.
 - The runtime dependencies are `three`, `@pixiv/three-vrm` and `@pixiv/three-vrm-animation`, which draw and load the figure and read a persona's clip; only the `draw` export imports them, so a consumer that only checks loads none of them. All are on patch ranges and update together with `@types/three`.
