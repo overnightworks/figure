@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { checkClip } from './check.js';
 import { clipProfile } from './profile.js';
 import { conformantTrack, identity, type ClipTrack } from '../tests/clipBuilder.js';
+import {
+	invalidNodeCases,
+	invalidSceneCases,
+	missingSceneCases,
+	nodeContentCode,
+	nodeProperties,
+	passingNodeCases,
+	sceneMissingCode,
+	unreadableGrandchildCase
+} from '../tests/sceneCases.js';
 import { addNode, buildClipGlb, expressionNode, forbiddenClipContent, lookAtNode, nodeOf, retarget, secondAnimationCases } from '../tests/clipFixtures.js';
 
 type Json = Record<string, any>;
@@ -61,88 +71,29 @@ describe('the clip rules', () => {
 		}
 	);
 
-	it.each([
-		['no scenes', (json: Json) => delete json.scenes],
-		['an empty scenes list', (json: Json) => (json.scenes = [])]
-	])('refuse %s as clip_scene_missing alone', (_name, change) => {
-		expect(codesOf(change)).toEqual(['clip_scene_missing']);
+	it.each(missingSceneCases)('refuse %s as clip_scene_missing alone', (_name, change) => {
+		expect(codesOf(change)).toEqual([sceneMissingCode.clip]);
 	});
 
-	it.each([
-		['scenes that is not a list', (json: Json) => (json.scenes = {})],
-		['a scene index that names no scene', (json: Json) => (json.scene = json.scenes.length)],
-		['a scene that is not an object', (json: Json) => (json.scenes = [null])],
-		['a scene whose nodes is not a list', (json: Json) => (json.scenes[0].nodes = 0)],
-		['a scene that names a node that is no entry of nodes', (json: Json) => json.scenes[0].nodes.push(json.nodes.length)],
-		['a scene that names a node by an index that is not an integer', (json: Json) => (json.scenes[0].nodes[0] = '0')]
-	])('refuse %s as gltf_invalid', (_name, change) => {
+	it.each(invalidSceneCases)('refuse %s as gltf_invalid', (_name, change) => {
 		expect(codesOf(change)).toEqual(['gltf_invalid']);
 	});
 
-	it.each([
-		['a nodes entry that is not an object', (json: Json) => json.nodes.push(null)],
-		['nodes that is not a list', (json: Json) => (json.nodes = {})],
-		['a children that is not a list', (json: Json) => (json.nodes[0].children = 1)],
-		['a children index that names no node', (json: Json) => (json.nodes[0].children = [json.nodes.length])],
-		['a children index that names an entry of nodes that is not an object', (json: Json) => {
-			json.nodes.push(null);
-			json.nodes[0].children = [json.nodes.length - 1];
-		}],
-		['a children index that is not an integer', (json: Json) => (json.nodes[0].children = ['1'])],
-		['a node that is its own child', (json: Json) => (json.nodes[0].children = [0])],
-		['two nodes that are each other\'s child', (json: Json) => {
-			json.nodes[0].children = [1];
-			json.nodes[1].children = [0];
-		}],
-		['three nodes that are each other\'s descendant in a ring', (json: Json) => {
-			json.nodes[0].children = [1];
-			json.nodes[1].children = [2];
-			json.nodes[2].children = [0];
-		}],
-		['a node under a cycle that does not contain it', (json: Json) => {
-			json.nodes[0].children = [1];
-			json.nodes[1].children = [2];
-			json.nodes[2].children = [1];
-		}],
-		['a node whose name is a number', (json: Json) => (json.nodes[0].name = 5)],
-		['a node whose name is null', (json: Json) => (json.nodes[0].name = null)],
-		['a scene whose name is a number', (json: Json) => (json.scenes[0].name = 5)]
-	])('refuse %s as gltf_invalid', (_name, change) => {
+	it.each(invalidNodeCases)('refuse %s as gltf_invalid', (_name, change) => {
 		expect(codesOf(change)).toContain('gltf_invalid');
 	});
 
-	it('pass a node whose children name nodes', () => {
-		expect(codesOf((json) => (json.nodes[0].children = [1, 2]))).toEqual([]);
-	});
-
-	it('pass two nodes that share a child, which is no cycle', () => {
-		expect(codesOf((json) => {
-			json.nodes[0].children = [2];
-			json.nodes[1].children = [2];
-		})).toEqual([]);
+	it.each(passingNodeCases)('pass %s', (_name, change) => {
+		expect(codesOf(change)).toEqual([]);
 	});
 
 	it('refuse a child whose own children are unreadable once, as gltf_invalid', () => {
-		expect(codesOf((json) => {
-			json.nodes[0].children = [1];
-			json.nodes[1].children = ['2'];
-		})).toEqual(['gltf_invalid']);
+		expect(codesOf(unreadableGrandchildCase)).toEqual(['gltf_invalid']);
 	});
 
-	it('pass text names on nodes and scenes', () => {
-		expect(codesOf((json) => {
-			json.nodes[0].name = 'root';
-			json.scenes[0].name = 'scene';
-		})).toEqual([]);
-	});
-
-	it.each(['mesh', 'camera', 'skin'])('refuse a node with a %s as clip_content_not_allowed naming it', (property) => {
+	it.each(nodeProperties)('refuse a node with a %s as clip_content_not_allowed naming it', (property) => {
 		const refusals = refusalsOf((json) => (json.nodes[0][property] = 0));
-		expect(refusals).toEqual([{ code: 'clip_content_not_allowed', detail: expect.stringContaining(property) }]);
-	});
-
-	it('pass a clip that names no default scene', () => {
-		expect(codesOf((json) => delete json.scene)).toEqual([]);
+		expect(refusals).toEqual([{ code: nodeContentCode.clip, detail: expect.stringContaining(property) }]);
 	});
 
 	it.each([

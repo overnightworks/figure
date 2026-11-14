@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { checkFigure } from './check.js';
-import { figureProfile } from './profile.js';
+import { checkFigure, checkRoom } from './check.js';
+import { figureProfile, roomProfile } from './profile.js';
 import { buildVrmGlb, buildVrmGlbWithImages, vrmJson, vrmParts } from '../tests/figureFixtures.js';
 import { buildGlb, buildJpeg, buildPng, buildWebp } from '../tests/glbBuilder.js';
+import { buildRoomGlb } from '../tests/roomBuilder.js';
 
 type Json = Record<string, any>;
 
@@ -187,5 +188,15 @@ describe('a part of the JSON the texture rules cannot read', () => {
 	it('leaves an image with a uri to uri_not_allowed alone', () => {
 		const bytes = buildVrmGlb({ json: vrmJson((json) => (json.images = [{ uri: 'face.png', bufferView: 9 }])) });
 		expect(codesOf(bytes)).toEqual(['uri_not_allowed']);
+	});
+});
+
+describe('the texture budgets of a kind', () => {
+	it('are the profile’s of the kind that is judged', () => {
+		const rows = Math.ceil(roomProfile.maxTexels / figureProfile.maxTextureSidePixels) + 1;
+		expect(rows * figureProfile.maxTextureSidePixels).toBeLessThanOrEqual(figureProfile.maxTexels);
+		const image = buildPng(figureProfile.maxTextureSidePixels, rows);
+		expect(codesOf(buildVrmGlbWithImages([image]))).toEqual([]);
+		expect(checkRoom(buildRoomGlb({ images: [image] })).map(({ code }) => code)).toEqual(['too_many_texels']);
 	});
 });

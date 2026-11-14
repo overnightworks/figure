@@ -3,10 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCommand } from './cli.js';
-import { clipProfile, figureProfile } from './profile.js';
+import { clipProfile, figureProfile, roomProfile } from './profile.js';
 import { conformantTrack, type ClipTrack } from '../tests/clipBuilder.js';
 import { buildClipGlb, buildClipGlbOfSize, nodeOf, rejectedAccessorShapes, retarget, secondAnimationCases } from '../tests/clipFixtures.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
+import { buildPng, imageSizesFilling } from '../tests/glbBuilder.js';
+import { buildBudgetRoom, buildRoomGlb, buildRoomGlbOfSize, drawing, type RoomLook } from '../tests/roomBuilder.js';
+import { invalidReferenceCases } from '../tests/roomCases.js';
+import { invalidNodeCases, invalidSceneCases, missingSceneCases } from '../tests/sceneCases.js';
 
 describe('runCommand', () => {
 	let directory: string;
@@ -144,6 +148,92 @@ describe('runCommand', () => {
 		expect(stdout.map((line) => line.split(':')[0])).toContain('not_vrm');
 	});
 
+	it('exits 0 and says so on stdout for a conformant room under --as room', () => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('ok.glb', buildRoomGlb())], output)).toBe(0);
+		expect(stdout).toHaveLength(1);
+		expect(stderr).toEqual([]);
+	});
+
+	it('exits 0 for a room at the byte budget under --as room', () => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('ok.glb', buildRoomGlbOfSize(roomProfile.fileBudgetBytes))], output)).toBe(0);
+	});
+
+	it.each<[RoomLook]>([['textured'], ['vertexColoured']])('exits 0 for a room painted only %s under --as room', (look) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('look.glb', buildRoomGlb({ look }))], output)).toBe(0);
+		expect(stderr).toEqual([]);
+	});
+
+	const side = roomProfile.maxTextureSidePixels;
+	const texelsAtBudget = imageSizesFilling(roomProfile.maxTexels, side).map(([width, height]) => buildPng(width, height));
+
+	it.each<[string, Uint8Array]>([
+		['a texture at the side budget', buildRoomGlb({ images: [buildPng(side, 1), buildPng(1, side)] })],
+		['textures at the texel budget', buildRoomGlb({ images: texelsAtBudget })],
+		['triangles at the budget', buildRoomGlb({ change: drawing({ triangles: roomProfile.maxTriangles }) })],
+		['a mesh drawn by two nodes holding the triangle budget together', buildRoomGlb({ change: drawing({ triangles: Math.floor(roomProfile.maxTriangles / 2), drawnBy: 2 }) })],
+		['primitives at the budget', buildRoomGlb({ change: drawing({ triangles: 1, primitives: roomProfile.maxPrimitives }) })],
+		['the draw and texture budgets filled together', buildBudgetRoom(roomProfile).glb]
+	])('exits 0 for a room with %s under --as room', (_name, bytes) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('limit.glb', bytes)], output)).toBe(0);
+		expect(stdout).toHaveLength(1);
+	});
+
+	it.each<[string, Uint8Array, string]>([
+		['a skin', buildRoomGlb({ change: (json) => (json.skins = []) }), 'room_content_not_allowed'],
+		['a lit material', buildRoomGlb({ change: (json) => delete json.materials[0].extensions }), 'room_material_not_unlit'],
+		['more primitives than the budget', buildRoomGlb({ change: drawing({ triangles: 1, primitives: roomProfile.maxPrimitives + 1 }) }), 'too_many_primitives'],
+		['more triangles than the budget', buildRoomGlb({ change: drawing({ triangles: roomProfile.maxTriangles + 1 }) }), 'too_many_triangles'],
+		['a texture over the side budget', buildRoomGlb({ images: [buildPng(side + 1, 1)] }), 'texture_too_large'],
+		['a mesh drawn by two nodes holding more triangles than the budget together', buildRoomGlb({ change: drawing({ triangles: Math.floor(roomProfile.maxTriangles / 2) + 1, drawnBy: 2 }) }), 'too_many_triangles'],
+		['a mesh drawn by two nodes holding more primitives than the budget together', buildRoomGlb({ change: drawing({ triangles: 1, primitives: Math.floor(roomProfile.maxPrimitives / 2) + 1, drawnBy: 2 }) }), 'too_many_primitives'],
+		['one texel over the texel budget', buildRoomGlb({ images: [...texelsAtBudget, buildPng(1, 1)] }), 'too_many_texels'],
+		['an extension the room does not allow', buildRoomGlb({ change: (json) => (json.extensionsRequired = ['VRMC_vrm']) }), 'extension_not_allowed'],
+		['a file over the byte budget', buildRoomGlbOfSize(roomProfile.fileBudgetBytes + 1), 'too_large']
+	])('exits 1 with the code on its line for a room with %s under --as room', (_name, bytes, code) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('bad.glb', bytes)], output)).toBe(1);
+		expect(codesPrinted()).toEqual([code]);
+	});
+
+	it('exits 1 with both budget codes for a node that no scene reaches and that draws more than the budgets', () => {
+		const unreached = (json: Record<string, any>) => {
+			drawing({ triangles: roomProfile.maxTriangles + 1, primitives: roomProfile.maxPrimitives + 1 })(json);
+			json.scenes[0].nodes = [];
+		};
+		expect(runCommand(['check', '--as', 'room', writeFigure('unreached.glb', buildRoomGlb({ change: unreached }))], output)).toBe(1);
+		expect(codesPrinted()).toEqual(['too_many_triangles', 'too_many_primitives']);
+	});
+
+	it.each(invalidReferenceCases)('exits 1 with gltf_invalid alone for a room with %s under --as room', (_name, change) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('reference.glb', buildRoomGlb({ change }))], output)).toBe(1);
+		expect([...new Set(codesPrinted())]).toEqual(['gltf_invalid']);
+	});
+
+	it.each(missingSceneCases)('exits 1 with room_scene_missing for a room with %s under --as room', (_name, change) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('scene.glb', buildRoomGlb({ change }))], output)).toBe(1);
+		expect(codesPrinted()).toEqual(['room_scene_missing']);
+	});
+
+	it.each([...invalidSceneCases, ...invalidNodeCases])('exits 1 with gltf_invalid among the codes for a room with %s under --as room', (_name, change) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('shape.glb', buildRoomGlb({ change }))], output)).toBe(1);
+		expect(codesPrinted()).toContain('gltf_invalid');
+	});
+
+	it('exits 1 with the room code and the text it found for a room that breaks a room rule', () => {
+		const path = writeFigure('skins.glb', buildRoomGlb({ change: (json) => (json.skins = []) }));
+		expect(runCommand(['check', '--as', 'room', path], output)).toBe(1);
+		expect(stdout).toEqual([expect.stringMatching(/^room_content_not_allowed\b.*skins/)]);
+	});
+
+	it('judges a figure and a clip as a room under --as room, and a room as a figure without it', () => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('figure.vrm', buildVrmGlb())], output)).toBe(1);
+		expect(codesPrinted()).toEqual(expect.arrayContaining(['extension_not_allowed', 'room_content_not_allowed']));
+		stdout = [];
+		expect(runCommand(['check', '--as', 'room', writeFigure('clip.vrma', buildClipGlb())], output)).toBe(1);
+		stdout = [];
+		expect(runCommand(['check', writeFigure('room.glb', buildRoomGlb())], output)).toBe(1);
+		expect(codesPrinted()).toContain('not_vrm');
+	});
+
 	it.each([
 		['no command', []],
 		['an unknown command', ['draw', 'a.glb']],
@@ -151,13 +241,15 @@ describe('runCommand', () => {
 		['more than one file', ['check', 'a.glb', 'b.glb']],
 		['--as without a value', ['check', '--as']],
 		['--as without a file', ['check', '--as', 'clip']],
-		['--as with a value that is not clip', ['check', '--as', 'room', 'a.glb']],
+		['--as room without a file', ['check', '--as', 'room']],
+		['--as with a value that is neither clip nor room', ['check', '--as', 'figure', 'a.glb']],
 		['--as after the file', ['check', 'a.glb', '--as', 'clip']],
-		['more than one file under --as clip', ['check', '--as', 'clip', 'a.vrma', 'b.vrma']]
+		['more than one file under --as clip', ['check', '--as', 'clip', 'a.vrma', 'b.vrma']],
+		['more than one file under --as room', ['check', '--as', 'room', 'a.glb', 'b.glb']]
 	])('exits 2 for %s', (_name, argv) => {
 		expect(runCommand(argv, output)).toBe(2);
 		expect(stdout).toEqual([]);
 		expect(stderr).toHaveLength(1);
-		expect(stderr[0]).toContain('usage: figure check [--as clip] <file>');
+		expect(stderr[0]).toContain('usage: figure check [--as clip|room] <file>');
 	});
 });

@@ -2,13 +2,18 @@ import type { Refusal } from './codes.js';
 import { attemptRead, indexOf, listOf, objectOf, requiredListOf, unreadable, type JsonObject } from './json.js';
 import { imageSize } from './imageSize.js';
 import type { ImageSize } from './pngHeader.js';
-import { figureProfile } from './profile.js';
+
+/** The texture budgets a kind of file sets: the longest side of an image and the texels of all images together. */
+export interface TextureBudgets {
+	readonly maxTextureSidePixels: number;
+	readonly maxTexels: number;
+}
 
 /**
  * Judges the texture budgets from each embedded image's header alone (glTF 2.0, sections 3.8 and 3.6.1.2): the images
  * sit in the binary chunk, and a PNG, JPEG or WebP header can be sized. An image with a `uri` is left to `uri_not_allowed`.
  */
-export function textureRefusals(json: JsonObject, binaryChunk: Uint8Array | undefined): Refusal[] {
+export function textureRefusals(json: JsonObject, binaryChunk: Uint8Array | undefined, budgets: TextureBudgets): Refusal[] {
 	const tooLarge: Refusal[] = [];
 	const invalidImages: Refusal[] = [];
 	const invalidJson: Refusal[] = [];
@@ -27,14 +32,14 @@ export function textureRefusals(json: JsonObject, binaryChunk: Uint8Array | unde
 					return;
 				}
 				texels += size.width * size.height;
-				if (size.width > figureProfile.maxTextureSidePixels || size.height > figureProfile.maxTextureSidePixels) {
+				if (size.width > budgets.maxTextureSidePixels || size.height > budgets.maxTextureSidePixels) {
 					tooLarge.push({ code: 'texture_too_large', detail: `${place} is ${size.width} by ${size.height} px` });
 				}
 			});
 		}
 	});
 	const overTexels: Refusal[] =
-		texels > figureProfile.maxTexels ? [{ code: 'too_many_texels', detail: `${texels} texels` }] : [];
+		texels > budgets.maxTexels ? [{ code: 'too_many_texels', detail: `${texels} texels` }] : [];
 	return [...tooLarge, ...overTexels, ...invalidImages, ...invalidJson];
 }
 

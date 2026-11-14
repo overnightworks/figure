@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { checkClip, checkFigure } from './check.js';
-import { clipProfile, figureProfile } from './profile.js';
+import { checkClip, checkFigure, checkRoom } from './check.js';
+import { clipProfile, figureProfile, roomProfile } from './profile.js';
 import { buildVrmGlb, vrmJson, vrmParts } from '../tests/figureFixtures.js';
 import { buildClipGlb, buildClipGlbOfSize, type ClipJson } from '../tests/clipFixtures.js';
-import { buildGlb, buildHeaderOnlyGlb } from '../tests/glbBuilder.js';
+import { buildGlb, buildHeaderOnlyGlb, buildPng, imageSizesFilling } from '../tests/glbBuilder.js';
+import { buildRoomGlb, buildRoomGlbOfSize } from '../tests/roomBuilder.js';
 
 function codesOf(bytes: Uint8Array): string[] {
 	return checkFigure(bytes).map(({ code }) => code);
@@ -228,5 +229,74 @@ describe('checkClip', () => {
 	it('refuses a figure as not_vrm_animation, and a clip is not a figure', () => {
 		expect(clipCodesOf(buildVrmGlb())).toContain('not_vrm_animation');
 		expect(codesOf(buildClipGlb())).toContain('not_vrm');
+	});
+});
+
+describe('checkRoom', () => {
+	const roomCodesOf = (bytes: Uint8Array) => checkRoom(bytes).map(({ code }) => code);
+
+	it('passes the conformant room', () => {
+		expect(checkRoom(buildRoomGlb())).toEqual([]);
+	});
+
+	it.each([
+		['a text file', new TextEncoder().encode('this is not a room'), ['not_glb']],
+		['a version other than 2', buildRoomGlb({ glb: { version: 1 } }), ['glb_version']],
+		['a header length that is not the file’s', buildRoomGlb({ glb: { declaredLength: 20 } }), ['glb_length']],
+		['a chunk that reaches past the end', buildRoomGlb({ glb: { jsonChunkLengthField: 0xffffffff } }), ['glb_chunk']],
+		['a JSON chunk that is not a JSON object', buildRoomGlb({ glb: { json: [] } }), ['glb_json']]
+	])('refuses %s with the container code', (_name, bytes, codes) => {
+		expect(roomCodesOf(bytes)).toEqual(codes);
+	});
+
+	it('refuses a file one byte over the room budget as too_large alone, and passes one at the budget', () => {
+		const atBudget = buildRoomGlbOfSize(roomProfile.fileBudgetBytes);
+		expect(atBudget).toHaveLength(roomProfile.fileBudgetBytes);
+		expect(checkRoom(atBudget)).toEqual([]);
+		expect(roomCodesOf(buildRoomGlbOfSize(roomProfile.fileBudgetBytes + 1))).toEqual(['too_large']);
+	});
+
+	it('refuses an extension the room profile does not allow, and one only the figure profile allows', () => {
+		const onlyTheFigure = figureProfile.allowedExtensions.filter((extension) => !(roomProfile.allowedExtensions as readonly string[]).includes(extension));
+		for (const extension of ['KHR_draco_mesh_compression', 'VRMC_vrm', ...onlyTheFigure]) {
+			expect(roomCodesOf(buildRoomGlb({ change: (json) => (json.extensionsRequired = [extension]) }))).toEqual(['extension_not_allowed']);
+		}
+	});
+
+	it.each(roomProfile.allowedExtensions)('passes the allowed extension %s used and required', (extension) => {
+		const change = (json: Record<string, any>) => {
+			json.extensionsUsed.push(extension);
+			json.extensionsRequired = [extension];
+		};
+		expect(checkRoom(buildRoomGlb({ change }))).toEqual([]);
+	});
+
+	it('refuses an image over the room side budget as texture_too_large and texels over its budget as too_many_texels', () => {
+		const side = roomProfile.maxTextureSidePixels;
+		expect(roomCodesOf(buildRoomGlb({ images: [buildPng(side, 1), buildPng(1, side)] }))).toEqual([]);
+		expect(roomCodesOf(buildRoomGlb({ images: [buildPng(side + 1, 1)] }))).toEqual(['texture_too_large']);
+		const rowsAtBudget = Math.floor(roomProfile.maxTexels / side);
+		expect(roomCodesOf(buildRoomGlb({ images: [buildPng(side, rowsAtBudget)] }))).toEqual([]);
+		expect(roomCodesOf(buildRoomGlb({ images: [buildPng(side, rowsAtBudget + 1)] }))).toEqual(['too_many_texels']);
+	});
+
+	it('passes textures that add up to exactly the room texel budget and refuses one texel more as too_many_texels alone', () => {
+		const atBudget = imageSizesFilling(roomProfile.maxTexels, roomProfile.maxTextureSidePixels).map(([width, height]) => buildPng(width, height));
+		expect(roomCodesOf(buildRoomGlb({ images: atBudget }))).toEqual([]);
+		expect(roomCodesOf(buildRoomGlb({ images: [...atBudget, buildPng(1, 1)] }))).toEqual(['too_many_texels']);
+	});
+
+	it('refuses a buffer that names a URI and a second buffer', () => {
+		expect(roomCodesOf(buildRoomGlb({ change: (json) => (json.buffers[0].uri = 'room.bin') }))).toEqual(['uri_not_allowed']);
+		expect(roomCodesOf(buildRoomGlb({ change: (json) => json.buffers.push({ byteLength: 1 }) }))).toEqual(['buffer_outside_glb']);
+	});
+
+	it('refuses a figure as extension_not_allowed and room_content_not_allowed, and a room is not a figure', () => {
+		expect(roomCodesOf(buildVrmGlb())).toEqual(expect.arrayContaining(['extension_not_allowed', 'room_content_not_allowed']));
+		expect(codesOf(buildRoomGlb())).toContain('not_vrm');
+	});
+
+	it('refuses a clip', () => {
+		expect(roomCodesOf(buildClipGlb())).not.toEqual([]);
 	});
 });

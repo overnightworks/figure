@@ -2,12 +2,12 @@
 
 ## 1. Context and Scope
 
-figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's bytes to a list of refusals, its sibling for a persona's gesture clip (a `.vrma` file), and the command `figure check [--as clip] <file>` around both; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into an app's canvas and keeps it alive: the figure breathes, blinks and glances until the app disposes it, and waves when the app asks, with a persona's clip in place of figure's wave when the app hands one. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` (or `checkClip`) in a browser before three parses the file, and an app calls `mount` on a canvas.
+figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's bytes to a list of refusals, its siblings for a persona's gesture clip (a `.vrma` file) and for a persona's room (one static GLB of unlit materials), and the command `figure check [--as clip|room] <file>` around all three; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into an app's canvas and keeps it alive: the figure breathes, blinks and glances until the app disposes it, and waves when the app asks, with a persona's clip in place of figure's wave when the app hands one. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` (or `checkClip`, `checkRoom`) in a browser before three parses the file, and an app calls `mount` on a canvas.
 
 ```mermaid
 flowchart LR
-    caller["person or CI job"] -->|"figure check [--as clip] file"| package
-    app["an app in a browser"] -->|"checkFigure(bytes), checkClip(bytes)"| package
+    caller["person or CI job"] -->|"figure check [--as clip|room] file"| package
+    app["an app in a browser"] -->|"checkFigure(bytes), checkClip(bytes), checkRoom(bytes)"| package
     app -->|"mount(canvas, bytes)"| package
     package["overnightworks-figure"] -->|"exit code, lines"| caller
     package -->|"list of refusals"| app
@@ -24,7 +24,7 @@ flowchart TD
     bin["bin.ts: process streams, exit code"] --> cli["cli.ts: arguments, file read, output, exit codes"]
     cli --> check
     subgraph pure["pure: no Node, no three; a browser and Node both run them"]
-        check["check.ts: container rules and their order"] --> rules["vrmRules, budgetRules, textureRules, clipRules"]
+        check["check.ts: container rules and their order"] --> rules["vrmRules, budgetRules, textureRules, clipRules, roomRules"] --> scene["sceneRules"]
         rules --> profile["profile.ts: the values the rules read"] --> expressions["expressions.ts: mouth shapes, moods"]
         check --> codes["codes.ts: the closed set of refusal codes"]
     end
@@ -42,10 +42,10 @@ flowchart TD
 *Module groups and their imports; derived from `src/`.*
 
 - `codes.ts` owns every refusal code and its description. `signals.ts` (five signals: `drawn`, `unsupported`, `refused`, `lost`, `slow`, of which every one but `drawn` ends a figure), `gestures.ts` (`wave`) and `expressions.ts` (mouth shapes, moods) own the other closed sets; each is the one place a member is written.
-- `profile.ts` owns the values the rules read: `figureProfile` and `clipProfile` (allowed extensions, file budget, version, required bones, and the mesh, texture and seconds budgets).
-- `check.ts` owns the container rules and their order once for both profiles; `checkFigure` and `checkClip` differ in the profile and in the rules after the container. The rule modules judge parsed JSON and import only pure modules beside them (the codes, the profile, `json.ts`, and `clipRules.ts` also `clipKeyRules.ts`), no Node, three or @pixiv module; `textureRules.ts` also reads the binary chunk through `imageSize.ts`. `clipRules.ts` and `clipKeyRules.ts` judge a clip, and are narrower than `VRMC_vrm_animation` where a gesture needs it.
+- `profile.ts` owns the values the rules read: `figureProfile`, `clipProfile` and `roomProfile` (allowed extensions, file budget, version, required bones, and the mesh, primitive, texture and seconds budgets).
+- `check.ts` owns the container rules and their order once for all three profiles; `checkFigure`, `checkClip` and `checkRoom` differ in the profile and in the rules after the container. The rule modules judge parsed JSON and import only pure modules beside them (the codes, the profile, `json.ts`, and `clipRules.ts` also `clipKeyRules.ts`; `clipRules.ts` and `roomRules.ts` also `sceneRules.ts`), no Node, three or @pixiv module; `textureRules.ts` also reads the binary chunk through `imageSize.ts` and takes the budgets of the profile it is given. `clipRules.ts` and `clipKeyRules.ts` judge a clip, and are narrower than `VRMC_vrm_animation` where a gesture needs it. `roomRules.ts` judges a room: its content, its unlit materials, and the references three's loader follows. `sceneRules.ts` walks the scenes and nodes for a clip and a room alike, each kind giving its own scene code and forbidden node properties. `budgetRules.ts` tallies each mesh once; a figure sums the tallies over its meshes, a room over every node that draws a mesh.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
-- `index.ts` exports `checkFigure`, `checkClip`, the codes, both profiles and `figureGesture`; `overnightworks-figure/codes` and `/profile` export a subset. No module they reach imports three or three-vrm.
+- `index.ts` exports `checkFigure`, `checkClip`, `checkRoom`, the codes, the three profiles and `figureGesture`; `overnightworks-figure/codes` and `/profile` export a subset. No module they reach imports three or three-vrm.
 - `draw.ts` is the one module of `overnightworks-figure/draw`: it exports `mount`, `figureSignal` and the types of the handle, the options, the signal, the mood and the gesture. The handle is the last signal, an idempotent `dispose`, `think`, `listen`, `speak` and `gesture`. The types live in `mountOptions.ts`, so no declaration of the export names a three type (`scripts/check_packed_tarball.sh` follows them). `mount` is `figureMount.ts`' `mountWithClipLoad` given `clipLoader.ts`' `loadClip`; tests give it another parse.
 - `figureMount.ts` owns the loop: one animation frame request at a time, the one place that draws. It runs only while the page is visible and the canvas is in the viewport, reads `prefers-reduced-motion` each frame, feeds each frame's interval to the guard and ends the figure with `slow` when it says so, and ends it with `lost` on `webglcontextlost`. No context is restored.
 - Under reduced motion no gesture starts and a running one ends, and the chin share it had taken from the base arm returns to the chin at the thinking look's rate, the forearm folding ahead of the upper arm, also when the page lifts reduced motion on the way; `gesture` is also dropped for a value outside the set, while the page is hidden and on a figure that ended. A gesture is a moment, not a state.
@@ -63,13 +63,13 @@ sequenceDiagram
     participant B as bin.ts
     participant C as cli.ts
     participant K as check.ts
-    U->>B: figure check [--as clip] file
+    U->>B: figure check [--as clip|room] file
     B->>C: runCommand(arguments, output)
     C->>C: read the file
     alt unreadable or wrong usage
         C-->>U: reason on stderr, exit 2
     else readable
-        C->>K: checkFigure(bytes), or checkClip(bytes) under --as clip
+        C->>K: checkFigure(bytes), or checkClip or checkRoom under --as
         K-->>C: refusals
         C-->>U: lines on stdout, exit 0 or 1
     end
@@ -141,6 +141,8 @@ The check's rules run in a fixed order. A refusal that leaves the later rules un
 5. the budgets, which read plain glTF and so judge a file that is `not_vrm` too: triangles and morph targets, counted from accessor fields, never from geometry;
 6. the texture budgets, judged from headers only (`imageSize.ts` sizes a PNG, JPEG or WebP by its first bytes, never by `mimeType`); the stated size is compared with the budgets and never used to allocate or read.
 
+A room runs steps 1 to 3 against `roomProfile`, then the room rules (content, scene, unlit materials, references), the draw budgets (triangles and primitives, counted for each node that draws a mesh) and the texture budgets with the room's numbers, all reported. Its budgets are provisional until a room is drawn on a phone.
+
 A clip runs steps 1 to 3 against `clipProfile`, then the clip rules, all reported: the extension, the required humanoid, content a clip may not hold, the scene, at least one animation, every channel of every animation (the loader parses each) and the seconds budget. Channels on other nodes pass and are never played, and so do tracks for bones a gesture does not own.
 
 ## 4. Deployment View
@@ -149,13 +151,13 @@ The build is `tsc` alone and emits ESM and declarations to `dist/`. `prepack` ru
 
 A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the build packs `overnightworks-figure-<version>.tgz` and proves it with `scripts/check_packed_tarball.sh`, and quality's tag job publishes the tarball, alone, on an immutable release whose notes carry its URL, its `sha512-` integrity and the gzip size of a checking and of a mounting consumer bundle (`scripts/measure_bundle_size.mjs`). quality's `docs/release.md` owns the path.
 
-`scripts/measure_budget_figure.mjs` is the measurement behind the profile's budgets, taken in headless Chromium at 390 CSS pixels; a budget changes only on such a measurement.
+`scripts/measure_budget_figure.mjs` is the measurement behind the profile's budgets, taken in headless Chromium at 390 CSS pixels; a budget changes only on such a measurement. For the room it parses a room at the budgets and reports its computed GPU memory beside the budget figure's; no room is drawn yet.
 
 ## 5. Crosscutting Concepts
 
 **Trust.** A figure file is untrusted input; no code comes from it. The check is about conformance and about protecting phones; it is not an app's security boundary. `mount` runs the check before three sees a byte.
 
-**Proof strategy.** Branch coverage is 100 % over the check's cases, the in-process command tests and the browser project (`src/*.browser.test.ts`, headless Chromium through vitest's Playwright provider) together, reported as one `lcov.info`; `bin.ts` is reached only as a process, so its lines count as uncovered and its branches stay 100 % because it has none. A second layer drives `dist/bin.js` as a process for each exit code, and CI installs the packed tarball into an empty directory and runs it. Synthetic bytes come from builders that share no code with the check (`tests/glbBuilder.ts` for figures, `tests/clipBuilder.ts` for clips); the builder's one conformant VRM is proven by the check, by the glTF 2.0 and VRM 1.0 schemas, by the Khronos glTF validator and by `mount` drawing it in the browser layer.
+**Proof strategy.** Branch coverage is 100 % over the check's cases, the in-process command tests and the browser project (`src/*.browser.test.ts`, headless Chromium through vitest's Playwright provider) together, reported as one `lcov.info`; `bin.ts` is reached only as a process, so its lines count as uncovered and its branches stay 100 % because it has none. A second layer drives `dist/bin.js` as a process for each exit code, and CI installs the packed tarball into an empty directory and runs it. Synthetic bytes come from builders that share no code with the check (`tests/glbBuilder.ts` for figures, `tests/clipBuilder.ts` for clips, `tests/roomBuilder.ts` for rooms); the builder's one conformant VRM is proven by the check, by the glTF 2.0 and VRM 1.0 schemas, by the Khronos glTF validator and by `mount` drawing it in the browser layer.
 
 A browser layer (`tests/e2e`, Playwright) packs the tarball, installs it into a temporary consumer, bundles that with Vite and serves it in headless Chromium under the script policy `default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' blob:; worker-src 'self'`. It proves that the check runs in a browser on raw bytes, that `mount` gives `drawn` with the texture's colour, and that loading code, files and textures breaks no part of the policy. The browser project drives `mount`'s other signals, the handle and the canvas contract.
 
@@ -175,6 +177,6 @@ A browser layer (`tests/e2e`, Playwright) packs the tarball, installs it into a 
 ## 8. Risks and Technical Debt
 
 - Of the humanoid only the required bones are judged, not optional bones, a bone used twice or the hierarchy; spring bones, constraints and materials are not judged.
-- Extension objects a file uses without declaring them in `extensionsUsed` are not scanned.
+- Extension objects a file uses without declaring them in `extensionsUsed` are not scanned, except the two a room refuses because three throws on them (`KHR_materials_unlit` on a material, a Draco object on a primitive).
 - The package does not validate image data: a corrupt image that the browser decodes without an error is drawn as decoded.
 - The command reads the whole file before the check judges its size.

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { checkClip, checkFigure } from './check.js';
-import { refusalDescriptions } from './codes.js';
+import { checkClip, checkFigure, checkRoom } from './check.js';
+import { refusalDescriptions, type Refusal } from './codes.js';
 
 /** The exit codes are quality's: 0 yes, 1 no, 2 could not answer. */
 export const EXIT_PASSED = 0;
@@ -12,7 +12,14 @@ export interface Output {
 	readonly stderr: (line: string) => void;
 }
 
-const USAGE = 'usage: figure check [--as clip] <file>';
+/** The check each value of `--as` runs; a file without `--as` is a figure. */
+const checksOfKind = { clip: checkClip, room: checkRoom } as const satisfies Record<string, (bytes: Uint8Array) => Refusal[]>;
+
+function isKind(value: string | undefined): value is keyof typeof checksOfKind {
+	return value !== undefined && Object.hasOwn(checksOfKind, value);
+}
+
+const USAGE = `usage: figure check [--as ${Object.keys(checksOfKind).join('|')}] <file>`;
 
 /** The package's one output owner and its one filesystem boundary. */
 export function runCommand(argv: readonly string[], output: Output): number {
@@ -21,10 +28,11 @@ export function runCommand(argv: readonly string[], output: Output): number {
 		output.stderr(`unknown command: ${command ?? '(none)'}; ${USAGE}`);
 		return EXIT_UNJUDGED;
 	}
-	// `--as` comes right after `check`, `clip` is its only value, and a file without it is a figure.
-	const isClip = checkArguments[0] === '--as';
-	const files = checkArguments.slice(isClip ? 2 : 0);
-	if ((isClip && checkArguments[1] !== 'clip') || files.length !== 1) {
+	// `--as` comes right after `check`, a key of `checksOfKind` is its value, and a file without it is a figure.
+	const hasKind = checkArguments[0] === '--as';
+	const kind = checkArguments[1];
+	const files = checkArguments.slice(hasKind ? 2 : 0);
+	if ((hasKind && !isKind(kind)) || files.length !== 1) {
 		output.stderr(USAGE);
 		return EXIT_UNJUDGED;
 	}
@@ -36,7 +44,7 @@ export function runCommand(argv: readonly string[], output: Output): number {
 		output.stderr(`cannot read ${file}: ${String(error)}`);
 		return EXIT_UNJUDGED;
 	}
-	const refusals = isClip ? checkClip(bytes) : checkFigure(bytes);
+	const refusals = hasKind && isKind(kind) ? checksOfKind[kind](bytes) : checkFigure(bytes);
 	if (refusals.length === 0) {
 		output.stdout(`${file}: passes every rule`);
 		return EXIT_PASSED;

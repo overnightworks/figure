@@ -56,3 +56,16 @@ export const clipProfile = {
 	/** How far a rotation key's length may lie from 1. */
 	rotationLengthTolerance: 0.01
 } as const;
+
+/**
+ * The values the room rules read: one static GLB of unlit materials, drawn behind a figure. The budgets are provisional until
+ * a room is drawn on a phone; `maxPrimitives` counts one draw call each.
+ */
+export const roomProfile = {
+	allowedExtensions: ['KHR_materials_unlit', 'KHR_texture_transform', 'EXT_texture_webp'],
+	fileBudgetBytes: 4 * 1024 * 1024,
+	maxTriangles: 20_000,
+	maxPrimitives: 32,
+	maxTextureSidePixels: 2048,
+	maxTexels: 4_000_000
+} as const;

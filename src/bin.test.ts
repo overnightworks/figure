@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { figureProfile } from './profile.js';
 import { buildJpeg, buildPng } from '../tests/glbBuilder.js';
 import { buildClipGlb } from '../tests/clipFixtures.js';
+import { buildRoomGlb } from '../tests/roomBuilder.js';
 import { buildConformantVrm, buildVrmGlb, buildVrmGlbWithImages, vrmJson } from '../tests/figureFixtures.js';
 
 const binPath = join(import.meta.dirname, '..', 'dist', 'bin.js');
@@ -89,10 +90,24 @@ describe('the figure command from the build output', () => {
 		expect(result.stdout).toMatch(/^clip_scene_missing\b/);
 	});
 
-	it('exits 2 with the usage line for a value of --as that is not clip', () => {
-		const result = figure('check', '--as', 'room', join(directory, 'a.glb'));
+	it('exits 0 on a conformant room under --as room', () => {
+		const path = join(directory, 'ok.glb');
+		writeFileSync(path, buildRoomGlb());
+		expect(figure('check', '--as', 'room', path).status).toBe(0);
+	});
+
+	it('exits 1 with the code of the room rule a synthetic room breaks', () => {
+		const path = join(directory, 'lit.glb');
+		writeFileSync(path, buildRoomGlb({ change: (json) => delete json.materials[0].extensions }));
+		const result = figure('check', '--as', 'room', path);
+		expect(result.status).toBe(1);
+		expect(result.stdout).toMatch(/^room_material_not_unlit\b/);
+	});
+
+	it('exits 2 with the usage line for a value of --as that is neither clip nor room', () => {
+		const result = figure('check', '--as', 'figure', join(directory, 'a.glb'));
 		expect(result.status).toBe(2);
-		expect(result.stderr).toContain('usage: figure check [--as clip] <file>');
+		expect(result.stderr).toContain('usage: figure check [--as clip|room] <file>');
 	});
 
 	it('exits 2 when it cannot read the file', () => {

@@ -3,8 +3,8 @@
 The fleet's VRM 1.0 profile as a check: the framework-free TypeScript ESM package `overnightworks-figure`.
 
 Today figure ships two things: the check, `figure check <file>` and `checkFigure(bytes)`, which tell whether a figure
-file meets the profile's container, VRM and budget rules, and its sibling for a gesture clip, `figure check --as clip <file>` and
-`checkClip(bytes)`; and the drawing, `mount` from `overnightworks-figure/draw`,
+file meets the profile's container, VRM and budget rules, and its siblings for a gesture clip, `figure check --as clip <file>` and
+`checkClip(bytes)`, and for a persona's room, `figure check --as room <file>` and `checkRoom(bytes)`; and the drawing, `mount` from `overnightworks-figure/draw`,
 which draws a figure that passes into an app's canvas, rests it with its arms lowered, keeps it alive with its idle motion, shows it thinking or listening when the app reports so,
 waves when the app asks (with a persona's own `.vrma` clip in place of figure's wave when the app hands one through `gestures`), and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
 mood of the sentence, until the app disposes it.
@@ -19,10 +19,12 @@ pnpm install --frozen-lockfile
 pnpm run build
 node dist/bin.js check path/to/figure.vrm
 node dist/bin.js check --as clip path/to/gesture.vrma
+node dist/bin.js check --as room path/to/room.glb
 ```
 
 In an app or a release check, `checkFigure(bytes)` from the package root returns the list of refusals for a file's
-bytes; it runs in a browser and in Node. `checkClip(bytes)` does the same for a `.vrma` gesture clip, against the clip profile below.
+bytes; it runs in a browser and in Node. `checkClip(bytes)` does the same for a `.vrma` gesture clip, against the clip profile below,
+and `checkRoom(bytes)` for a room, against the room profile below.
 
 ## Mount a figure
 
@@ -118,7 +120,7 @@ The package brings `three`, `@pixiv/three-vrm` and `@pixiv/three-vrm-animation` 
 dependencies. Only `overnightworks-figure/draw` imports them: a consumer that only checks (the package root,
 `overnightworks-figure/codes`, `overnightworks-figure/profile` or the command) loads nothing of three.
 
-Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } from 'overnightworks-figure'` in code; `pnpm exec figure check --as clip path/to/gesture.vrma` and `checkClip` judge a clip.
+Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } from 'overnightworks-figure'` in code; `pnpm exec figure check --as clip path/to/gesture.vrma` and `checkClip` judge a clip, `pnpm exec figure check --as room path/to/room.glb` and `checkRoom` a room.
 
 ## Exit codes
 
@@ -126,9 +128,9 @@ Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } fro
 |---|---|---|
 | 0 | the file passes every rule | one line on stdout |
 | 1 | the file is refused | one line per refusal on stdout, starting with its code |
-| 2 | no verdict: no file named, a file that cannot be read, an unknown command, an `--as` that is not `clip` | the reason, or the usage line `usage: figure check [--as clip] <file>`, on stderr |
+| 2 | no verdict: no file named, a file that cannot be read, an unknown command, an `--as` that is neither `clip` nor `room` | the reason, or the usage line `usage: figure check [--as clip\|room] <file>`, on stderr |
 
-`--as` sits between `check` and the file and its only value is `clip`; without it the file is a figure. The codes and the exit codes are the contract; the wording of a line is not.
+`--as` sits between `check` and the file and its value is `clip` or `room`; without it the file is a figure. The codes and the exit codes are the contract; the wording of a line is not.
 
 ## Refusal codes
 
@@ -150,7 +152,7 @@ Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } fro
 | `licence_redistribution` | `meta.allowRedistribution` is not `true` |
 | `licence_avatar_permission` | `meta.avatarPermission` is not `everyone` |
 | `licence_credit` | `meta.creditNotation` is not `unnecessary` |
-| `too_many_triangles` | the meshes hold more triangles together than the profile's budget (each mesh counted once) |
+| `too_many_triangles` | the drawn meshes hold more triangles together than the profile's budget (a figure counts each mesh once, a room each node that draws a mesh) |
 | `too_many_morph_targets` | a primitive has more morph targets than the profile's budget |
 | `texture_too_large` | an embedded image is wider or taller than the profile's side budget; one refusal per image, naming it |
 | `too_many_texels` | the embedded images' widths times heights, added up (each image once), are over the profile's texel budget |
@@ -162,10 +164,15 @@ Then `pnpm exec figure check path/to/figure.vrm`, or `import { checkFigure } fro
 | `clip_track_not_allowed` | a channel has no target node, animates `weights`, or takes a path its node does not (a humanoid bone takes rotation, the hips also translation, an expression node translation, the look-at node rotation); or its key data is sparse, has no buffer view, or holds rotations that are not float |
 | `clip_keys_invalid` | a channel's keys reach past their buffer view or the binary chunk, its times are not finite, 0 or later and strictly ascending, or a rotation is not finite or not of unit length within the profile's tolerance |
 | `clip_too_long` | a clip's first animation has a key later than the profile's seconds budget |
+| `room_content_not_allowed` | a room holds `skins`, `animations` or `cameras`, a node with a `skin` or a `camera`, a primitive with `targets` or a mesh with `weights`; one refusal per property, naming it |
+| `room_scene_missing` | a room's `scenes` is absent or empty |
+| `room_material_not_unlit` | a room's material has no `KHR_materials_unlit` object, or a primitive names no material (the default material is lit) |
+| `too_many_primitives` | the nodes of a room draw more primitives together than the profile's budget, each primitive being one draw call |
 | `gltf_invalid` | a mesh, primitive, accessor, index, image, buffer view, buffer, scene, sampler, channel or node a rule must read does not have glTF's shape, so it cannot judge |
 
 The container codes (`not_glb` to `buffer_outside_glb`, `too_large`), `humanoid_bone_missing` and `gltf_invalid` apply to a figure
-and to a clip; the seven clip codes to a clip alone; the other VRM, budget and texture codes to a figure alone.
+and to a clip, the container, texture, `too_many_triangles` and `gltf_invalid` codes also to a room; the seven clip codes to a clip alone; the four
+room codes to a room alone; the other VRM, budget and texture codes to a figure alone.
 
 ### The clip profile
 
@@ -176,8 +183,23 @@ key data is float and not sparse. The profile's values (extension, version, file
 live in `src/profile.ts` as `clipProfile`; the budgets stand on a measurement in headless Chromium (`scripts/measure_budget_figure.mjs`). A track for
 the head, neck, eyes, jaw, legs, expressions, look-at or hips passes the check and is dropped when a clip plays.
 
+### The room profile
+
+A room is one static GLB that a persona's figure stands in: the check's third kind, `--as room`. It holds a scene and meshes under nodes, and no skin,
+animation, camera, morph target or mesh weights. Every material carries `KHR_materials_unlit` and every primitive names a material: the room
+carries its own light, painted into its vertex colours and textures, so it looks the same on every device and nothing lights it. The
+extensions it may use are `KHR_materials_unlit`, `KHR_texture_transform` and `EXT_texture_webp`; every byte sits in the GLB, as for a figure. A
+node under the root may draw a mesh, and a mesh may be drawn by many nodes. The budgets are provisional until a room is drawn on a phone:
+4 MiB, 20 000 triangles, 32 primitives (draw calls), 4 000 000 texels and 2048 px a side, the triangles and primitives counted for each node that draws
+a mesh, reached from the scene or not. The loader's own throws are refused as `gltf_invalid`: a scene or node shape it cannot walk, a node's mesh, a primitive's material, indices or
+attribute, a base colour texture, a texture's image or WebP image that names no entry, an unlit material that `extensionsUsed` does not name, and a Draco object it does not name. An unlit material draws only its base colour
+texture, so a room's other textures are not followed.
+
+A room follows a convention that the check does not judge: metres, +Y up, the floor at y = 0, the figure at the origin facing +Z, and the
+side toward the camera open or back-face culled. A room that breaks it shows wrongly on the stage and in a persona's review and corrupts nothing.
+
 A refusal may also carry a text naming what it found (the extension, the place of the URI); the command prints it
-after the code. The profile's values (allowed extensions, file budget, presets, licence values, triangle, morph-target, texture-side and texel budgets) live in `src/profile.ts` and are exported as
+after the code. The profile's values (allowed extensions, file budget, presets, licence values, triangle, morph-target, primitive, texture-side and texel budgets) live in `src/profile.ts` as `figureProfile`, `clipProfile` and `roomProfile` and are exported as
 `overnightworks-figure/profile`.
 
 The closed set lives in `src/codes.ts` and is exported as `overnightworks-figure/codes`.
