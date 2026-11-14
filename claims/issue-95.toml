@@ -1,0 +1,8 @@
+claim_id = "666e79b1cd654a409d1447a915c9eca4"
+agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
+role = "builder"
+base = "e56e74cb9b33fc9bf43947a1ad592829f06c4461"
+branch = "claude/issue-95-the-figure-vocabulary-in-the-package-for"
+scope = ["README.md", "docs/ARCHITECTURE.md", "package.json", "scripts"]
+opened_commit = "5d42cc35f32e9c5393b21520e4c1678884e6b16c"
+whole_reason = "One published artefact: its generator, its export, its tarball check and its two documents land together."
