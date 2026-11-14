@@ -48,8 +48,8 @@ async function expectTwoDrawings(page: Page): Promise<void> {
 	await expect(page.locator('canvas[data-signal="drawn"]')).toHaveCount(2, { timeout: drawingTimeout });
 }
 
-/** Resolves once the frames the figure animates on have run for the given milliseconds, so the wait ends when the figure's own clock has passed, not when a timer fires. */
-async function untilFrameClockPasses(page: Page, milliseconds: number): Promise<void> {
+/** Resolves on the first animation frame after the given milliseconds of wall-clock time, so frames have been drawn throughout the wait; the figure's own clock caps each step, so it may have advanced less. */
+async function untilFramesHaveRunFor(page: Page, milliseconds: number): Promise<void> {
 	await page.evaluate(
 		(duration) =>
 			new Promise<void>((resolve) => {
@@ -161,7 +161,7 @@ test.describe('the demo stage under the script policy', () => {
 			.poll(
 				async () => {
 					await page.getByRole('button', { name: 'wave', exact: true }).click();
-					await untilFrameClockPasses(page, afterNeutralWaveMilliseconds);
+					await untilFramesHaveRunFor(page, afterNeutralWaveMilliseconds);
 					const waved = await Promise.all(figures.map((figure, index) => figure.screenshot().then((shown) => differingPixels(page, resting[index]!, shown, raisedArmArea))));
 					return Math.min(...waved);
 				},
