@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { figureProfile } from './profile.js';
 import { buildJpeg, buildPng } from '../tests/glbBuilder.js';
+import { buildClipGlb } from '../tests/clipFixtures.js';
 import { buildConformantVrm, buildVrmGlb, buildVrmGlbWithImages, vrmJson } from '../tests/figureFixtures.js';
 
 const binPath = join(import.meta.dirname, '..', 'dist', 'bin.js');
@@ -72,6 +73,26 @@ describe('the figure command from the build output', () => {
 		const result = figure('check', path);
 		expect(result.status).toBe(1);
 		expect(result.stdout).toMatch(/^uri_not_allowed\b.*buffers\[0\]/);
+	});
+
+	it('exits 0 on a conformant clip under --as clip', () => {
+		const path = join(directory, 'ok.vrma');
+		writeFileSync(path, buildClipGlb());
+		expect(figure('check', '--as', 'clip', path).status).toBe(0);
+	});
+
+	it('exits 1 with the code of the clip rule a synthetic clip breaks', () => {
+		const path = join(directory, 'no-scene.vrma');
+		writeFileSync(path, buildClipGlb({ change: (json) => delete json.scenes }));
+		const result = figure('check', '--as', 'clip', path);
+		expect(result.status).toBe(1);
+		expect(result.stdout).toMatch(/^clip_scene_missing\b/);
+	});
+
+	it('exits 2 with the usage line for a value of --as that is not clip', () => {
+		const result = figure('check', '--as', 'room', join(directory, 'a.glb'));
+		expect(result.status).toBe(2);
+		expect(result.stderr).toContain('usage: figure check [--as clip] <file>');
 	});
 
 	it('exits 2 when it cannot read the file', () => {
