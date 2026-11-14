@@ -6,7 +6,7 @@ Today figure ships two things: the check, `figure check <file>` and `checkFigure
 file meets the profile's container, VRM and budget rules, and its sibling for a gesture clip, `figure check --as clip <file>` and
 `checkClip(bytes)`; and the drawing, `mount` from `overnightworks-figure/draw`,
 which draws a figure that passes into an app's canvas, rests it with its arms lowered, keeps it alive with its idle motion, shows it thinking or listening when the app reports so,
-waves when the app asks, and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
+waves when the app asks (with a persona's own `.vrma` clip in place of figure's wave when the app hands one through `gestures`), and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
 mood of the sentence, until the app disposes it.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -107,7 +107,7 @@ https://github.com/overnightworks/figure/releases/download/v<version>/overnightw
 ```
 
 ```sh
-pnpm add https://github.com/overnightworks/figure/releases/download/v0.4.0/overnightworks-figure-0.4.0.tgz
+pnpm add https://github.com/overnightworks/figure/releases/download/v0.5.0/overnightworks-figure-0.5.0.tgz
 ```
 
 pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it downloads the tarball. The value to compare stands
