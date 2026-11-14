@@ -1,7 +1,0 @@
-claim_id = "8647d6d9442f443e84670e68e0d3554f"
-agent = "Claude ed012e5f-ddfc-4fdd-a74e-535e9e19bd03"
-role = "builder"
-base = "faae6034dd45b755e5f3f7f8bb1c1e0a80e2f93a"
-branch = "claude/issue-84-ease-the-right-arm-when-reduced-motion-l"
-scope = ["docs/ARCHITECTURE.md", "src/figureMotion.ts", "src/figureMotionGesture.test.ts"]
-opened_commit = "a9aed9302d3d715288a6375353ba61fc1aacd41f"
