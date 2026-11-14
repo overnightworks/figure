@@ -404,7 +404,7 @@ export interface FigureBudgets {
 }
 
 /** The sides of the images that together hold exactly `texels`, none longer than `maxSide`: full squares of that side while they fit, then what is left. */
-function imageSizesFilling(texels: number, maxSide: number): [number, number][] {
+export function imageSizesFilling(texels: number, maxSide: number): [number, number][] {
 	const sizes: [number, number][] = [];
 	for (let left = texels; left > 0; ) {
 		const width = Math.min(maxSide, left);

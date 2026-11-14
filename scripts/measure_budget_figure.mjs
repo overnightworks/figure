@@ -12,6 +12,13 @@
 // figure (the budget figure is slow on its own in this renderer) is mounted with it. The report gives the longest main-thread task
 // after the mount (the parse), the frame interval without a clip and while the clip plays, whether `slow` came, and how many pixels
 // the picture differs from the figure at rest once the figure's own wave would be over, which shows the clip plays.
+// Last it measures a room at the room profile's budgets: the test builder writes one whose textures fill the texel budget at the
+// side budget and whose triangle budget is spread over as many one-primitive meshes as the primitive budget allows (its file size is
+// whatever those give, since the file budget has its own cases in the check's tests and stored image bytes add no parse work); the
+// script refuses unless checkRoom passes it. The report gives the parse in the page through three's GLTFLoader with the package's
+// refusing plugins (the time to parsed and the longest main-thread task after it began), what the parse built, and the room's computed
+// GPU memory by part (its textures with their mip chains, its vertex and index buffers once for each mesh) alone and summed with the
+// budget figure's. No room is drawn here, so its frame interval waits for the room loader.
 // Usage: pnpm run build && node scripts/measure_budget_figure.mjs; needs `pnpm exec playwright install chromium` once.
 // It runs itself through the fleet's probe-run, which starts it once the machine's load leaves room, inside a 4 GiB memory cap;
 // a frame interval measured beside another browser proof is not the figure's own, so run it alone. It fetches nothing, serves
@@ -30,6 +37,7 @@ import { build } from 'vite';
 import { serveConsumer, origin } from '../tests/e2e/serve-consumer.ts';
 import { buildBudgetVrm, buildConformantVrmGlb, buildGlb } from '../tests/glbBuilder.ts';
 import { clipParts } from '../tests/clipBuilder.ts';
+import { buildBudgetRoom } from '../tests/roomBuilder.ts';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repositoryRoot = resolve(dirname(scriptPath), '..');
@@ -147,6 +155,8 @@ const pageHtml = `<!doctype html>
 
 /** The page's one function: reads the renderer, mounts the figure and records the frame intervals until `frames` came or the figure ended. */
 const pageScript = `import { mount } from 'figure-draw';
+import { GLTFLoader } from 'three-gltf-loader';
+import { registerRefusingPlugins } from 'figure-loader';
 const endingSignals = ['unsupported', 'refused', 'lost', 'slow'];
 
 function describeRenderer() {
@@ -275,17 +285,50 @@ window.measureClip = async (frames, parseWatchSeconds, pictureSecondsAfterGestur
 };
 `;
 
+/** The page's third function, appended to the others: it parses the room as the package's loaders parse a file and reports what the parse built. */
+const pageRoomScript = `
+window.measureRoom = async (watchSeconds) => {
+	const bytes = new Uint8Array(await (await fetch('/room.glb')).arrayBuffer());
+	document.body.style.margin = '0';
+	const longTasks = [];
+	new PerformanceObserver((list) => longTasks.push(...list.getEntries().map((entry) => entry.duration))).observe({ type: 'longtask' });
+	let textureFailed = false;
+	const loader = new GLTFLoader();
+	registerRefusingPlugins(loader, () => (textureFailed = true));
+	const start = performance.now();
+	const gltf = await loader.parseAsync(bytes.slice().buffer, '');
+	const parsedMilliseconds = performance.now() - start;
+	await new Promise((resolve) => setTimeout(resolve, watchSeconds * 1000));
+	let meshes = 0;
+	let triangles = 0;
+	let unlitMeshes = 0;
+	gltf.scene.traverse((object) => {
+		if (!object.isMesh) return;
+		meshes++;
+		triangles += (object.geometry.index === null ? object.geometry.attributes.position.count : object.geometry.index.count) / 3;
+		if (object.material.isMeshBasicMaterial) unlitMeshes++;
+	});
+	return { parsedMilliseconds, longestTask: Math.max(0, ...longTasks), textureFailed, meshes, triangles, unlitMeshes };
+};
+`;
+
 async function bundlePage(workDirectory) {
 	const pageDirectory = join(workDirectory, 'page');
 	mkdirSync(pageDirectory);
 	writeFileSync(join(pageDirectory, 'index.html'), pageHtml);
-	writeFileSync(join(pageDirectory, 'main.js'), pageScript + pageClipScript);
+	writeFileSync(join(pageDirectory, 'main.js'), pageScript + pageClipScript + pageRoomScript);
 	const bundleDirectory = join(workDirectory, 'bundle');
 	await build({
 		root: pageDirectory,
 		configFile: false,
 		logLevel: 'warn',
-		resolve: { alias: { 'figure-draw': join(repositoryRoot, 'dist/draw.js') } },
+		resolve: {
+			alias: {
+				'figure-draw': join(repositoryRoot, 'dist/draw.js'),
+				'figure-loader': join(repositoryRoot, 'dist/figureLoader.js'),
+				'three-gltf-loader': join(repositoryRoot, 'node_modules/three/examples/jsm/loaders/GLTFLoader.js')
+			}
+		},
 		build: { outDir: bundleDirectory, emptyOutDir: true }
 	});
 	return bundleDirectory;
@@ -325,9 +368,15 @@ function report(figure, fileBudgetBytes, measured, parts) {
 	console.log(`mounts: ${measured.mounts.length}, drawn in all of them`);
 	console.log(`slow came: ${slowMounts === 0 ? 'no' : 'yes'}, in ${slowMounts} of ${measured.mounts.length} mounts`);
 	console.log(`frame interval: ${describeIntervals(measured.intervals)}`);
+	reportGpuMemory(parts);
+}
+
+/** Prints each part and the total of a GPU memory computation, and returns the total. */
+function reportGpuMemory(parts) {
 	for (const { part, bytes } of parts) console.log(`gpu memory, ${part}: ${megabytes(bytes)} (${bytes} bytes)`);
 	const total = parts.reduce((sum, { bytes }) => sum + bytes, 0);
 	console.log(`gpu memory, total computed: ${megabytes(total)} (${total} bytes)`);
+	return total;
 }
 
 function reportClip(clip, fileBudgetBytes, maxSeconds, measured) {
@@ -363,8 +412,11 @@ async function main() {
 		console.error(`only ${measured.intervals.length} of ${frameCount} frame intervals came in ${measured.mounts.length} mounts`);
 		return 1;
 	}
-	report(figure, figureProfile.fileBudgetBytes, measured, gpuMemoryParts(readGlb(figure.glb), measured.maxTextureSize));
-	return measureClip(bundleDirectory);
+	const figureParts = gpuMemoryParts(readGlb(figure.glb), measured.maxTextureSize);
+	report(figure, figureProfile.fileBudgetBytes, measured, figureParts);
+	const clipStatus = await measureClip(bundleDirectory);
+	if (clipStatus !== 0) return clipStatus;
+	return measureRoom(bundleDirectory, figureParts.reduce((sum, { bytes }) => sum + bytes, 0), measured.maxTextureSize);
 }
 
 /** Measures the budget clip on the conformant figure; the bundle already holds the page's function. */
@@ -386,6 +438,30 @@ async function measureClip(bundleDirectory) {
 	const ended = [...measured.plainSignals, ...measured.signals].find((signal) => endingSignals.includes(signal));
 	if (ended !== undefined || !measured.pictureTaken || measured.shownDifference < shownPixels) {
 		console.error(`the clip was not measured playing: ended with ${ended ?? 'nothing'}, picture taken ${measured.pictureTaken}, ${measured.shownDifference} differing pixels`);
+		return 1;
+	}
+	return 0;
+}
+
+/** Measures the budget room: the check must pass it, the page parses it, and its computed GPU memory is reported alone and summed with the budget figure's. */
+async function measureRoom(bundleDirectory, figureGpuBytes, maxTextureSize) {
+	const { roomProfile } = await import(join(repositoryRoot, 'dist/profile.js'));
+	const { checkRoom } = await import(join(repositoryRoot, 'dist/check.js'));
+	const room = buildBudgetRoom(roomProfile);
+	const refusals = checkRoom(room.glb);
+	if (refusals.length > 0) {
+		console.error(`the budget room fails the check: ${refusals.map(({ code }) => code).join(' ')}`);
+		return 1;
+	}
+	const measured = await measureInChromium(bundleDirectory, { '/room.glb': room.glb }, (page) => page.evaluate((seconds) => window.measureRoom(seconds), parseWatchSeconds));
+	console.log(`room: ${room.meshes} meshes of one primitive and ${room.images} images, file ${room.glb.length} bytes (the file budget is ${roomProfile.fileBudgetBytes} and is not filled), check passes`);
+	console.log(`room parse: time to parsed ${milliseconds(measured.parsedMilliseconds)}, longest main-thread task from the start to ${parseWatchSeconds} s after it ${milliseconds(measured.longestTask)}`);
+	console.log(`room parsed into ${measured.meshes} meshes of ${measured.triangles} triangles, ${measured.unlitMeshes} with an unlit material`);
+	const roomBytes = reportGpuMemory(gpuMemoryParts(readGlb(room.glb), maxTextureSize));
+	const together = figureGpuBytes + roomBytes;
+	console.log(`gpu memory, budget figure and budget room together: ${megabytes(together)} (${together} bytes)`);
+	if (measured.textureFailed || measured.meshes !== room.meshes || measured.triangles !== roomProfile.maxTriangles || measured.unlitMeshes !== measured.meshes) {
+		console.error(`the room was not parsed as built: texture failed ${measured.textureFailed}, ${measured.meshes} of ${room.meshes} meshes, ${measured.triangles} of ${roomProfile.maxTriangles} triangles, ${measured.unlitMeshes} unlit`);
 		return 1;
 	}
 	return 0;

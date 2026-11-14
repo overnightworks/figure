@@ -1,9 +1,10 @@
-import { budgetRefusals } from './budgetRules.js';
+import { budgetRefusals, roomBudgetRefusals } from './budgetRules.js';
 import { clipRefusals } from './clipRules.js';
 import { textureRefusals } from './textureRules.js';
 import type { Refusal } from './codes.js';
 import { type JsonObject, isJsonObject } from './json.js';
-import { clipProfile, figureProfile } from './profile.js';
+import { clipProfile, figureProfile, roomProfile } from './profile.js';
+import { roomRefusals } from './roomRules.js';
 import { vrmRefusals } from './vrmRules.js';
 
 const GLB_HEADER_BYTES = 12;
@@ -29,13 +30,22 @@ export function checkFigure(bytes: Uint8Array): Refusal[] {
 	return checkContainer(bytes, figureProfile, (json, binaryChunk) => [
 		...vrmRefusals(json),
 		...budgetRefusals(json),
-		...textureRefusals(json, binaryChunk)
+		...textureRefusals(json, binaryChunk, figureProfile)
 	]);
 }
 
 /** Judges a clip file (a `.vrma`) from its raw bytes against the clip profile; the file is untrusted input and nothing in it runs. */
 export function checkClip(bytes: Uint8Array): Refusal[] {
 	return checkContainer(bytes, clipProfile, clipRefusals);
+}
+
+/** Judges a room file (a static GLB of unlit materials) from its raw bytes against the room profile; the file is untrusted input and nothing in it runs. */
+export function checkRoom(bytes: Uint8Array): Refusal[] {
+	return checkContainer(bytes, roomProfile, (json, binaryChunk) => [
+		...roomRefusals(json),
+		...roomBudgetRefusals(json),
+		...textureRefusals(json, binaryChunk, roomProfile)
+	]);
 }
 
 /** The GLB container rules against `profile`, then the rules of the file's kind, which read the JSON and the binary chunk. */

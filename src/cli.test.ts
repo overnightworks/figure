@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCommand } from './cli.js';
-import { clipProfile, figureProfile } from './profile.js';
+import { clipProfile, figureProfile, roomProfile } from './profile.js';
 import { conformantTrack, type ClipTrack } from '../tests/clipBuilder.js';
 import { buildClipGlb, buildClipGlbOfSize, nodeOf, rejectedAccessorShapes, retarget, secondAnimationCases } from '../tests/clipFixtures.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
+import { buildRoomGlb, buildRoomGlbOfSize } from '../tests/roomBuilder.js';
 
 describe('runCommand', () => {
 	let directory: string;
@@ -144,6 +145,51 @@ describe('runCommand', () => {
 		expect(stdout.map((line) => line.split(':')[0])).toContain('not_vrm');
 	});
 
+	it('exits 0 and says so on stdout for a conformant room under --as room', () => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('ok.glb', buildRoomGlb())], output)).toBe(0);
+		expect(stdout).toHaveLength(1);
+		expect(stderr).toEqual([]);
+	});
+
+	it('exits 0 for a room at the byte budget under --as room', () => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('ok.glb', buildRoomGlbOfSize(roomProfile.fileBudgetBytes))], output)).toBe(0);
+	});
+
+	it.each<[string, Uint8Array, string]>([
+		['a skin', buildRoomGlb({ change: (json) => (json.skins = []) }), 'room_content_not_allowed'],
+		['no scene', buildRoomGlb({ change: (json) => delete json.scenes }), 'room_scene_missing'],
+		['a lit material', buildRoomGlb({ change: (json) => delete json.materials[0].extensions }), 'room_material_not_unlit'],
+		[
+			'more primitives than the budget',
+			buildRoomGlb({
+				change: (json) => (json.meshes[0].primitives = new Array<object>(roomProfile.maxPrimitives + 1).fill(json.meshes[0].primitives[0]))
+			}),
+			'too_many_primitives'
+		],
+		['a mesh that no node names', buildRoomGlb({ change: (json) => (json.nodes[1].mesh = json.meshes.length) }), 'gltf_invalid'],
+		['an extension the room does not allow', buildRoomGlb({ change: (json) => (json.extensionsRequired = ['VRMC_vrm']) }), 'extension_not_allowed'],
+		['a file over the byte budget', buildRoomGlbOfSize(roomProfile.fileBudgetBytes + 1), 'too_large']
+	])('exits 1 with the code on its line for a room with %s under --as room', (_name, bytes, code) => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('bad.glb', bytes)], output)).toBe(1);
+		expect(codesPrinted()).toEqual([code]);
+	});
+
+	it('exits 1 with the room code and the text it found for a room that breaks a room rule', () => {
+		const path = writeFigure('skins.glb', buildRoomGlb({ change: (json) => (json.skins = []) }));
+		expect(runCommand(['check', '--as', 'room', path], output)).toBe(1);
+		expect(stdout).toEqual([expect.stringMatching(/^room_content_not_allowed\b.*skins/)]);
+	});
+
+	it('judges a figure and a clip as a room under --as room, and a room as a figure without it', () => {
+		expect(runCommand(['check', '--as', 'room', writeFigure('figure.vrm', buildVrmGlb())], output)).toBe(1);
+		expect(codesPrinted()).toEqual(expect.arrayContaining(['extension_not_allowed', 'room_content_not_allowed']));
+		stdout = [];
+		expect(runCommand(['check', '--as', 'room', writeFigure('clip.vrma', buildClipGlb())], output)).toBe(1);
+		stdout = [];
+		expect(runCommand(['check', writeFigure('room.glb', buildRoomGlb())], output)).toBe(1);
+		expect(codesPrinted()).toContain('not_vrm');
+	});
+
 	it.each([
 		['no command', []],
 		['an unknown command', ['draw', 'a.glb']],
@@ -151,13 +197,15 @@ describe('runCommand', () => {
 		['more than one file', ['check', 'a.glb', 'b.glb']],
 		['--as without a value', ['check', '--as']],
 		['--as without a file', ['check', '--as', 'clip']],
-		['--as with a value that is not clip', ['check', '--as', 'room', 'a.glb']],
+		['--as room without a file', ['check', '--as', 'room']],
+		['--as with a value that is neither clip nor room', ['check', '--as', 'figure', 'a.glb']],
 		['--as after the file', ['check', 'a.glb', '--as', 'clip']],
-		['more than one file under --as clip', ['check', '--as', 'clip', 'a.vrma', 'b.vrma']]
+		['more than one file under --as clip', ['check', '--as', 'clip', 'a.vrma', 'b.vrma']],
+		['more than one file under --as room', ['check', '--as', 'room', 'a.glb', 'b.glb']]
 	])('exits 2 for %s', (_name, argv) => {
 		expect(runCommand(argv, output)).toBe(2);
 		expect(stdout).toEqual([]);
 		expect(stderr).toHaveLength(1);
-		expect(stderr[0]).toContain('usage: figure check [--as clip] <file>');
+		expect(stderr[0]).toContain('usage: figure check [--as clip|room] <file>');
 	});
 });

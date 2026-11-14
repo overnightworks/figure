@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { checkFigure } from './check.js';
-import { figureProfile } from './profile.js';
+import { checkFigure, checkRoom } from './check.js';
+import { figureProfile, roomProfile } from './profile.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
+import { buildRoomGlb } from '../tests/roomBuilder.js';
 
 type Json = Record<string, any>;
 
@@ -150,5 +151,80 @@ describe('gltf_invalid', () => {
 
 	it('does not read the accessors of a mode that counts no triangle', () => {
 		expect(codesOf(withPrimitives([{ attributes: {}, mode: 1 }], []))).toEqual([]);
+	});
+});
+
+describe('the room draw budgets', () => {
+	const roomCodesOf = (change: (json: Json) => void) => checkRoom(buildRoomGlb({ change })).map(({ code }) => code);
+	const { maxTriangles, maxPrimitives } = roomProfile;
+
+	/** The room's meshes after `change`: the first draws `triangles` triangles in `primitives` primitives, the second none. */
+	function drawing({ triangles, primitives = 1, drawnBy = 1 }: { triangles: number; primitives?: number; drawnBy?: number }) {
+		return (json: Json) => {
+			const primitive = json.meshes[0].primitives[0];
+			json.accessors[primitive.indices].count = 3 * triangles;
+			json.meshes[0].primitives = new Array<object>(primitives).fill(primitive);
+			json.nodes = [{ children: Array.from({ length: drawnBy }, (_, index) => index + 1) }, ...Array.from({ length: drawnBy }, () => ({ mesh: 0 }))];
+		};
+	}
+
+	it('passes exactly the triangle budget and refuses one more as too_many_triangles alone', () => {
+		expect(roomCodesOf(drawing({ triangles: maxTriangles }))).toEqual([]);
+		expect(roomCodesOf(drawing({ triangles: maxTriangles + 1 }))).toEqual(['too_many_triangles']);
+	});
+
+	it('passes exactly the primitive budget and refuses one more as too_many_primitives alone', () => {
+		expect(roomCodesOf(drawing({ triangles: 1, primitives: maxPrimitives }))).toEqual([]);
+		expect(roomCodesOf(drawing({ triangles: 1, primitives: maxPrimitives + 1 }))).toEqual(['too_many_primitives']);
+	});
+
+	it('counts the triangles of a mesh once for each node that draws it', () => {
+		const half = Math.floor(maxTriangles / 2);
+		expect(roomCodesOf(drawing({ triangles: half, drawnBy: 2 }))).toEqual([]);
+		expect(roomCodesOf(drawing({ triangles: half + 1, drawnBy: 2 }))).toEqual(['too_many_triangles']);
+	});
+
+	it('counts the primitives of a mesh once for each node that draws it', () => {
+		const half = Math.floor(maxPrimitives / 2);
+		expect(roomCodesOf(drawing({ triangles: 1, primitives: half, drawnBy: 2 }))).toEqual([]);
+		expect(roomCodesOf(drawing({ triangles: 1, primitives: half + 1, drawnBy: 2 }))).toEqual(['too_many_primitives']);
+	});
+
+	it('counts a node that no scene reaches', () => {
+		const unreached = (json: Json) => {
+			drawing({ triangles: maxTriangles + 1 })(json);
+			json.scenes[0].nodes = [];
+		};
+		expect(roomCodesOf(unreached)).toEqual(['too_many_triangles']);
+	});
+
+	it('counts no mesh that no node draws', () => {
+		const undrawn = (json: Json) => {
+			drawing({ triangles: 10 * maxTriangles, primitives: 10 * maxPrimitives })(json);
+			json.nodes = [{ children: [1] }, { mesh: 1 }];
+		};
+		expect(roomCodesOf(undrawn)).toEqual([]);
+	});
+
+	it('reports a triangle and a primitive refusal together, the triangles first', () => {
+		expect(roomCodesOf(drawing({ triangles: maxTriangles + 1, primitives: maxPrimitives + 1 }))).toEqual(['too_many_triangles', 'too_many_primitives']);
+	});
+
+	it('refuses a primitive it cannot read once for the mesh, however many nodes draw it', () => {
+		const unreadable = (json: Json) => {
+			drawing({ triangles: 1, drawnBy: 3 })(json);
+			json.meshes[0].primitives[0] = { ...json.meshes[0].primitives[0], mode: 9 };
+		};
+		const refusals = checkRoom(buildRoomGlb({ change: unreadable }));
+		expect(refusals.map(({ code }) => code)).toEqual(['gltf_invalid']);
+		expect(refusals[0]?.detail).toContain('meshes[0].primitives[0]');
+	});
+
+	it('counts a point or a line as no triangle but as a primitive', () => {
+		const lines = (json: Json) => {
+			drawing({ triangles: 10 * maxTriangles, primitives: maxPrimitives + 1 })(json);
+			json.meshes[0].primitives.forEach((primitive: Json, index: number) => (json.meshes[0].primitives[index] = { ...primitive, mode: 1 }));
+		};
+		expect(roomCodesOf(lines)).toEqual(['too_many_primitives']);
 	});
 });
