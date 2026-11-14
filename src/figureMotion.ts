@@ -16,17 +16,19 @@ import type { VowelWeights } from './vowelWeights.js';
  * size at rest and while listening, `speakingJumpShare` of it while the agent speaks, none while it thinks. Under reduced motion
  * the look-at reaches the goal at once, and there are no jumps and no blink brought forward.
  *
- * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and
- * to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the easing rates. The right arm
- * rises with the thinking weight to the picture's hand at the chin. The listening look is that of its listening state: the gaze toward the
- * speaker, the head's larger share of its yaw, the slower yaw and the lean, and a nod every 2.5 to 5 seconds, which the picture times
- * and which `spreadPosture` shares between neck and head. Under reduced motion the pose is reached and left at once, and no nod comes.
- * The speaking look is that of its speaking state: the five mouth weights easing at 38 a second up and 22 down, and the head nodding
- * with the voice by the weights' eased level. A mood the sentence names shows while the agent speaks: its weight eases toward its peak at 9
- * a second and away at 4, the mouth's weights shrink to 0.72 of themselves while any mood is shown, and each mood leans the head, the
- * trunk and the shoulders by its share of the picture's offsets. A gesture the host asks for starts at the next frame and runs its clip's
- * length on the clock the motion owns, the step of every other blend; the pose names it and its seconds, and the clip over the base pose
- * is the frame's, and while one plays the base pose's arm leaves the chin by the share its clip shows, so the hand travels below the frame instead of across the face. Under reduced motion none starts and a running one ends at the next frame.
+ * The thinking look is that of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its thinking state: the gaze up and to
+ * the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the
+ * easing rates. The right arm rises with the thinking weight to the picture's hand at the chin, the forearm folding ahead of the upper
+ * arm. The listening look is that of its listening state: the gaze toward the speaker, the head's larger share of its yaw, the slower yaw
+ * and the lean, and a nod every 2.5 to 5 seconds, which the picture times and which `spreadPosture` shares between neck and head. Under
+ * reduced motion the pose is reached and left at once, and no nod comes. The speaking look is that of its speaking state: the five mouth
+ * weights easing at 38 a second up and 22 down, and the head nodding with the voice by the weights' eased level. A mood the sentence
+ * names shows while the agent speaks: its weight eases toward its peak at 9 a second and away at 4, the mouth's weights shrink to 0.72 of
+ * themselves while any mood is shown, and each mood leans the head, the trunk and the shoulders by its share of the picture's offsets. A
+ * gesture the host asks for starts at the next frame and runs its clip's length on the clock the motion owns, the step of every other
+ * blend; the pose names it and its seconds, and the clip over the base pose is the frame's, and while one plays the base pose's arm
+ * leaves the chin by the share its clip shows, so the hand travels below the frame instead of across the face. Under reduced motion none
+ * starts and a running one ends at the next frame, and the arm's share that it had taken returns to the chin at the thinking look's rate.
  */
 
 /** What the host reports about its agent. */
