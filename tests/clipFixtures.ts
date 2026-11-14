@@ -113,6 +113,15 @@ export const rejectedAccessorShapes: readonly ClipRefusalCase[] = [
 		'gltf_invalid'
 	],
 	[
+		'an accessor offset that is not a multiple of 4 though its sum with the buffer view offset is',
+		(json) => {
+			json.accessors[timesAccessor].byteOffset = 2;
+			json.bufferViews[timesAccessor].byteOffset = 2;
+			json.bufferViews[timesAccessor].byteLength += 4;
+		},
+		'gltf_invalid'
+	],
+	[
 		'a buffer view offset that is not a multiple of 4',
 		(json) => {
 			json.bufferViews[timesAccessor].byteOffset = 2;

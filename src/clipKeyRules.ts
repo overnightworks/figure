@@ -101,8 +101,8 @@ function locate(json: JsonObject, binary: Uint8Array, accessorIndex: unknown, ty
 	}
 	const accessorOffset = offsetOf(accessor['byteOffset']);
 	const start = offsetOf(bufferView['byteOffset']) + accessorOffset;
-	if (start % ALIGNMENT_BYTES !== 0) {
-		unreadable(`accessor ${index} starts at a byte that is not a multiple of ${ALIGNMENT_BYTES}`);
+	if (start % ALIGNMENT_BYTES !== 0 || accessorOffset % ALIGNMENT_BYTES !== 0) {
+		unreadable(`accessor ${index} starts at a byte, or at an offset into its buffer view, that is not a multiple of ${ALIGNMENT_BYTES}`);
 	}
 	const byteLength = (count as number) * COMPONENTS_OF_TYPE[type] * BYTES_PER_COMPONENT;
 	if (accessorOffset + byteLength > indexOf(bufferView['byteLength']) || start + byteLength > binary.length) {
