@@ -171,11 +171,11 @@ function blendedTurn(from: Turn, to: Turn, weight: number): Turn {
 }
 
 /**
- * The share of the way to the chin that the forearm has folded at `thinkingWeight`: it leads the upper arm, so the hand rises close to
+ * The share of the way to the chin that the forearm has folded when the arm is `armWeight` of the way there: it leads the upper arm, so the hand rises close to
  * the body and stays inside the picture's side, where a forearm still hanging straight would swing out beyond it.
  */
-function forearmFoldShare(thinkingWeight: number): number {
-	return 1 - (1 - thinkingWeight) ** 4;
+function forearmFoldShare(armWeight: number): number {
+	return 1 - (1 - armWeight) ** 4;
 }
 
 /**
@@ -184,11 +184,11 @@ function forearmFoldShare(thinkingWeight: number): number {
  */
 function baseArms(breathShare: number, thinkingWeight: number, armGiven: number): Arms {
 	const restingRightUpperArm: Turn = { yaw: 0, pitch: 0, roll: restingArm.upperArmRoll };
-	const kept = 1 - armGiven;
+	const keptWeight = thinkingWeight * (1 - armGiven);
 	return {
 		leftUpperArm: { yaw: 0, pitch: restingArm.upperArmSwing * breathShare, roll: -restingArm.upperArmRoll },
-		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, thinkingWeight * kept),
-		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, forearmFoldShare(thinkingWeight) * kept)
+		rightUpperArm: blendedTurn(restingRightUpperArm, chinArm.upperArm, keptWeight),
+		rightLowerArm: blendedTurn(restTurn, chinArm.lowerArm, forearmFoldShare(keptWeight))
 	};
 }
 

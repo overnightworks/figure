@@ -123,6 +123,18 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 				expect(reduced.slice(lastShownFrame + 1).map(({ gesture }) => gesture)).toEqual(Array(frames - lastShownFrame - 1).fill(null));
 			});
 
+			it('folds the forearm ahead of the upper arm on the way back to the chin', () => {
+				const shareOf = (frame: number, bone: 'rightUpperArm' | 'rightLowerArm', axis: 'roll' | 'yaw') => {
+					const [rest, chin] = [resting[frame]!.arms[bone][axis], thinkingOnly[frame]!.arms[bone][axis]];
+					return (reduced[frame]!.arms[bone][axis] - rest) / (chin - rest);
+				};
+				const returning = reduced.map((_, frame) => frame).slice(lastShownFrame + 1);
+				const shares = returning.map((frame) => ({ upper: shareOf(frame, 'rightUpperArm', 'roll'), fore: shareOf(frame, 'rightLowerArm', 'yaw') }));
+
+				shares.forEach(({ upper, fore }) => expect(fore).toBeGreaterThanOrEqual(upper - 1e-9));
+				expect(shares.some(({ upper, fore }) => upper > 0.05 && upper < 0.95 && fore > upper + 0.05)).toBe(true);
+			});
+
 			it('eases the base arm back to the chin without a jump', () => {
 				const steps = chinShares.slice(1).map((share, frame) => share - chinShares[frame]!);
 
