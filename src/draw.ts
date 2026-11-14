@@ -1,10 +1,11 @@
 import { loadClip } from './clipLoader.js';
-import { mountWithClipLoad, type FigureHandle, type MountOptions } from './figureMount.js';
+import { mountWithClipLoad } from './figureMount.js';
+import type { FigureHandle, MountOptions } from './mountOptions.js';
 
 export { figureSignal, type FigureSignal } from './signals.js';
 export type { FigureMood } from './expressions.js';
 export type { FigureGesture } from './gestures.js';
-export type { FigureHandle, MountOptions } from './figureMount.js';
+export type { FigureHandle, MountOptions } from './mountOptions.js';
 
 /**
  * Draws the VRM in `bytes` into `canvas`, whose CSS size the host owns, and keeps it alive: the figure breathes, sways, blinks and

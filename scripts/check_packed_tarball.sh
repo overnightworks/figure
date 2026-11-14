@@ -2,7 +2,7 @@
 # Proves a packed figure tarball runs: installs it without install scripts into a temporary directory and expects `figure check`
 # to exit 0 on the test builder's conformant file, 1 on a file that is not GLB and 2 on a missing file; expects `figure check --as clip`
 # to exit 0 on each of figure's base clips, written from the keys of the built gestures, and 1 on the conformant figure; expects the declarations
-# of ./draw to name no three type; then removes three and the @pixiv packages (three-vrm and three-vrm-animation) and expects the check, both of its kinds, and the package's root, ./codes and ./profile to work without them.
+# of ./draw, and every declaration they reach through relative imports, to name no three type; then removes three and the @pixiv packages (three-vrm and three-vrm-animation) and expects the check, both of its kinds, and the package's root, ./codes and ./profile to work without them.
 # Usage: scripts/check_packed_tarball.sh <tarball>; run it from the repository after `pnpm run build`.
 # Exit codes: 2 for a missing tarball argument, non-zero for any failed expectation or command.
 set -euo pipefail
@@ -37,10 +37,26 @@ test "${status}" -eq 1
 
 installed="${install_directory}/node_modules/overnightworks-figure"
 test -f "${installed}/dist/draw.js"
-if grep -rqE "from ['\"](three|@pixiv)" "${installed}/dist/draw.d.ts"; then
-  echo "dist/draw.d.ts names a three type" >&2
-  exit 1
-fi
+node --input-type=module -e '
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+const dist = join(process.argv[1], "dist");
+const pending = ["draw.d.ts"];
+const reached = new Set();
+while (pending.length > 0) {
+  const declaration = pending.pop();
+  if (reached.has(declaration)) continue;
+  reached.add(declaration);
+  const text = readFileSync(join(dist, declaration), "utf8");
+  for (const [, specifier] of text.matchAll(/(?:from|import\()\s*["\x27]([^"\x27]+)["\x27]/g)) {
+    if (/^(three|@pixiv\/)/.test(specifier)) {
+      console.error(`dist/${declaration} names a three type`);
+      process.exit(1);
+    }
+    if (specifier.startsWith(".")) pending.push(resolve("/", declaration, "..", specifier).slice(1).replace(/\.js$/, ".d.ts"));
+  }
+}
+' "${installed}"
 rm -rf "${install_directory}/node_modules/three" "${install_directory}/node_modules/@pixiv"
 npx figure check synthetic.vrm
 for clip in base-clips/*.vrma; do
