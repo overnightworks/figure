@@ -1,6 +1,3 @@
-// The `.ts` extension lets Node run this file without a build, as scripts/write_base_clips.mjs does.
-import { buildGlb } from './glbBuilder.ts';
-
 const FLOAT = 5126;
 const BYTES_PER_FLOAT = 4;
 
@@ -94,9 +91,4 @@ export function clipParts(
 		animations: animationEntries
 	};
 	return { json, binary };
-}
-
-/** A clip GLB of `clipParts`; the options replace the chunks, as `buildGlb`'s do. */
-export function buildClip(values: ClipValues, tracks?: readonly (readonly ClipTrack[])[]): Uint8Array {
-	return buildGlb(clipParts(values, tracks));
 }
