@@ -110,8 +110,9 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 			expect(withGesture.at(-1)!.arms).toEqual(thinkingOnly.at(-1)!.arms);
 		});
 
+		const lastShownFrame = midClip;
+
 		describe('when reduced motion ends it', () => {
-			const lastShownFrame = midClip;
 			const reducedFrom = (frame: number): Frame => ({ ...call(frame), reducedMotion: frame > lastShownFrame });
 			const reduced = posesOf(frames, reducedFrom);
 			const chinShares = reduced.slice(lastShownFrame).map(({ arms }, frame) => {
@@ -142,6 +143,34 @@ describe.each(Object.values(figureGesture))('the gesture %s', (name) => {
 				expect(Math.min(...steps)).toBeGreaterThanOrEqual(0);
 				expect(chinShares[1]).toBeLessThan(0.1);
 				expect(chinShares.at(-1)).toBeCloseTo(1, 3);
+			});
+		});
+
+		describe('when the preference is lifted again while the arm is still returning', () => {
+			const liftedFrame = lastShownFrame + 10;
+			const lifted = posesOf(frames, (frame): Frame => ({ ...call(frame), reducedMotion: frame > lastShownFrame && frame <= liftedFrame }));
+			const shareOf = (frame: number, bone: 'rightUpperArm' | 'rightLowerArm', axis: 'roll' | 'yaw') => {
+				const [rest, chin] = [resting[frame]!.arms[bone][axis], thinkingOnly[frame]!.arms[bone][axis]];
+				return (lifted[frame]!.arms[bone][axis] - rest) / (chin - rest);
+			};
+			const afterWave = lifted.map((_, frame) => frame).slice(lastShownFrame);
+
+			it('moves the base arm to the chin without a jump', () => {
+				const shares = afterWave.map((frame) => shareOf(frame, 'rightUpperArm', 'roll'));
+				const steps = shares.slice(1).map((share, frame) => share - shares[frame]!);
+
+				expect(shares[liftedFrame - lastShownFrame]).toBeLessThan(0.9);
+				expect(Math.max(...steps)).toBeLessThan(0.1);
+				expect(Math.min(...steps)).toBeGreaterThanOrEqual(0);
+				expect(shares.at(-1)).toBeCloseTo(1, 3);
+			});
+
+			it('keeps the forearm ahead of the upper arm from the frame it is lifted on', () => {
+				const shares = afterWave.map((frame) => ({ frame, upper: shareOf(frame, 'rightUpperArm', 'roll'), fore: shareOf(frame, 'rightLowerArm', 'yaw') }));
+				const afterLift = shares.filter(({ frame }) => frame > liftedFrame);
+
+				shares.forEach(({ upper, fore }) => expect(fore).toBeGreaterThanOrEqual(upper - 1e-9));
+				expect(afterLift.some(({ upper, fore }) => upper > 0.05 && upper < 0.95 && fore > upper + 0.05)).toBe(true);
 			});
 		});
 	});
