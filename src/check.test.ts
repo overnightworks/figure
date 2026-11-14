@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkClip, checkFigure } from './check.js';
 import { clipProfile, figureProfile } from './profile.js';
 import { buildVrmGlb, vrmJson, vrmParts } from '../tests/figureFixtures.js';
-import { clipParts } from '../tests/clipBuilder.js';
-import { buildClipGlb, type ClipJson } from '../tests/clipFixtures.js';
+import { buildClipGlb, buildClipGlbOfSize, type ClipJson } from '../tests/clipFixtures.js';
 import { buildGlb, buildHeaderOnlyGlb } from '../tests/glbBuilder.js';
 
 function codesOf(bytes: Uint8Array): string[] {
@@ -220,16 +219,10 @@ describe('checkClip', () => {
 	});
 
 	it('refuses a file one byte over the clip budget as too_large alone, and passes one at the budget', () => {
-		const { json, binary } = clipParts(clipProfile);
-		const withFileSize = (size: number) => {
-			const padded = new Uint8Array(size - buildGlb({ json, binary }).length + binary.length);
-			padded.set(binary);
-			return buildGlb({ json, binary: padded });
-		};
-		const atBudget = withFileSize(clipProfile.fileBudgetBytes);
+		const atBudget = buildClipGlbOfSize(clipProfile.fileBudgetBytes);
 		expect(atBudget).toHaveLength(clipProfile.fileBudgetBytes);
 		expect(checkClip(atBudget)).toEqual([]);
-		expect(clipCodesOf(withFileSize(clipProfile.fileBudgetBytes + 1))).toEqual(['too_large']);
+		expect(clipCodesOf(buildClipGlbOfSize(clipProfile.fileBudgetBytes + 1))).toEqual(['too_large']);
 	});
 
 	it('refuses a figure as not_vrm_animation, and a clip is not a figure', () => {

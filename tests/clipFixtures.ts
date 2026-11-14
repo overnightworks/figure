@@ -20,3 +20,11 @@ export function buildClipGlb({ animations, change, glb }: ClipVariant = {}): Uin
 	change?.(parts.json);
 	return buildGlb({ ...parts, ...glb });
 }
+
+/** A GLB of the conformant clip padded in its binary chunk to exactly `size` bytes. */
+export function buildClipGlbOfSize(size: number): Uint8Array {
+	const { json, binary } = clipParts(clipProfile);
+	const padded = new Uint8Array(size - buildGlb({ json, binary }).length + binary.length);
+	padded.set(binary);
+	return buildGlb({ json, binary: padded });
+}

@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runCommand } from './cli.js';
-import { figureProfile } from './profile.js';
-import { buildClipGlb } from '../tests/clipFixtures.js';
+import { clipProfile, figureProfile } from './profile.js';
+import { conformantTrack, type ClipTrack } from '../tests/clipBuilder.js';
+import { buildClipGlb, buildClipGlbOfSize, type ClipJson } from '../tests/clipFixtures.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 
 describe('runCommand', () => {
@@ -75,6 +76,73 @@ describe('runCommand', () => {
 		const path = writeFigure('mesh.vrma', buildClipGlb({ change: (json) => (json.meshes = []) }));
 		expect(runCommand(['check', '--as', 'clip', path], output)).toBe(1);
 		expect(stdout).toEqual([expect.stringMatching(/^clip_content_not_allowed\b.*meshes/)]);
+	});
+
+	function codesPrinted(): string[] {
+		return stdout.map((line) => line.split(':')[0] as string);
+	}
+
+	const track = (change: Partial<ClipTrack>): ClipTrack => ({ ...conformantTrack(), ...change });
+	const zeroRotation = [0, 0, 0, 0] as const;
+
+	it.each([
+		['a STEP track', buildClipGlb({ animations: [[track({ interpolation: 'STEP' })]] })],
+		[
+			'a CUBICSPLINE track',
+			buildClipGlb({
+				animations: [[track({ interpolation: 'CUBICSPLINE', rotations: conformantTrack().rotations.flatMap((value) => [zeroRotation, value, zeroRotation]) })]]
+			})
+		],
+		['several animations', buildClipGlb({ animations: [[conformantTrack()], [conformantTrack()]] })],
+		['a first animation whose last key is at the length budget', buildClipGlb({ animations: [[track({ times: [0, 1, clipProfile.maxSeconds] })]] })],
+		['a file at the byte budget', buildClipGlbOfSize(clipProfile.fileBudgetBytes)]
+	])('exits 0 for a clip with %s under --as clip', (_name, bytes) => {
+		expect(runCommand(['check', '--as', 'clip', writeFigure('ok.vrma', bytes)], output)).toBe(0);
+		expect(stdout).toHaveLength(1);
+		expect(stderr).toEqual([]);
+	});
+
+	const expressionNode = (json: ClipJson) => {
+		json.nodes.push({ name: 'expression' });
+		json.extensions.VRMC_vrm_animation.expressions = { preset: { happy: { node: json.nodes.length - 1 } } };
+		return json.nodes.length - 1;
+	};
+	const lookAtNode = (json: ClipJson) => {
+		json.nodes.push({ name: 'lookAt' });
+		json.extensions.VRMC_vrm_animation.lookAt = { node: json.nodes.length - 1 };
+		return json.nodes.length - 1;
+	};
+	/** Points the clip's one channel at `node` with a rotation or a translation; a translation reads VEC3. */
+	const retarget = (json: ClipJson, node: number, path: 'rotation' | 'translation') => {
+		json.animations[0].channels[0].target = { node, path };
+		if (path === 'translation') {
+			Object.assign(json.accessors[json.animations[0].samplers[0].output], { type: 'VEC3', count: 3 });
+		}
+	};
+
+	it.each<[string, Uint8Array, string[]]>([
+		['a file that is not a GLB', new TextEncoder().encode('not a clip'), ['not_glb']],
+		['a file over the byte budget', buildClipGlbOfSize(clipProfile.fileBudgetBytes + 1), ['too_large']],
+		['a GLB version other than 2', buildClipGlb({ glb: { version: 1 } }), ['glb_version']],
+		['a header length that is not the file’s', buildClipGlb({ glb: { declaredLength: 20 } }), ['glb_length']],
+		['a chunk that reaches past the end', buildClipGlb({ glb: { jsonChunkLengthField: 0xffffffff } }), ['glb_chunk']],
+		['a JSON chunk that is not an object', buildClipGlb({ glb: { json: [] } }), ['glb_json']],
+		['an extension the clip profile does not allow', buildClipGlb({ change: (json) => (json.extensionsRequired = ['KHR_draco_mesh_compression']) }), ['extension_not_allowed']],
+		['a buffer that names a URI', buildClipGlb({ change: (json) => (json.buffers[0].uri = 'clip.bin') }), ['uri_not_allowed']],
+		['a second buffer', buildClipGlb({ change: (json) => json.buffers.push({ byteLength: 1 }) }), ['buffer_outside_glb']],
+		['a missing required bone', buildClipGlb({ change: (json) => delete json.extensions.VRMC_vrm_animation.humanoid.humanBones.hips }), ['humanoid_bone_missing']],
+		['a part of the JSON that is no glTF shape', buildClipGlb({ change: (json) => (json.animations[0].samplers[0].input = 99) }), ['gltf_invalid']],
+		['no VRMC_vrm_animation', buildClipGlb({ change: (json) => delete json.extensions.VRMC_vrm_animation }), ['not_vrm_animation']],
+		['meshes', buildClipGlb({ change: (json) => (json.meshes = []) }), ['clip_content_not_allowed']],
+		['no scene', buildClipGlb({ change: (json) => delete json.scenes }), ['clip_scene_missing']],
+		['no animation', buildClipGlb({ change: (json) => delete json.animations }), ['clip_animation_missing']],
+		['a rotation channel on an expression node', buildClipGlb({ change: (json) => retarget(json, expressionNode(json), 'rotation') }), ['clip_track_not_allowed']],
+		['a translation channel on the look-at node', buildClipGlb({ change: (json) => retarget(json, lookAtNode(json), 'translation') }), ['clip_track_not_allowed']],
+		['times that descend', buildClipGlb({ animations: [[track({ times: [0, 2, 1] })]] }), ['clip_keys_invalid']],
+		['a first animation past the length budget', buildClipGlb({ animations: [[track({ times: [0, 1, clipProfile.maxSeconds + 1] })]] }), ['clip_too_long']]
+	])('exits 1 with the code on its line for a clip with %s under --as clip', (_name, bytes, codes) => {
+		expect(runCommand(['check', '--as', 'clip', writeFigure('bad.vrma', bytes)], output)).toBe(1);
+		expect(codesPrinted()).toEqual(codes);
 	});
 
 	it('judges a figure as a clip under --as clip, and a clip as a figure without it', () => {
