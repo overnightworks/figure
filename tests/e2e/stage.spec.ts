@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { build } from 'vite';
+import { clipProfile } from '../../src/profile.js';
 import { buildArmUpClip } from '../clipFixtures.js';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './serve-consumer.js';
@@ -13,11 +14,11 @@ const stageConfig = fileURLToPath(new URL('../stage/vite.config.ts', import.meta
 const drawingTimeout = 30_000;
 /** The pixels of a canvas a shown mood changes at least: the brows and the mouth lie well beyond it, a sleeve's spring or a blink does not reach it. */
 const shownPixels = 300;
-/** The pixels of the phone-wide canvas a raised arm changes at least: the arm lies well beyond it, the idle glance and a blink do not reach it. */
+/** The pixels of the phone-wide canvas a raised arm changes at least: the arm lies well beyond it, the idle glance and a blink do not reach it; within `raisedArmArea` of a wider drawing the arm covers more. */
 const wavedPixels = 3000;
 
-/** The seconds a picked clip holds the arm up: longer than the figure's own wave. */
-const clipHoldSeconds = 20;
+/** The seconds a picked clip holds the arm up: longer than the figure's own wave and within what a clip may last, so the check passes it. */
+const clipHoldSeconds = clipProfile.maxSeconds - 1;
 /** The milliseconds after a wave at which the figure's own wave is over. */
 const afterNeutralWaveMilliseconds = 4000;
 
@@ -61,24 +62,30 @@ async function expectNoViolations(page: Page, pageErrors: string[]): Promise<voi
 	expect(pageErrors).toEqual([]);
 }
 
-/** The pixels of two screenshots that differ by more than a rounding of the colour: counted in the page, which decodes the PNGs. */
-async function differingPixels(page: Page, first: Buffer, second: Buffer): Promise<number> {
+/** The part of a drawing that is bare at rest and a raised arm covers: the left quarter of its width down to three fifths of its height; the head's sway and a blink do not reach it. */
+const raisedArmArea = { width: 0.25, height: 0.6 };
+
+/** The pixels of two screenshots that differ by more than a rounding of the colour, within the top left `area` of the drawing (all of it by default): counted in the page, which decodes the PNGs. */
+async function differingPixels(page: Page, first: Buffer, second: Buffer, area = { width: 1, height: 1 }): Promise<number> {
 	return page.evaluate(
-		async ([before, after]) => {
+		async ({ before, after, areaWidth, areaHeight }) => {
 			const pixelsOf = async (base64: string) => {
 				const bitmap = await createImageBitmap(new Blob([Uint8Array.from(atob(base64), (character) => character.charCodeAt(0))], { type: 'image/png' }));
 				const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
 				context.drawImage(bitmap, 0, 0);
-				return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+				return context.getImageData(0, 0, bitmap.width, bitmap.height);
 			};
-			const [one, other] = [await pixelsOf(before!), await pixelsOf(after!)];
+			const [one, other] = [await pixelsOf(before), await pixelsOf(after)];
 			let differing = 0;
-			for (let offset = 0; offset < one.length; offset += 4) {
-				if ([0, 1, 2].some((channel) => Math.abs(one[offset + channel]! - other[offset + channel]!) > 32)) differing++;
+			for (let row = 0; row < one.height * areaHeight; row++) {
+				for (let column = 0; column < one.width * areaWidth; column++) {
+					const offset = (row * one.width + column) * 4;
+					if ([0, 1, 2].some((channel) => Math.abs(one.data[offset + channel]! - other.data[offset + channel]!) > 32)) differing++;
+				}
 			}
 			return differing;
 		},
-		[first.toString('base64'), second.toString('base64')]
+		{ before: first.toString('base64'), after: second.toString('base64'), areaWidth: area.width, areaHeight: area.height }
 	);
 }
 
@@ -133,8 +140,8 @@ test.describe('the demo stage under the script policy', () => {
 		await page.locator('#clip-picker').setInputFiles({ name: 'hold.vrma', mimeType: 'model/gltf-binary', buffer: Buffer.from(buildArmUpClip(clipHoldSeconds)) });
 		await expect.poll(() => previousCanvas!.evaluate((canvas) => canvas.isConnected), { timeout: drawingTimeout }).toBe(false);
 		await expectTwoDrawings(page);
-		const figure = page.locator('canvas').nth(0);
-		const resting = await figure.screenshot();
+		const figures = [page.locator('canvas').nth(0), page.locator('canvas').nth(1)];
+		const resting = await Promise.all(figures.map((figure) => figure.screenshot()));
 
 		// A wave made before the clip has parsed is the neutral one, which is over by the time the picked clip still holds the arm up; waves are made until the clip plays.
 		await expect
@@ -142,7 +149,8 @@ test.describe('the demo stage under the script policy', () => {
 				async () => {
 					await page.getByRole('button', { name: 'wave', exact: true }).click();
 					await page.waitForTimeout(afterNeutralWaveMilliseconds);
-					return differingPixels(page, resting, await figure.screenshot());
+					const waved = await Promise.all(figures.map((figure, index) => figure.screenshot().then((shown) => differingPixels(page, resting[index]!, shown, raisedArmArea))));
+					return Math.min(...waved);
 				},
 				{ timeout: drawingTimeout, intervals: [0] }
 			)
