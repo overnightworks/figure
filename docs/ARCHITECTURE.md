@@ -31,12 +31,12 @@ flowchart TD
     index["index.ts"] --> check
     draw["draw.ts: mount, the handle"] --> figureMount["figureMount.ts: the mount's work and the loop"]
     figureMount --> check
-    figureMount --> loaders["figureLoader.ts, clipLoader.ts: GLB and .vrma into three objects"]
+    figureMount --> loaders["figureLoader.ts: GLB into three objects"]
     figureMount --> motion["figureMotion.ts, idleMotion.ts, gestureClips.ts: the pose, pure"]
     figureMount --> frame["figureFrame.ts, gestureLayer.ts: camera, lights, one frame"]
     figureMount --> voice["voiceTap.ts, vowelWeights.ts: the host's voice to mouth weights"]
     figureMount --> guard["frameTimeGuard.ts: the slow test, pure"]
-    draw --> signals["signals.ts, gestures.ts, expressions.ts: closed sets"]
+    draw --> signals["signals.ts, gestures.ts, expressions.ts: closed sets"] & clipLoader["clipLoader.ts: .vrma into three objects"]
 ```
 
 *Module groups and their imports; derived from `src/`.*
@@ -48,7 +48,7 @@ flowchart TD
 - `index.ts` exports `checkFigure`, `checkClip`, the codes, both profiles and `figureGesture`; `overnightworks-figure/codes` and `/profile` export a subset. No module they reach imports three or three-vrm.
 - `draw.ts` is the one module of `overnightworks-figure/draw`: it exports `mount`, `figureSignal` and the types of the handle, the options, the signal, the mood and the gesture. The handle is the last signal, an idempotent `dispose`, `think`, `listen`, `speak` and `gesture`. The types live in `mountOptions.ts`, so no declaration of the export names a three type (`scripts/check_packed_tarball.sh` follows them). `mount` is `figureMount.ts`' `mountWithClipLoad` given `clipLoader.ts`' `loadClip`; tests give it another parse.
 - `figureMount.ts` owns the loop: one animation frame request at a time, the one place that draws. It runs only while the page is visible and the canvas is in the viewport, reads `prefers-reduced-motion` each frame, feeds each frame's interval to the guard and ends the figure with `slow` when it says so, and ends it with `lost` on `webglcontextlost`. No context is restored.
-- Under reduced motion no gesture starts and a running one ends; `gesture` is also dropped for a value outside the set, while the page is hidden and on a figure that ended. A gesture is a moment, not a state.
+- Under reduced motion no gesture starts and a running one ends, and the chin share it had taken from the base arm returns to the chin at the thinking look's rate, the forearm folding ahead of the upper arm, also when the page lifts reduced motion on the way; `gesture` is also dropped for a value outside the set, while the page is hidden and on a figure that ended. A gesture is a moment, not a state.
 - `figureMotion.ts` owns the order of the states (speaking over thinking over listening over idle) and the blending between them: a pure function of the facts the host reported through `think`, `listen` and `speak`, the elapsed seconds and a source of chance. The host reports a fact and the package decides the motion. `idleMotion.ts` is its idle layer; `gestureClips.ts` owns the clips' keys, the bones a clip plays and their lags.
 - `figureFrame.ts` owns the picture: camera, lights, clear colour, the drawing buffer's size and the order in which the layers write the bones: base pose, gesture, deltas, head and neck, face. `gestureLayer.ts` holds the clip per gesture name, figure's own until a persona's replaces it.
 - `clipLoader.ts` parses a `.vrma` that `checkClip` passed. The check is the only gate: `figureMount.ts` never hands a loader a byte the check refused. A `gestures` option clip is checked and parsed after `drawn`, without `mount` waiting; a refused clip, a failed load and a parse that ends after `dispose` are dropped with no signal.
