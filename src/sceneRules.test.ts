@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkRoom } from './check.js';
 import { buildRoomGlb } from '../tests/roomBuilder.js';
 import {
+	childOfTwoNodesCase,
 	invalidNodeCases,
 	invalidSceneCases,
 	missingSceneCases,
@@ -37,6 +38,10 @@ describe('the scene and node rules a room shares with a clip', () => {
 
 	it.each(passingNodeCases)('pass %s', (_name, change) => {
 		expect(codesOf(change)).toEqual([]);
+	});
+
+	it('name the node that is a child of two nodes', () => {
+		expect(refusalsOf(childOfTwoNodesCase)).toEqual([{ code: 'gltf_invalid', detail: expect.stringContaining('child of more than one node') }]);
 	});
 
 	it('refuse nodes that are not a list once, naming nodes', () => {

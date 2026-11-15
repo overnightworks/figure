@@ -24,6 +24,13 @@ export const invalidSceneCases: readonly (readonly [name: string, change: Change
 	['a scene that names a node by an index that is not an integer', (json) => (json.scenes[0].nodes[0] = '0')]
 ];
 
+/** A node under two parents, which the loader draws under the last parent it resolves. */
+export const childOfTwoNodesCase: Change = (json) => {
+	json.nodes.push({ name: 'shared' });
+	json.nodes[0].children = [...(json.nodes[0].children ?? []), json.nodes.length - 1];
+	json.nodes[1].children = [...(json.nodes[1].children ?? []), json.nodes.length - 1];
+};
+
 /** Each is refused as `gltf_invalid`, beside any other refusal the shape draws. */
 export const invalidNodeCases: readonly (readonly [name: string, change: Change])[] = [
 	['a nodes entry that is not an object', (json) => json.nodes.push(null)],
@@ -62,6 +69,7 @@ export const invalidNodeCases: readonly (readonly [name: string, change: Change]
 			json.nodes[2].children = [1];
 		}
 	],
+	['a node that is a child of two nodes', childOfTwoNodesCase],
 	['a node whose name is a number', (json) => (json.nodes[0].name = 5)],
 	['a node whose name is null', (json) => (json.nodes[0].name = null)],
 	['a scene whose name is a number', (json) => (json.scenes[0].name = 5)]
@@ -69,13 +77,7 @@ export const invalidNodeCases: readonly (readonly [name: string, change: Change]
 
 export const passingNodeCases: readonly (readonly [name: string, change: Change])[] = [
 	['a node whose children name nodes', (json) => (json.nodes[0].children = [1, 2])],
-	[
-		'two nodes that share a child, which is no cycle',
-		(json) => {
-			json.nodes[0].children = [2];
-			json.nodes[1].children = [2];
-		}
-	],
+	['a node listed twice under one parent, which the loader adds once', (json) => (json.nodes[0].children = [1, 1])],
 	[
 		'text names on nodes and scenes',
 		(json) => {

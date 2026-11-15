@@ -3,6 +3,7 @@ import { checkClip } from './check.js';
 import { clipProfile } from './profile.js';
 import { conformantTrack, identity, type ClipTrack } from '../tests/clipBuilder.js';
 import {
+	childOfTwoNodesCase,
 	invalidNodeCases,
 	invalidSceneCases,
 	missingSceneCases,
@@ -81,6 +82,10 @@ describe('the clip rules', () => {
 
 	it.each(invalidNodeCases)('refuse %s as gltf_invalid', (_name, change) => {
 		expect(codesOf(change)).toContain('gltf_invalid');
+	});
+
+	it('refuse a node that is a child of two nodes once, as gltf_invalid', () => {
+		expect(codesOf(childOfTwoNodesCase)).toEqual(['gltf_invalid']);
 	});
 
 	it.each(passingNodeCases)('pass %s', (_name, change) => {

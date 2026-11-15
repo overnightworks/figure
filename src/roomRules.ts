@@ -10,6 +10,8 @@ const SCENE_KIND: SceneKind = {
 	contentCode: 'room_content_not_allowed',
 	forbiddenNodeProperties: ['skin', 'camera']
 };
+/** The component types glTF 2.0 defines: the loader reads an accessor through the typed array of its component type, and throws on any other. */
+const COMPONENT_TYPES = new Set([5120, 5121, 5122, 5123, 5125, 5126]);
 const UNLIT = 'KHR_materials_unlit';
 const DRACO = 'KHR_draco_mesh_compression';
 
@@ -97,6 +99,15 @@ function mustNameEntry(json: JsonObject, listName: string, index: unknown): void
 	}
 }
 
+/** Unreadable unless `index` names an accessor the loader can read. An accessor that no primitive names is never read. */
+function mustNameLoadableAccessor(json: JsonObject, index: unknown): void {
+	mustNameEntry(json, 'accessors', index);
+	const accessor = objectOf(listOf(json['accessors'])[indexOf(index)]);
+	if (!COMPONENT_TYPES.has(accessor['componentType'] as number)) {
+		unreadable("names an accessor whose componentType is none of glTF's");
+	}
+}
+
 /** Unreadable unless `index` lies inside the list `json[listName]`. A list that is no list, and what an entry holds, are for the walk that owns the list. */
 function mustNameListed(json: JsonObject, listName: string, index: unknown): void {
 	const list = json[listName];
@@ -141,10 +152,10 @@ function primitiveReferences(json: JsonObject, primitive: JsonObject): void {
 		mustNameListed(json, 'materials', primitive['material']);
 	}
 	if (primitive['indices'] !== undefined) {
-		mustNameEntry(json, 'accessors', primitive['indices']);
+		mustNameLoadableAccessor(json, primitive['indices']);
 	}
 	for (const accessor of Object.values(objectOf(primitive['attributes']))) {
-		mustNameEntry(json, 'accessors', accessor);
+		mustNameLoadableAccessor(json, accessor);
 	}
 	const extensions = primitive['extensions'];
 	if (isJsonObject(extensions) && extensions[DRACO] !== undefined && !namedInExtensionsUsed(json, DRACO)) {

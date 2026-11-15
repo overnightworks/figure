@@ -47,7 +47,7 @@ function nameMustBeText(entry: JsonObject): void {
 	}
 }
 
-/** The loader follows `children` recursively, so each must be an object, name only nodes that exist and hold none of the kind's forbidden properties, and the children must form no cycle. */
+/** The loader follows `children` recursively, so each must be an object, name only nodes that exist and hold none of the kind's forbidden properties, and the children must form a forest: no cycle and no node under two parents. */
 function nodeRefusals(json: JsonObject, kind: SceneKind, refusals: Refusal[]): void {
 	attemptRead(refusals, 'nodes', () => {
 		const nodes = listOf(json['nodes']);
@@ -75,7 +75,35 @@ function nodeRefusals(json: JsonObject, kind: SceneKind, refusals: Refusal[]): v
 		if (inCycle !== undefined) {
 			unreadable(`nodes[${inCycle}] is its own descendant`);
 		}
+		unlessAChildOfTwoNodes(childrenOf);
 	});
+}
+
+/** The loader adds each child to its parent, which re-parents a node with two parents to the one it resolves last and draws it under the wrong transform; a node listed twice under one parent is added once. */
+function unlessAChildOfTwoNodes(childrenOf: ReadonlyMap<number, readonly number[]>): void {
+	const parentOf = new Map<number, number>();
+	for (const [parent, children] of childrenOf) {
+		for (const child of children) {
+			if (parentOf.get(child) !== undefined && parentOf.get(child) !== parent) {
+				unreadable(`nodes[${child}] is a child of more than one node`);
+			}
+			parentOf.set(child, parent);
+		}
+	}
+}
+
+/** The shape the scene walk refuses, for a file kind that walks no scene: the children it can read, and nothing it cannot. */
+export function sharedChildRefusals(json: JsonObject): Refusal[] {
+	const refusals: Refusal[] = [];
+	attemptRead(refusals, 'nodes', () => {
+		const childrenOf = new Map<number, readonly number[]>();
+		for (const [index, node] of (Array.isArray(json['nodes']) ? json['nodes'] : []).entries()) {
+			const children = isJsonObject(node) && Array.isArray(node['children']) ? node['children'] : [];
+			childrenOf.set(index, children.filter((child): child is number => Number.isInteger(child)));
+		}
+		unlessAChildOfTwoNodes(childrenOf);
+	});
+	return refusals;
 }
 
 /** The first node, in index order, that a walk of `children` meets again on its own path, or undefined when the nodes form a forest. Iterative, since a file may chain nodes deeper than the stack. */

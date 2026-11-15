@@ -139,6 +139,15 @@ describe('the room rules', () => {
 			expect(codesOf(change)).toEqual(['extension_not_allowed']);
 		});
 
+		it('passes an accessor without a componentType that no primitive names, which the loader never reads', () => {
+			expect(codesOf((json) => json.accessors.push({}))).toEqual([]);
+		});
+
+		it('passes an accessor of each componentType glTF defines', () => {
+			const types = [5120, 5121, 5122, 5123, 5125, 5126];
+			expect(types.map((type) => codesOf((json) => (json.accessors[json.meshes[0].primitives[0].indices].componentType = type)))).toEqual(types.map(() => []));
+		});
+
 		it('passes a primitive without indices, which is not indexed', () => {
 			expect(codesOf((json) => delete json.meshes[0].primitives[0].indices)).toEqual([]);
 		});

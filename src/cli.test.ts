@@ -10,7 +10,7 @@ import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
 import { buildPng, imageSizesFilling } from '../tests/glbBuilder.js';
 import { buildBudgetRoom, buildRoomGlb, buildRoomGlbOfSize, drawing, type RoomLook } from '../tests/roomBuilder.js';
 import { invalidReferenceCases } from '../tests/roomCases.js';
-import { invalidNodeCases, invalidSceneCases, missingSceneCases } from '../tests/sceneCases.js';
+import { childOfTwoNodesCase, invalidNodeCases, invalidSceneCases, missingSceneCases } from '../tests/sceneCases.js';
 
 describe('runCommand', () => {
 	let directory: string;
@@ -138,6 +138,16 @@ describe('runCommand', () => {
 	])('exits 1 with the code on its line for a clip with %s under --as clip', (_name, bytes, codes) => {
 		expect(runCommand(['check', '--as', 'clip', writeFigure('bad.vrma', bytes)], output)).toBe(1);
 		expect(codesPrinted()).toEqual(codes);
+	});
+
+	it.each([
+		['a figure', [], buildVrmGlb({ json: vrmJson(childOfTwoNodesCase) })],
+		['a clip', ['--as', 'clip'], buildClipGlb({ change: childOfTwoNodesCase })],
+		['a room', ['--as', 'room'], buildRoomGlb({ change: childOfTwoNodesCase })]
+	])('exits 1 with gltf_invalid alone for %s with a node that is a child of two nodes', (_name, flags, bytes) => {
+		expect(runCommand(['check', ...flags, writeFigure('shared.glb', bytes)], output)).toBe(1);
+		expect(codesPrinted()).toEqual(['gltf_invalid']);
+		expect(stdout[0]).toContain('child of more than one node');
 	});
 
 	it('judges a figure as a clip under --as clip, and a clip as a figure without it', () => {
