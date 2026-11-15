@@ -6,7 +6,7 @@ import { runCommand } from './cli.js';
 import { clipProfile, figureProfile, roomProfile } from './profile.js';
 import { conformantTrack, type ClipTrack } from '../tests/clipBuilder.js';
 import { buildClipGlb, buildClipGlbOfSize, nodeOf, rejectedAccessorShapes, retarget, secondAnimationCases } from '../tests/clipFixtures.js';
-import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
+import { buildVrmGlb, invalidComponentTypeCases, vrmJson } from '../tests/figureFixtures.js';
 import { buildPng, imageSizesFilling } from '../tests/glbBuilder.js';
 import { buildBudgetRoom, buildRoomGlb, buildRoomGlbOfSize, drawing, type RoomLook } from '../tests/roomBuilder.js';
 import { invalidReferenceCases } from '../tests/roomCases.js';
@@ -148,6 +148,12 @@ describe('runCommand', () => {
 		expect(runCommand(['check', ...flags, writeFigure('shared.glb', bytes)], output)).toBe(1);
 		expect(codesPrinted()).toEqual(['gltf_invalid']);
 		expect(stdout[0]).toContain('child of more than one node');
+	});
+
+	it.each(invalidComponentTypeCases)('exits 1 with gltf_invalid alone for a figure with %s', (_name, change) => {
+		expect(runCommand(['check', writeFigure('component.vrm', buildVrmGlb({ json: vrmJson(change) }))], output)).toBe(1);
+		expect(codesPrinted()).toEqual(['gltf_invalid']);
+		expect(stdout[0]).toContain('componentType');
 	});
 
 	it('judges a figure as a clip under --as clip, and a clip as a figure without it', () => {

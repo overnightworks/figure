@@ -1,3 +1,4 @@
+import { mustNameAccessorsOfGltfComponentType } from './accessorRules.js';
 import type { Refusal } from './codes.js';
 import { attemptRead, indexOf, isJsonObject, listOf, objectOf, requiredListOf, unreadable, type JsonObject } from './json.js';
 import { figureProfile, roomProfile } from './profile.js';
@@ -16,12 +17,12 @@ interface MeshTally {
 interface TallyReading {
 	/** Runs on each primitive that is an object, for a rule of the caller's. */
 	readonly alsoRead?: (primitive: JsonObject, place: string) => void;
-	/** Whether the caller refuses an accessor a primitive names that is not there, so that the tally counts none for it and says nothing. */
-	readonly callerRefusesMissingAccessors?: boolean;
+	/** Whether the caller refuses an accessor a primitive names that is not there or has no glTF component type, so that the tally counts none for a missing one and says nothing. */
+	readonly callerRefusesAccessors?: boolean;
 }
 
 /** Reads every mesh once and tallies it; a part it cannot read is `gltf_invalid` in `invalid`, once for the mesh however many nodes draw it. */
-function tallyMeshes(json: JsonObject, invalid: Refusal[], { alsoRead = () => {}, callerRefusesMissingAccessors = false }: TallyReading = {}): MeshTally[] {
+function tallyMeshes(json: JsonObject, invalid: Refusal[], { alsoRead = () => {}, callerRefusesAccessors = false }: TallyReading = {}): MeshTally[] {
 	const tallies: MeshTally[] = [];
 	const attempt = (place: string, read: () => void) => attemptRead(invalid, place, read);
 	attempt('meshes', () => {
@@ -35,7 +36,12 @@ function tallyMeshes(json: JsonObject, invalid: Refusal[], { alsoRead = () => {}
 					attempt(place, () => {
 						const primitiveObject = objectOf(primitive);
 						tally.primitives++;
-						attempt(place, () => (tally.triangles += triangleCount(json, primitiveObject, callerRefusesMissingAccessors)));
+						attempt(place, () => {
+							if (!callerRefusesAccessors) {
+								mustNameAccessorsOfGltfComponentType(json, primitiveObject);
+							}
+							tally.triangles += triangleCount(json, primitiveObject, callerRefusesAccessors);
+						});
 						alsoRead(primitiveObject, place);
 					});
 				}
@@ -45,7 +51,10 @@ function tallyMeshes(json: JsonObject, invalid: Refusal[], { alsoRead = () => {}
 	return tallies;
 }
 
-/** Judges the triangle and morph-target budgets from the glTF JSON alone, counting each mesh once; a part it cannot read is `gltf_invalid`. */
+/**
+ * Judges the triangle and morph-target budgets from the glTF JSON alone, counting each mesh once; a part it cannot read is `gltf_invalid`,
+ * and so is an accessor a primitive names that has no glTF component type, since the loader throws on it.
+ */
 export function budgetRefusals(json: JsonObject): Refusal[] {
 	const invalid: Refusal[] = [];
 	const morph: Refusal[] = [];
@@ -70,7 +79,7 @@ export function budgetRefusals(json: JsonObject): Refusal[] {
  */
 export function roomBudgetRefusals(json: JsonObject): Refusal[] {
 	const invalid: Refusal[] = [];
-	const tallies = tallyMeshes(json, invalid, { callerRefusesMissingAccessors: true });
+	const tallies = tallyMeshes(json, invalid, { callerRefusesAccessors: true });
 	let triangles = 0;
 	let primitives = 0;
 	for (const node of Array.isArray(json['nodes']) ? (json['nodes'] as unknown[]) : []) {
@@ -110,7 +119,7 @@ function isNamedAccessor(accessors: unknown, accessorIndex: unknown): boolean {
 	return Array.isArray(accessors) && Number.isInteger(accessorIndex) && isJsonObject(accessors[accessorIndex as number]);
 }
 
-function triangleCount(json: JsonObject, primitive: JsonObject, callerRefusesMissingAccessors: boolean): number {
+function triangleCount(json: JsonObject, primitive: JsonObject, callerRefusesAccessors: boolean): number {
 	const mode = primitive['mode'] === undefined ? MODE_TRIANGLES : primitive['mode'];
 	if (!Number.isInteger(mode) || (mode as number) < 0 || (mode as number) > LAST_MODE) {
 		return unreadable('has a mode that is not an integer from 0 to 6');
@@ -121,7 +130,7 @@ function triangleCount(json: JsonObject, primitive: JsonObject, callerRefusesMis
 	const vertices = accessorCount(
 		json,
 		primitive['indices'] === undefined ? objectOf(primitive['attributes'])['POSITION'] : primitive['indices'],
-		callerRefusesMissingAccessors
+		callerRefusesAccessors
 	);
 	return mode === MODE_TRIANGLES
 		? Math.floor(vertices / VERTICES_PER_TRIANGLE)

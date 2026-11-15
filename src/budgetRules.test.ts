@@ -61,7 +61,7 @@ describe('the triangle budget', () => {
 				{ primitives: [{ attributes: { POSITION: 0 } }, { attributes: { POSITION: 0 } }] },
 				{ primitives: [{ attributes: { POSITION: 1 } }] }
 			];
-			json.accessors = [{ count: half }, { count: 3 }];
+			json.accessors = [{ componentType: 5123, count: half }, { componentType: 5123, count: 3 }];
 		};
 		expect(codesOf(change)).toEqual(['too_many_triangles']);
 	});
