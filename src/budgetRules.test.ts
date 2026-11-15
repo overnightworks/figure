@@ -137,8 +137,8 @@ describe('gltf_invalid', () => {
 	it.each([
 		['accessors that are not a list', (json: Json) => (json.accessors = {})],
 		['an accessor that is not an object', (json: Json) => (json.accessors = [7])],
-		['an accessor without a count', (json: Json) => (json.accessors = [{}])],
-		['a count that is a string', (json: Json) => (json.accessors = [{ count: '3' }])]
+		['an accessor without a count', (json: Json) => (json.accessors = [{ componentType: 5123 }])],
+		['a count that is a string', (json: Json) => (json.accessors = [{ componentType: 5123, count: '3' }])]
 	])('refuses %s as gltf_invalid once for each primitive of the figure', (_name, change) => {
 		const primitives = vrmJson().meshes.flatMap((mesh: Json) => mesh.primitives);
 		expect(codesOf(change)).toEqual(primitives.map(() => 'gltf_invalid'));
