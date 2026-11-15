@@ -57,13 +57,7 @@ function nodeRefusals(json: JsonObject, kind: SceneKind, refusals: Refusal[]): v
 			attemptRead(refusals, place, () => {
 				const node = objectOf(entry);
 				nameMustBeText(node);
-				const children = listOf(node['children']).map((child) => {
-					if (!isJsonObject(nodes[indexOf(child)])) {
-						unreadable('children names a node that is no entry of nodes');
-					}
-					return indexOf(child);
-				});
-				childrenOf.set(nodeIndex, children);
+				childrenOf.set(nodeIndex, childrenOfNode(nodes, node, 'refuse'));
 				for (const property of kind.forbiddenNodeProperties) {
 					if (node[property] !== undefined) {
 						refusals.push({ code: kind.contentCode, detail: `${place} holds a ${property}` });
@@ -92,14 +86,28 @@ function unlessAChildOfTwoNodes(childrenOf: ReadonlyMap<number, readonly number[
 	}
 }
 
+/** What the loader reads as the children of `node`. `refuse` makes a child that is no entry of `nodes` unreadable; `skip` leaves out what is no list or no integer, for a caller that judges no other shape of the children. */
+function childrenOfNode(nodes: readonly unknown[], node: JsonObject, onUnreadable: 'refuse' | 'skip'): number[] {
+	if (onUnreadable === 'skip') {
+		const children = node['children'];
+		return Array.isArray(children) ? children.filter((child): child is number => Number.isInteger(child)) : [];
+	}
+	return listOf(node['children']).map((child) => {
+		if (!isJsonObject(nodes[indexOf(child)])) {
+			unreadable('children names a node that is no entry of nodes');
+		}
+		return indexOf(child);
+	});
+}
+
 /** The shape the scene walk refuses, for a file kind that walks no scene: the children it can read, and nothing it cannot. */
 export function sharedChildRefusals(json: JsonObject): Refusal[] {
 	const refusals: Refusal[] = [];
 	attemptRead(refusals, 'nodes', () => {
+		const nodes: unknown[] = Array.isArray(json['nodes']) ? json['nodes'] : [];
 		const childrenOf = new Map<number, readonly number[]>();
-		for (const [index, node] of (Array.isArray(json['nodes']) ? json['nodes'] : []).entries()) {
-			const children = isJsonObject(node) && Array.isArray(node['children']) ? node['children'] : [];
-			childrenOf.set(index, children.filter((child): child is number => Number.isInteger(child)));
+		for (const [index, node] of nodes.entries()) {
+			childrenOf.set(index, childrenOfNode(nodes, isJsonObject(node) ? node : {}, 'skip'));
 		}
 		unlessAChildOfTwoNodes(childrenOf);
 	});
