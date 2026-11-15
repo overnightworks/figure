@@ -212,15 +212,26 @@ test.describe('the demo stage under the script policy', () => {
 			const figure = page.locator('canvas').nth(index);
 			const box = (await figure.boundingBox())!;
 			expect(box.x + box.width / 2).toBeCloseTo(1600 / 2, 0);
-			const headLookingAt = async (choice: string) => {
+			// The head turns over a few frames after the choice and frames run slower on a loaded machine, so the offset is read again until the head has turned the chosen way and two readings agree to a pixel.
+			const headLookingAt = async (choice: string, turned: (offset: number) => boolean) => {
 				await page.getByLabel(choice, { exact: true }).check();
-				await untilFramesHaveRunFor(page, beyondABlinkMilliseconds * 3);
-				return headOffset(page, await figure.screenshot());
+				let offset = 0;
+				let earlier = Number.NaN;
+				await expect
+					.poll(
+						async () => {
+							await untilFramesHaveRunFor(page, beyondABlinkMilliseconds);
+							earlier = offset;
+							offset = await headOffset(page, await figure.screenshot());
+							return turned(offset) && Math.abs(offset - earlier) < 1;
+						},
+						{ timeout: drawingTimeout, intervals: [0] }
+					)
+					.toBe(true);
+				return offset;
 			};
-			const left = await headLookingAt('left');
-			const right = await headLookingAt('right');
-			expect(left).toBeLessThan(0);
-			expect(right).toBeGreaterThan(0);
+			const left = await headLookingAt('left', (offset) => offset < 0);
+			const right = await headLookingAt('right', (offset) => offset > 0);
 			// A figure that turns further one way leaves the two offsets unequal; the breath and the unmirrored lighting leave a fraction of the spread.
 			expect(Math.abs(left + right)).toBeLessThan((right - left) / 3);
 		}
