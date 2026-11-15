@@ -104,6 +104,34 @@ async function differingPixels(page: Page, first: Buffer, second: Buffer, area =
 	);
 }
 
+/** The rows of a drawing, from the top, that hold the head and no shoulder; the figure's lighting is not mirrored, so only the silhouette counts. */
+const headRows = 0.55;
+
+/** How far the drawn head lies right of the canvas's centre, in pixels: the mean column of the non-white pixels within the head's rows, counted in the page, which decodes the PNG. */
+async function headOffset(page: Page, picture: Buffer): Promise<number> {
+	return page.evaluate(
+		async ({ encoded, rows }) => {
+			const bitmap = await createImageBitmap(new Blob([Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))], { type: 'image/png' }));
+			const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
+			context.drawImage(bitmap, 0, 0);
+			const pixels = context.getImageData(0, 0, bitmap.width, Math.floor(bitmap.height * rows));
+			let columnSum = 0;
+			let drawn = 0;
+			for (let row = 0; row < pixels.height; row++) {
+				for (let column = 0; column < pixels.width; column++) {
+					const offset = (row * pixels.width + column) * 4;
+					if ([0, 1, 2].some((channel) => pixels.data[offset + channel]! < 240)) {
+						columnSum += column;
+						drawn++;
+					}
+				}
+			}
+			return columnSum / drawn - bitmap.width / 2;
+		},
+		{ encoded: picture.toString('base64'), rows: headRows }
+	);
+}
+
 test.describe('the demo stage under the script policy', () => {
 	let stage: BuiltStage;
 	test.beforeAll(async () => {
@@ -172,6 +200,30 @@ test.describe('the demo stage under the script policy', () => {
 			.toBeGreaterThan(wavedPixels);
 		expect(requests).toEqual([]);
 		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	test('each drawing lies at the page centre, so the left and right speakers turn its head equally far, mirrored', async ({ page }) => {
+		await page.setViewportSize({ width: 1600, height: 900 });
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		for (const index of [0, 1]) {
+			const figure = page.locator('canvas').nth(index);
+			const box = (await figure.boundingBox())!;
+			expect(box.x + box.width / 2).toBeCloseTo(1600 / 2, 0);
+			const headLookingAt = async (choice: string) => {
+				await page.getByLabel(choice, { exact: true }).check();
+				await untilFramesHaveRunFor(page, beyondABlinkMilliseconds * 3);
+				return headOffset(page, await figure.screenshot());
+			};
+			const left = await headLookingAt('left');
+			const right = await headLookingAt('right');
+			expect(left).toBeLessThan(0);
+			expect(right).toBeGreaterThan(0);
+			// A figure that turns further one way leaves the two offsets unequal; the breath and the unmirrored lighting leave a fraction of the spread.
+			expect(Math.abs(left + right)).toBeLessThan((right - left) / 3);
+		}
 		await expectNoViolations(page, pageErrors);
 	});
 
