@@ -35,6 +35,7 @@ export const childOfTwoNodesCase: Change = (json) => {
 export const invalidNodeCases: readonly (readonly [name: string, change: Change])[] = [
 	['a nodes entry that is not an object', (json) => json.nodes.push(null)],
 	['nodes that is not a list', (json) => (json.nodes = {})],
+	['no nodes, which a scene still names', (json) => delete json.nodes],
 	['a children that is not a list', (json) => (json.nodes[0].children = 1)],
 	['a children index that names no node', (json) => (json.nodes[0].children = [json.nodes.length])],
 	[
