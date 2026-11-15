@@ -109,7 +109,7 @@ https://github.com/overnightworks/figure/releases/download/v<version>/overnightw
 ```
 
 ```sh
-pnpm add https://github.com/overnightworks/figure/releases/download/v0.7.0/overnightworks-figure-0.7.0.tgz
+pnpm add https://github.com/overnightworks/figure/releases/download/v0.8.0/overnightworks-figure-0.8.0.tgz
 ```
 
 pnpm writes the tarball's `sha512-` integrity into `pnpm-lock.yaml` when it downloads the tarball. The value to compare stands
