@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { build } from 'vite';
 import { clipProfile } from '../../src/profile.js';
+import { figureSignal } from '../../src/signals.js';
 import { buildArmUpClip } from '../clipFixtures.js';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './serve-consumer.js';
@@ -21,6 +22,8 @@ const wavedPixels = 3000;
 const clipHoldSeconds = clipProfile.maxSeconds - 1;
 /** The milliseconds between two pictures that must agree for a figure to count as still: longer than a blink (0.28 s under reduced motion, which the figure keeps), so no blink fills both and a picture in one never passes for the face at rest. */
 const beyondABlinkMilliseconds = 500;
+/** The milliseconds of frames between two readings of the head: short, so a drawing that runs slowly is read within the frames the frame-time guard allows it. */
+const framesBetweenReadingsMilliseconds = 150;
 /** The milliseconds after a wave at which the figure's own wave is over. */
 const afterNeutralWaveMilliseconds = 4000;
 
@@ -104,6 +107,34 @@ async function differingPixels(page: Page, first: Buffer, second: Buffer, area =
 	);
 }
 
+/** The rows of a drawing, from the top, that hold the head and no shoulder; the figure's lighting is not mirrored, so only the silhouette counts. */
+const headRows = 0.55;
+
+/** How far the drawn head lies right of the canvas's centre, in pixels: the mean column of the non-white pixels within the head's rows, counted in the page, which decodes the PNG. */
+async function headOffset(page: Page, picture: Buffer): Promise<number> {
+	return page.evaluate(
+		async ({ encoded, rows }) => {
+			const bitmap = await createImageBitmap(new Blob([Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))], { type: 'image/png' }));
+			const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
+			context.drawImage(bitmap, 0, 0);
+			const pixels = context.getImageData(0, 0, bitmap.width, Math.floor(bitmap.height * rows));
+			let columnSum = 0;
+			let drawn = 0;
+			for (let row = 0; row < pixels.height; row++) {
+				for (let column = 0; column < pixels.width; column++) {
+					const offset = (row * pixels.width + column) * 4;
+					if ([0, 1, 2].some((channel) => pixels.data[offset + channel]! < 240)) {
+						columnSum += column;
+						drawn++;
+					}
+				}
+			}
+			return columnSum / drawn - bitmap.width / 2;
+		},
+		{ encoded: picture.toString('base64'), rows: headRows }
+	);
+}
+
 test.describe('the demo stage under the script policy', () => {
 	let stage: BuiltStage;
 	test.beforeAll(async () => {
@@ -172,6 +203,41 @@ test.describe('the demo stage under the script policy', () => {
 			.toBeGreaterThan(wavedPixels);
 		expect(requests).toEqual([]);
 		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	test('each drawing lies at the page centre, so the left and right speakers turn its head equally far, mirrored', async ({ page }) => {
+		await page.setViewportSize({ width: 1600, height: 900 });
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		for (const index of [0, 1]) {
+			const figure = page.locator('canvas').nth(index);
+			const box = (await figure.boundingBox())!;
+			expect(box.x + box.width / 2).toBeCloseTo(1600 / 2, 0);
+			// The head turns over a few frames after the choice, and the 1280 px drawing runs slower than the frame-time guard allows on a machine without a GPU: the guard then ends the loop, so a drawing that ended slow is mounted again, which draws it with the speaker it is told. The offset is read again until the head has turned the chosen way and two readings agree to a pixel.
+			const headLookingAt = async (choice: string, turned: (offset: number) => boolean) => {
+				await page.getByLabel(choice, { exact: true }).check();
+				let offset = Number.NaN;
+				await expect
+					.poll(
+						async () => {
+							if ((await figure.getAttribute('data-signal')) === figureSignal.slow) await page.locator('section').nth(index).getByRole('button', { name: 'mount again' }).click();
+							await untilFramesHaveRunFor(page, framesBetweenReadingsMilliseconds);
+							const earlier = offset;
+							offset = await headOffset(page, await figure.screenshot());
+							return turned(offset) && Math.abs(offset - earlier) < 1;
+						},
+						{ timeout: drawingTimeout, intervals: [0] }
+					)
+					.toBe(true);
+				return offset;
+			};
+			const left = await headLookingAt('left', (offset) => offset < 0);
+			const right = await headLookingAt('right', (offset) => offset > 0);
+			// A figure that turns further one way leaves the two offsets unequal; the breath and the unmirrored lighting leave a fraction of the spread.
+			expect(Math.abs(left + right)).toBeLessThan((right - left) / 3);
+		}
 		await expectNoViolations(page, pageErrors);
 	});
 

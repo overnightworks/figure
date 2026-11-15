@@ -90,6 +90,9 @@ async function mountSlot(slot: Slot): Promise<void> {
 
 function createSlot(cssWidth: number, stage: HTMLElement): Slot {
 	const section = document.createElement('section');
+	// The script policy allows no inline style element: the drawing sits at the page's centre, so the left and right speaker markers lie equally far from its centre.
+	section.style.width = 'max-content';
+	section.style.marginInline = 'auto';
 	const heading = document.createElement('h2');
 	heading.textContent = `${cssWidth} px`;
 	const mountPoint = document.createElement('div');
