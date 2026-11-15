@@ -456,7 +456,7 @@ async function measureRoom(bundleDirectory, figureGpuBytes, maxTextureSize) {
 	const measured = await measureInChromium(bundleDirectory, { '/room.glb': room.glb }, (page) => page.evaluate((seconds) => window.measureRoom(seconds), parseWatchSeconds));
 	console.log(`room: ${room.meshes} meshes of one primitive and ${room.images} images, file ${room.glb.length} bytes (the file budget is ${roomProfile.fileBudgetBytes} and is not filled), check passes`);
 	console.log(`room parse: time to parsed ${milliseconds(measured.parsedMilliseconds)}, longest main-thread task from the start to ${parseWatchSeconds} s after it ${milliseconds(measured.longestTask)}`);
-	console.log(`room parsed into ${measured.meshes} meshes of ${measured.triangles} triangles, ${measured.unlitMeshes} with an unlit material`);
+	console.log(`room parsed into ${measured.meshes} meshes of ${measured.triangles} triangles in total, ${measured.unlitMeshes} with an unlit material`);
 	const roomBytes = reportGpuMemory(gpuMemoryParts(readGlb(room.glb), maxTextureSize));
 	const together = figureGpuBytes + roomBytes;
 	console.log(`gpu memory, budget figure and budget room together: ${megabytes(together)} (${together} bytes)`);

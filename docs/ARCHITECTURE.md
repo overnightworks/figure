@@ -118,10 +118,10 @@ sequenceDiagram
                     M->>F: draw(pose)
                 end
                 opt the context is lost while the figure lives
-                    M-->>A: onSignal(lost); the loop ends, no restore
+                    M-->>A: onSignal(lost), the loop ends, no restore
                 end
                 opt the frame-time guard finds the figure slow
-                    M-->>A: onSignal(slow); the loop ends, no restore
+                    M-->>A: onSignal(slow), the loop ends, no restore
                 end
             end
         end
