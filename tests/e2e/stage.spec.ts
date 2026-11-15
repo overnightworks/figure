@@ -215,13 +215,12 @@ test.describe('the demo stage under the script policy', () => {
 			// The head turns over a few frames after the choice and frames run slower on a loaded machine, so the offset is read again until the head has turned the chosen way and two readings agree to a pixel.
 			const headLookingAt = async (choice: string, turned: (offset: number) => boolean) => {
 				await page.getByLabel(choice, { exact: true }).check();
-				let offset = 0;
-				let earlier = Number.NaN;
+				let offset = Number.NaN;
 				await expect
 					.poll(
 						async () => {
 							await untilFramesHaveRunFor(page, beyondABlinkMilliseconds);
-							earlier = offset;
+							const earlier = offset;
 							offset = await headOffset(page, await figure.screenshot());
 							return turned(offset) && Math.abs(offset - earlier) < 1;
 						},
