@@ -1,8 +1,0 @@
-claim_id = "f700dc235ebf46ec92886e34cbbb5ec3"
-agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
-role = "builder"
-base = "8ee03049f5c9a656af1058026835d477afec4fc4"
-branch = "claude/issue-96-room-check-polish"
-scope = ["README.md", "docs/ARCHITECTURE.md", "scripts/measure_budget_figure.mjs", "scripts/write_vocabulary.mjs", "src/accessorRules.ts", "src/budgetRules.test.ts", "src/budgetRules.ts", "src/cli.test.ts", "src/clipRules.test.ts", "src/roomRules.test.ts", "src/roomRules.ts", "src/sceneRules.test.ts", "src/sceneRules.ts", "src/vrmRules.test.ts", "src/vrmRules.ts", "tests/figureFixtures.ts", "tests/roomCases.ts", "tests/sceneCases.ts"]
-opened_commit = "81aa3990dac7c1bda9ebe876f28ec1afd541d48a"
-whole_reason = "Polish of one check: its refusal lines, its structural shapes and their command proofs move together, with two one-line wording fixes routed here."
