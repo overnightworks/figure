@@ -1,0 +1,7 @@
+claim_id = "374935198f8c454ea70528db544c234b"
+agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
+role = "builder"
+base = "8ea347fcc9f1aaeb44e875e449eb4eaf87b0286c"
+branch = "claude/issue-106-release-0-8-0-carries-the-stricter-check"
+scope = ["README.md", "docs/ARCHITECTURE.md", "package.json"]
+opened_commit = "35853cc8eab4312331e39de0b8ec7327c54d62a8"
