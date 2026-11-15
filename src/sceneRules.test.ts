@@ -39,6 +39,10 @@ describe('the scene and node rules a room shares with a clip', () => {
 		expect(codesOf(change)).toEqual([]);
 	});
 
+	it('refuse nodes that are not a list once, naming nodes', () => {
+		expect(refusalsOf((json) => (json.nodes = {})).map(({ detail }) => detail?.split(': ')[0])).toEqual(['nodes']);
+	});
+
 	it('refuse a child whose own children are unreadable once, as gltf_invalid', () => {
 		expect(codesOf(unreadableGrandchildCase)).toEqual(['gltf_invalid']);
 	});

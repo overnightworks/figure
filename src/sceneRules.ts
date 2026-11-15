@@ -26,11 +26,13 @@ function defaultSceneRefusals(json: JsonObject, kind: SceneKind, refusals: Refus
 		} else if (json['scene'] !== undefined && indexOf(json['scene']) >= scenes.length) {
 			unreadable('scene names no entry of scenes');
 		}
-		const nodes = listOf(json['nodes']);
+		const nodes = json['nodes'] === undefined ? [] : json['nodes'];
 		for (const scene of scenes) {
 			nameMustBeText(objectOf(scene));
 			for (const node of listOf(objectOf(scene)['nodes'])) {
-				if (!isJsonObject(nodes[indexOf(node)])) {
+				const index = indexOf(node);
+				// Nodes that are no list are refused once, by the node walk.
+				if (Array.isArray(nodes) && !isJsonObject(nodes[index])) {
 					unreadable('a scene names a node that is no entry of nodes');
 				}
 			}

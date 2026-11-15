@@ -87,6 +87,11 @@ describe('the clip rules', () => {
 		expect(codesOf(change)).toEqual([]);
 	});
 
+	it('refuse nodes that are not a list once at nodes, and at no scene', () => {
+		const places = refusalsOf((json) => (json.nodes = {})).map(({ detail }) => detail?.split(': ')[0]);
+		expect(places.filter((place) => place === 'nodes' || place === 'scenes')).toEqual(['nodes']);
+	});
+
 	it('refuse a child whose own children are unreadable once, as gltf_invalid', () => {
 		expect(codesOf(unreadableGrandchildCase)).toEqual(['gltf_invalid']);
 	});

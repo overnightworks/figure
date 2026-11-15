@@ -203,9 +203,11 @@ describe('runCommand', () => {
 		expect(codesPrinted()).toEqual(['too_many_triangles', 'too_many_primitives']);
 	});
 
-	it.each(invalidReferenceCases)('exits 1 with gltf_invalid alone for a room with %s under --as room', (_name, change) => {
+	it.each(invalidReferenceCases)('exits 1 with gltf_invalid alone, one line for each place, for a room with %s under --as room', (_name, change) => {
 		expect(runCommand(['check', '--as', 'room', writeFigure('reference.glb', buildRoomGlb({ change }))], output)).toBe(1);
-		expect([...new Set(codesPrinted())]).toEqual(['gltf_invalid']);
+		expect(new Set(codesPrinted())).toEqual(new Set(['gltf_invalid']));
+		const places = stdout.map((line) => /\((.*?): /.exec(line)?.[1]);
+		expect(new Set(places).size).toBe(places.length);
 	});
 
 	it.each(missingSceneCases)('exits 1 with room_scene_missing for a room with %s under --as room', (_name, change) => {
