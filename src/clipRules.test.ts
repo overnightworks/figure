@@ -3,6 +3,7 @@ import { checkClip } from './check.js';
 import { clipProfile } from './profile.js';
 import { conformantTrack, identity, type ClipTrack } from '../tests/clipBuilder.js';
 import {
+	childOfTwoNodesCase,
 	invalidNodeCases,
 	invalidSceneCases,
 	missingSceneCases,
@@ -83,8 +84,17 @@ describe('the clip rules', () => {
 		expect(codesOf(change)).toContain('gltf_invalid');
 	});
 
+	it('refuse a node that is a child of two nodes once, as gltf_invalid', () => {
+		expect(codesOf(childOfTwoNodesCase)).toEqual(['gltf_invalid']);
+	});
+
 	it.each(passingNodeCases)('pass %s', (_name, change) => {
 		expect(codesOf(change)).toEqual([]);
+	});
+
+	it('refuse nodes that are not a list once at nodes, and at no scene', () => {
+		const places = refusalsOf((json) => (json.nodes = {})).map(({ detail }) => detail?.split(': ')[0]);
+		expect(places.filter((place) => place === 'nodes' || place === 'scenes')).toEqual(['nodes']);
 	});
 
 	it('refuse a child whose own children are unreadable once, as gltf_invalid', () => {

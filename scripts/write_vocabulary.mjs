@@ -1,6 +1,5 @@
 // Writes figure's vocabulary to `dist/figure-vocabulary.json`: the gesture names (the keys of `figureGesture`) and the moods (the values
-// of `figureMood`), each in its declared order, read from the built modules so no token is written twice. `version` is the file's shape
-// version: a token added or removed is a release, only a changed shape raises it.
+// of `figureMood`), each in its declared order, read from the built modules so no token is written twice. `version` is the file's shape version.
 // Run it from the repository after `tsc`; `package.json`'s `build` does.
 import { writeFileSync } from 'node:fs';
 import { figureMood } from '../dist/expressions.js';

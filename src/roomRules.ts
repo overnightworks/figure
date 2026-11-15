@@ -1,4 +1,5 @@
 import type { Refusal } from './codes.js';
+import { mustNameAccessorsOfGltfComponentType } from './accessorRules.js';
 import { attemptRead, indexOf, isJsonObject, listOf, objectOf, unreadable, type JsonObject } from './json.js';
 import { sceneRefusals, type SceneKind } from './sceneRules.js';
 
@@ -97,25 +98,37 @@ function mustNameEntry(json: JsonObject, listName: string, index: unknown): void
 	}
 }
 
+/** Unreadable unless `index` lies inside the list `json[listName]`. A list that is no list, and what an entry holds, are for the walk that owns the list. */
+function mustNameListed(json: JsonObject, listName: string, index: unknown): void {
+	const list = json[listName];
+	const position = indexOf(index);
+	if (list === undefined || (Array.isArray(list) && position >= list.length)) {
+		unreadable(`names no entry of ${listName}`);
+	}
+}
+
+/** The entries of a list with their indexes, or none for a value that is no list: the walk that owns the list refuses it. */
+function listEntries(value: unknown): [number, unknown][] {
+	return Array.isArray(value) ? [...value.entries()] : [];
+}
+
 /** The loader indexes the lists these name; an index that names no entry throws there, so each is `gltf_invalid` here. */
 function referenceRefusals(json: JsonObject): Refusal[] {
 	const refusals: Refusal[] = [];
 	const attempt = (place: string, read: () => void) => attemptRead(refusals, place, read);
-	attempt('nodes', () => {
-		for (const [index, node] of listOf(json['nodes']).entries()) {
-			if (isJsonObject(node) && node['mesh'] !== undefined) {
-				attempt(`nodes[${index}]`, () => mustNameEntry(json, 'meshes', node['mesh']));
-			}
+	for (const [index, node] of listEntries(json['nodes'])) {
+		if (isJsonObject(node) && node['mesh'] !== undefined) {
+			attempt(`nodes[${index}]`, () => mustNameListed(json, 'meshes', node['mesh']));
 		}
-	});
+	}
 	for (const { place, value } of primitivesOf(json)) {
 		attempt(place, () => primitiveReferences(json, value));
 	}
-	attempt('materials', () => {
-		for (const [index, material] of listOf(json['materials']).entries()) {
-			attempt(`materials[${index}]`, () => baseColourTextureReference(json, objectOf(material)));
+	for (const [index, material] of listEntries(json['materials'])) {
+		if (isJsonObject(material)) {
+			attempt(`materials[${index}]`, () => baseColourTextureReference(json, material));
 		}
-	});
+	}
 	attempt('textures', () => {
 		for (const [index, texture] of listOf(json['textures']).entries()) {
 			attempt(`textures[${index}]`, () => textureSources(json, objectOf(texture)));
@@ -126,7 +139,7 @@ function referenceRefusals(json: JsonObject): Refusal[] {
 
 function primitiveReferences(json: JsonObject, primitive: JsonObject): void {
 	if (primitive['material'] !== undefined) {
-		mustNameEntry(json, 'materials', primitive['material']);
+		mustNameListed(json, 'materials', primitive['material']);
 	}
 	if (primitive['indices'] !== undefined) {
 		mustNameEntry(json, 'accessors', primitive['indices']);
@@ -134,6 +147,7 @@ function primitiveReferences(json: JsonObject, primitive: JsonObject): void {
 	for (const accessor of Object.values(objectOf(primitive['attributes']))) {
 		mustNameEntry(json, 'accessors', accessor);
 	}
+	mustNameAccessorsOfGltfComponentType(json, primitive);
 	const extensions = primitive['extensions'];
 	if (isJsonObject(extensions) && extensions[DRACO] !== undefined && !namedInExtensionsUsed(json, DRACO)) {
 		unreadable(`holds ${DRACO} while extensionsUsed does not name it`);
