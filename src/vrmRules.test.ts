@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkFigure } from './check.js';
 import { figureProfile } from './profile.js';
 import { buildVrmGlb, vrmJson } from '../tests/figureFixtures.js';
+import { childOfTwoNodesCase } from '../tests/sceneCases.js';
 
 function refusalsOf(change: Parameters<typeof vrmJson>[0]) {
 	return checkFigure(buildVrmGlb({ json: vrmJson(change) }));
@@ -14,6 +15,10 @@ function codesOf(change: Parameters<typeof vrmJson>[0]): string[] {
 describe('the VRM rules', () => {
 	it('pass the conformant synthetic VRM with no refusal', () => {
 		expect(checkFigure(buildVrmGlb())).toEqual([]);
+	});
+
+	it('refuses a node that is a child of two nodes once, as gltf_invalid', () => {
+		expect(codesOf(childOfTwoNodesCase)).toEqual(['gltf_invalid']);
 	});
 
 	it.each([

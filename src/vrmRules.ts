@@ -1,6 +1,7 @@
 import type { Refusal } from './codes.js';
 import { attemptRead, indexOf, isJsonObject, listOf, unreadable, type JsonObject } from './json.js';
 import { figureProfile } from './profile.js';
+import { sharedChildRefusals } from './sceneRules.js';
 
 const licenceCodes = {
 	allowRedistribution: 'licence_redistribution',
@@ -8,14 +9,14 @@ const licenceCodes = {
 	creditNotation: 'licence_credit'
 } as const;
 
-/** Judges the VRM 1.0 extension; a file without it reports `not_vrm` alone. */
+/** Judges the VRM 1.0 extension and the one node shape the loader draws wrong; a file without it reports `not_vrm` alone. */
 export function vrmRefusals(json: JsonObject): Refusal[] {
 	const extensions = json['extensions'];
 	const vrm = isJsonObject(extensions) ? extensions['VRMC_vrm'] : undefined;
 	if (!isJsonObject(vrm) || vrm['specVersion'] !== figureProfile.vrmSpecVersion) {
 		return [{ code: 'not_vrm' }];
 	}
-	return [...presetRefusals(vrm), ...humanoidRefusals(vrm, json), ...lookAtRefusals(vrm), ...licenceRefusals(vrm)];
+	return [...presetRefusals(vrm), ...humanoidRefusals(vrm, json), ...lookAtRefusals(vrm), ...licenceRefusals(vrm), ...sharedChildRefusals(json)];
 }
 
 function presetRefusals(vrm: JsonObject): Refusal[] {

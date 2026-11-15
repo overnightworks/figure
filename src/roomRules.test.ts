@@ -14,9 +14,9 @@ function codesOf(change: (json: Json) => void, variant: RoomVariant = {}): strin
 	return refusalsOf(change, variant).map(({ code }) => code);
 }
 
-/** The codes without repeats: a reference two rules both read may be refused by each. */
-function distinctCodesOf(change: (json: Json) => void): string[] {
-	return [...new Set(codesOf(change))];
+/** The place each refusal names, in the order printed. */
+function placesOf(change: (json: Json) => void): (string | undefined)[] {
+	return refusalsOf(change).map(({ detail }) => detail?.split(': ')[0]);
 }
 
 const looks: RoomLook[] = ['both', 'textured', 'vertexColoured'];
@@ -97,8 +97,33 @@ describe('the room rules', () => {
 	});
 
 	describe('the references the rules walk', () => {
-		it.each(invalidReferenceCases)('refuses %s as gltf_invalid', (_name, change) => {
-			expect(distinctCodesOf(change)).toEqual(['gltf_invalid']);
+		it.each(invalidReferenceCases)('refuses %s as gltf_invalid, one line for each place', (_name, change) => {
+			const places = placesOf(change);
+			expect(new Set(codesOf(change))).toEqual(new Set(['gltf_invalid']));
+			expect(new Set(places).size).toBe(places.length);
+		});
+
+		it.each([
+			['a material that is not an object', (json: Json) => (json.materials[0] = null), ['materials[0]']],
+			['materials that are not a list', (json: Json) => (json.materials = {}), ['materials']],
+			['indices that name no accessor', (json: Json) => (json.meshes[0].primitives[0].indices = json.accessors.length), ['meshes[0].primitives[0]']],
+			[
+				'a POSITION that names no accessor, on a primitive without indices',
+				(json: Json) => {
+					delete json.meshes[0].primitives[0].indices;
+					json.meshes[0].primitives[0].attributes.POSITION = json.accessors.length;
+				},
+				['meshes[0].primitives[0]']
+			],
+			['an accessor that is not an object, named by indices', (json: Json) => (json.accessors[json.meshes[0].primitives[0].indices] = null), ['meshes[0].primitives[0]']],
+			['accessors that are absent', (json: Json) => delete json.accessors, ['meshes[0].primitives[0]', 'meshes[1].primitives[0]']]
+		])('names %s once', (_name, change, places) => {
+			expect(placesOf(change)).toEqual(places);
+		});
+
+		it('says a material that is not an object is not an object, though a primitive names it', () => {
+			const refusals = refusalsOf((json) => (json.materials[0] = null));
+			expect(refusals).toEqual([{ code: 'gltf_invalid', detail: expect.stringContaining('object') }]);
 		});
 
 		it('names the place that names no entry', () => {
@@ -114,6 +139,15 @@ describe('the room rules', () => {
 			expect(codesOf(change)).toEqual(['extension_not_allowed']);
 		});
 
+		it('passes an accessor without a componentType that no primitive names, which the loader never reads', () => {
+			expect(codesOf((json) => json.accessors.push({}))).toEqual([]);
+		});
+
+		it('passes an accessor of each componentType glTF defines', () => {
+			const types = [5120, 5121, 5122, 5123, 5125, 5126];
+			expect(types.map((type) => codesOf((json) => (json.accessors[json.meshes[0].primitives[0].indices].componentType = type)))).toEqual(types.map(() => []));
+		});
+
 		it('passes a primitive without indices, which is not indexed', () => {
 			expect(codesOf((json) => delete json.meshes[0].primitives[0].indices)).toEqual([]);
 		});
@@ -124,7 +158,7 @@ describe('the room rules', () => {
 			['primitives that are not a list', (json: Json) => (json.meshes[1].primitives = 'x')],
 			['a primitive that is not an object', (json: Json) => (json.meshes[1].primitives = [null])]
 		])('leaves %s to the budget rules, which refuse it as gltf_invalid', (_name, change) => {
-			expect(distinctCodesOf(change)).toEqual(['gltf_invalid']);
+			expect(new Set(codesOf(change))).toEqual(new Set(['gltf_invalid']));
 		});
 
 		it('passes a node that draws no mesh', () => {

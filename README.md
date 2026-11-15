@@ -7,7 +7,7 @@ file meets the profile's container, VRM and budget rules, and its siblings for a
 `checkClip(bytes)`, and for a persona's room (one static GLB, unlit materials only), `figure check --as room <file>` and `checkRoom(bytes)`; and the drawing, `mount` from `overnightworks-figure/draw`,
 which draws a figure that passes into an app's canvas, rests it with its arms lowered, keeps it alive with its idle motion, shows it thinking or listening when the app reports so,
 waves when the app asks (with a persona's own `.vrma` clip in place of figure's wave when the app hands one through `gestures`), and lets it speak with the app's voice, its mouth following the voice, its head nodding with it and its face showing the
-mood of the sentence, until the app disposes it. Beside them, `overnightworks-figure/vocabulary.json`, lists the gesture and mood names for a consumer that does not run TypeScript.
+mood of the sentence, until the app disposes it. Beside them, `overnightworks-figure/vocabulary.json` lists the gesture and mood names for a consumer that does not run TypeScript.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick start
@@ -193,9 +193,9 @@ carries its own light, painted into its vertex colours and textures, so it looks
 extensions it may use are `KHR_materials_unlit`, `KHR_texture_transform` and `EXT_texture_webp`; every byte sits in the GLB, as for a figure. A
 node under the root may draw a mesh, and a mesh may be drawn by many nodes. The budgets are provisional until a room is drawn on a phone:
 4 MiB, 20 000 triangles, 32 primitives (draw calls), 4 000 000 texels and 2048 px a side, the triangles and primitives counted for each node that draws
-a mesh, reached from the scene or not. The loader's own throws are refused as `gltf_invalid`: a scene or node shape it cannot walk, a node's mesh, a primitive's material, indices or
+a mesh, reached from the scene or not. The loader's own throws are refused as `gltf_invalid`: a scene or node shape it cannot walk (a node under two parents is one, and an accessor a primitive names with a missing or unknown componentType is another; the figure check refuses both too), a node's mesh, a primitive's material, indices or
 attribute, a base colour texture, a texture's image or WebP image that names no entry, an unlit material that `extensionsUsed` does not name, and a Draco object it does not name. An unlit material draws only its base colour
-texture, so a room's other textures are not followed.
+texture, so a room's other textures are not followed. A component type written as text, such as "5126", loads but is no glTF value, so the check refuses it all the same.
 
 A room follows a convention that the check does not judge: metres, +Y up, the floor at y = 0, the figure at the origin facing +Z, and the
 side toward the camera open or back-face culled. A room that breaks it shows wrongly on the stage and in a persona's review and corrupts nothing.

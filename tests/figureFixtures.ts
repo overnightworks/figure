@@ -37,3 +37,10 @@ export function readGlb(glb: Uint8Array): { json: Record<string, any>; binary: U
 	const jsonEnd = 20 + view.getUint32(12, true);
 	return { json: JSON.parse(new TextDecoder().decode(glb.subarray(20, jsonEnd))), binary: glb.subarray(jsonEnd + 8) };
 }
+
+/** Each names a primitive's accessor of the conformant figure whose component type is none of glTF's integers; the loader throws on the first two and loads the text, which glTF does not allow. */
+export const invalidComponentTypeCases: readonly (readonly [name: string, change: (json: VrmJson) => void])[] = [
+	['an indices accessor without a componentType', (json) => delete json.accessors[json.meshes[0].primitives[0].indices].componentType],
+	['an indices accessor whose componentType is not one of glTF', (json) => (json.accessors[json.meshes[0].primitives[0].indices].componentType = 5124)],
+	['a POSITION accessor whose componentType is a number as text', (json) => (json.accessors[json.meshes[0].primitives[0].attributes.POSITION].componentType = '5126')]
+];
