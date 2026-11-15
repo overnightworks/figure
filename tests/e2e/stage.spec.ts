@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { build } from 'vite';
 import { clipProfile } from '../../src/profile.js';
+import { figureSignal } from '../../src/signals.js';
 import { buildArmUpClip } from '../clipFixtures.js';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './serve-consumer.js';
@@ -21,6 +22,8 @@ const wavedPixels = 3000;
 const clipHoldSeconds = clipProfile.maxSeconds - 1;
 /** The milliseconds between two pictures that must agree for a figure to count as still: longer than a blink (0.28 s under reduced motion, which the figure keeps), so no blink fills both and a picture in one never passes for the face at rest. */
 const beyondABlinkMilliseconds = 500;
+/** The milliseconds of frames between two readings of the head: short, so a drawing that runs slowly is read within the frames the frame-time guard allows it. */
+const framesBetweenReadingsMilliseconds = 150;
 /** The milliseconds after a wave at which the figure's own wave is over. */
 const afterNeutralWaveMilliseconds = 4000;
 
@@ -212,14 +215,15 @@ test.describe('the demo stage under the script policy', () => {
 			const figure = page.locator('canvas').nth(index);
 			const box = (await figure.boundingBox())!;
 			expect(box.x + box.width / 2).toBeCloseTo(1600 / 2, 0);
-			// The head turns over a few frames after the choice and frames run slower on a loaded machine, so the offset is read again until the head has turned the chosen way and two readings agree to a pixel.
+			// The head turns over a few frames after the choice, and the 1280 px drawing runs slower than the frame-time guard allows on a machine without a GPU: the guard then ends the loop, so a drawing that ended slow is mounted again, which draws it with the speaker it is told. The offset is read again until the head has turned the chosen way and two readings agree to a pixel.
 			const headLookingAt = async (choice: string, turned: (offset: number) => boolean) => {
 				await page.getByLabel(choice, { exact: true }).check();
 				let offset = Number.NaN;
 				await expect
 					.poll(
 						async () => {
-							await untilFramesHaveRunFor(page, beyondABlinkMilliseconds);
+							if ((await figure.getAttribute('data-signal')) === figureSignal.slow) await page.locator('section').nth(index).getByRole('button', { name: 'mount again' }).click();
+							await untilFramesHaveRunFor(page, framesBetweenReadingsMilliseconds);
 							const earlier = offset;
 							offset = await headOffset(page, await figure.screenshot());
 							return turned(offset) && Math.abs(offset - earlier) < 1;
