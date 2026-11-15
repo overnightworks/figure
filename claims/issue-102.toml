@@ -1,0 +1,7 @@
+claim_id = "db3c9dc2f5d04f8bb826090f7c6ae5a3"
+agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
+role = "builder"
+base = "8ee03049f5c9a656af1058026835d477afec4fc4"
+branch = "claude/issue-102-stage-centres-figures"
+scope = ["tests/e2e/stage.spec.ts", "tests/stage/index.html", "tests/stage/main.ts"]
+opened_commit = "87678b2c4956e967fb7aeb911dfc3d50ac042035"
