@@ -193,9 +193,9 @@ carries its own light, painted into its vertex colours and textures, so it looks
 extensions it may use are `KHR_materials_unlit`, `KHR_texture_transform` and `EXT_texture_webp`; every byte sits in the GLB, as for a figure. A
 node under the root may draw a mesh, and a mesh may be drawn by many nodes. The budgets are provisional until a room is drawn on a phone:
 4 MiB, 20 000 triangles, 32 primitives (draw calls), 4 000 000 texels and 2048 px a side, the triangles and primitives counted for each node that draws
-a mesh, reached from the scene or not. The loader's own throws are refused as `gltf_invalid`: a scene or node shape it cannot walk (a node under two parents is one, and an accessor a primitive names without a component type glTF defines another; the figure check refuses both too), a node's mesh, a primitive's material, indices or
+a mesh, reached from the scene or not. The loader's own throws are refused as `gltf_invalid`: a scene or node shape it cannot walk (a node under two parents is one, and an accessor a primitive names without one of glTF's component type integers is another; the figure check refuses both too), a node's mesh, a primitive's material, indices or
 attribute, a base colour texture, a texture's image or WebP image that names no entry, an unlit material that `extensionsUsed` does not name, and a Draco object it does not name. An unlit material draws only its base colour
-texture, so a room's other textures are not followed.
+texture, so a room's other textures are not followed. A component type written as text, such as "5126", loads but is no glTF value, so the check refuses it all the same.
 
 A room follows a convention that the check does not judge: metres, +Y up, the floor at y = 0, the figure at the origin facing +Z, and the
 side toward the camera open or back-face culled. A room that breaks it shows wrongly on the stage and in a persona's review and corrupts nothing.

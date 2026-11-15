@@ -53,7 +53,7 @@ function tallyMeshes(json: JsonObject, invalid: Refusal[], { alsoRead = () => {}
 
 /**
  * Judges the triangle and morph-target budgets from the glTF JSON alone, counting each mesh once; a part it cannot read is `gltf_invalid`,
- * and so is an accessor a primitive names that has no glTF component type, since the loader throws on it.
+ * and so is an accessor a primitive names whose component type is none of glTF's integers: the loader throws on a missing or unknown one, and the check refuses a number written as text too, which is no glTF value.
  */
 export function budgetRefusals(json: JsonObject): Refusal[] {
 	const invalid: Refusal[] = [];
