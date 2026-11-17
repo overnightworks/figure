@@ -1,7 +1,0 @@
-claim_id = "499fc5954f9b42bca485bb93bfa735b9"
-agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
-role = "builder"
-base = "157e53495074eac9a3020bc4b880aeb8c1c6c298"
-branch = "docs/vision-video"
-scope = ["docs/VISION.md"]
-opened_commit = "84e0e4ceedf51a42cea214d6f46d1c3838db60fc"
