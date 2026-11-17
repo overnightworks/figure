@@ -1,0 +1,8 @@
+claim_id = "ef3cc68b9cff4981bf187a42f61ff009"
+agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
+role = "builder"
+base = "54f00ab968b4635c00391be1da68ad3c790beecf"
+branch = "claude/issue-115-bring-readme-agents-md-comments-and-test"
+scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "scripts/run_consumer_check.sh", "src/drawClips.browser.test.ts", "src/figureFrame.ts", "src/figureMotion.ts", "src/frameTimeGuard.ts", "src/idleMotion.ts"]
+opened_commit = "4a141e937c6f1f2dfdd56fb3c363f28f0bacf383"
+whole_reason = "Five small contract fixes with no behaviour change, each a few lines, read in one sitting."
