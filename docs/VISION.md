@@ -29,8 +29,9 @@ a file meets it.
 - Not a maker of figures: it generates none, and a figure file arrives ready.
 - Not a voice: it speaks nothing and owns no voices. It only reads the audio it
   is handed.
-- Not video: photoreal faces generated from a photo are not chosen. They need
-  the GPU, add delay and send video through a server.
+- Not video: it draws in each browser and sends no stream. An agent's live
+  video look comes from the video service, and the figure is that look's
+  fallback.
 - Not a server: it fetches, stores and serves no file, and talks to no network.
 - Not an app: it draws no fallback and no tile. Its app owns those.
 - Not trusting: a figure file is untrusted input, and no code from it runs.
