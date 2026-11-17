@@ -48,3 +48,11 @@ reason = "it tests the test builder in tests/, and vitest runs only src/**/*.tes
 path = "src/figureDriving.browser.test.ts"
 rule = "test-layout"
 reason = "it drives the handle's think through the draw, motion and frame modules together on a canvas, so no single module is its subject"
+
+[[advisories.allow]]
+id = "GHSA-fc5q-39xc-vjpf"
+lock = "pnpm-lock.yaml"
+until = 2027-01-31
+date = 2026-11-17
+item = "overnightworks/quality#879"
+reason = "picomatch 4.0.7, no fixed release: dev-only, through tinyglobby and fdir under vite and vitest; it globs the repository's own test paths"
