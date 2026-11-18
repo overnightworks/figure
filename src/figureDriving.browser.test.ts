@@ -646,11 +646,13 @@ describe('a figure driven by the host', () => {
 
 	it('nods while a speaker is set: the nose dips and comes back within a nod', async () => {
 		const { canvas, handle } = await mountFigure();
+		// The first nod starts at the first frame after listen, and its clock advances at most `longestStepSeconds` a frame, so on a slow machine it is a handful of frames long: the nose at rest is read before listen, not from the trace's first picture, which may already lie inside the nod.
+		const resting = (await noseNow(canvas)).y;
 		handle.listen(speakerOnCentre(canvas));
 		const trace = await noseTrace(canvas, nodTraceSamples);
 
 		const peak = trace.indexOf(Math.max(...trace));
-		expect(trace[peak]! - trace[0]!).toBeGreaterThanOrEqual(nodPixels);
+		expect(trace[peak]! - resting).toBeGreaterThanOrEqual(nodPixels);
 		expect(trace[peak]! - Math.min(...trace.slice(peak, peak + nodReturnSamples))).toBeGreaterThanOrEqual(nodPixels);
 	});
 
