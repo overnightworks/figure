@@ -1,7 +1,0 @@
-claim_id = "871280f9a3e343908cb3200c806f4bc5"
-agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
-role = "builder"
-base = "db5ba877b47bfca513d2d814a89eace8f0302b7f"
-branch = "fix/types-node-major"
-scope = [".github/dependabot.yml"]
-opened_commit = "5b68cbb2a315991674a785d13e1ba122a3f3293e"
