@@ -3,5 +3,6 @@ agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
 role = "builder"
 base = "e0abcf22f12e1182749331d73a11f0f528379916"
 branch = "claude/issue-116-move-to-the-fleet-s-pnpm-12-x"
-scope = ["package.json", "pnpm-lock.yaml"]
+scope = [".github/workflows/ci.yml", ".github/workflows/code-scanning.yml", ".github/workflows/release.yml", "package.json", "pnpm-lock.yaml"]
 opened_commit = "f15ad2af37a8cd6e19321cdb264a74a0cca69983"
+whole_reason = "One tool-version move: pnpm in package.json and its lock, and the quality gate pin in the three workflows that reference it, proven together by one CI run."
