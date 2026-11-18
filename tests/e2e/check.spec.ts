@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext } from '@playwright/test';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { buildFigureTexturePng, figureTexture } from '../glbBuilder.js';
-import { buildConsumer, type BuiltConsumer } from './build-consumer.js';
+import { useConsumer, type BuiltConsumer } from './build-consumer.js';
 import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './serve-consumer.js';
 
 /** The RGBA of the pixel at `across` and `down`, fractions of the PNG's width and height, decoded in a page that has no policy. */
@@ -27,7 +27,7 @@ const hueTolerance = 0.15;
 test.describe('the packed package in a browser under the script policy', () => {
 	let consumer: BuiltConsumer;
 	test.beforeAll(async () => {
-		consumer = await buildConsumer();
+		consumer = await useConsumer();
 	});
 	test.afterAll(() => consumer.remove());
 

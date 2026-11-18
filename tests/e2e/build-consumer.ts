@@ -19,6 +19,15 @@ export interface BuiltConsumer {
 	remove(): void;
 }
 
+/** The environment variable through which `scripts/run_consumer_check.sh` hands the specs a consumer it built before the drive. */
+export const builtConsumerVariable = 'FIGURE_CONSUMER_BUNDLE';
+
+/** The consumer the script built, or a fresh one when the specs run directly (as CI's `pnpm run test:consumer` does); the caller of a handed-over bundle removes it. */
+export async function useConsumer(): Promise<BuiltConsumer> {
+	const handedOver = process.env[builtConsumerVariable];
+	return handedOver === undefined ? buildConsumer() : { bundleDirectory: handedOver, remove: () => undefined };
+}
+
 /** Installs the packed tarball into a temporary consumer and bundles the consumer for production. */
 export async function buildConsumer(): Promise<BuiltConsumer> {
 	const workDirectory = mkdtempSync(join(tmpdir(), 'figure-consumer-'));
@@ -39,4 +48,8 @@ export async function buildConsumer(): Promise<BuiltConsumer> {
 		build: { outDir: bundleDirectory, emptyOutDir: true }
 	});
 	return { bundleDirectory, remove: () => rmSync(workDirectory, { recursive: true, force: true }) };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+	process.stdout.write(`${(await buildConsumer()).bundleDirectory}\n`);
 }
