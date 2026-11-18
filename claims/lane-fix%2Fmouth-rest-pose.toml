@@ -1,7 +1,0 @@
-claim_id = "957c5e570e9e4c939990893eb8747500"
-agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
-role = "builder"
-base = "c8e85c638418248cfbc2e6b5d34dc5cc16b10733"
-branch = "fix/mouth-rest-pose"
-scope = ["src/drawSpeaking.browser.test.ts"]
-opened_commit = "3b0eef3b54d18204ab937d247261faa06b0be424"
