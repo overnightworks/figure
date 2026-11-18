@@ -33,20 +33,25 @@ export async function buildConsumer(): Promise<BuiltConsumer> {
 	const workDirectory = mkdtempSync(join(tmpdir(), 'figure-consumer-'));
 	const packDirectory = join(workDirectory, 'pack');
 	const consumerDirectory = join(workDirectory, 'consumer');
-	mkdirSync(packDirectory);
-	cpSync(consumerSource, consumerDirectory, { recursive: true });
-	const tarball = packTarball(packDirectory);
-	execFileSync('npm', ['install', '--no-audit', '--no-fund', tarball], {
-		cwd: consumerDirectory,
-		stdio: 'pipe'
-	});
 	const bundleDirectory = join(workDirectory, 'bundle');
-	await build({
-		root: consumerDirectory,
-		configFile: false,
-		logLevel: 'warn',
-		build: { outDir: bundleDirectory, emptyOutDir: true }
-	});
+	try {
+		mkdirSync(packDirectory);
+		cpSync(consumerSource, consumerDirectory, { recursive: true });
+		const tarball = packTarball(packDirectory);
+		execFileSync('npm', ['install', '--no-audit', '--no-fund', tarball], {
+			cwd: consumerDirectory,
+			stdio: 'pipe'
+		});
+		await build({
+			root: consumerDirectory,
+			configFile: false,
+			logLevel: 'warn',
+			build: { outDir: bundleDirectory, emptyOutDir: true }
+		});
+	} catch (failure) {
+		rmSync(workDirectory, { recursive: true, force: true });
+		throw failure;
+	}
 	return { bundleDirectory, remove: () => rmSync(workDirectory, { recursive: true, force: true }) };
 }
 

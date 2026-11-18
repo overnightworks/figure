@@ -10,21 +10,20 @@ import type { VowelWeights } from './vowelWeights.js';
  * the one that is true and strongest decides the gaze, and while the agent speaks the gaze is the idle glance. Whether someone speaks
  * to the agent, and where, is read by the caller each frame and given as numbers, and so are the mouth weights of the agent's voice.
  *
- * The gaze has one goal and two eases: the look-at reaches the goal in a jump, the head follows at the picture's ease, so the eyes
- * lead the head and both settle where the picture puts them. A goal that shifts by more than `largeGazeShiftDegrees` brings the next
+ * The gaze has one goal and two eases: the look-at reaches the goal in a jump and the head follows at a slower ease, so the
+ * eyes lead the head and both settle on the goal. A goal that shifts by more than `largeGazeShiftDegrees` brings the next
  * blink forward. The eyes also make small jumps of their own, an offset on the look-at alone that the head never takes: all of their
  * size at rest and while listening, `speakingJumpShare` of it while the agent speaks, none while it thinks. Under reduced motion
  * the look-at reaches the goal at once, and there are no jumps and no blink brought forward.
  *
- * The thinking look is the gaze up and to the
- * figure's side, the head's turn, the blink at 0.8 of its idle weight and on its idle schedule, the idle glance suppressed, and the
- * easing rates. The right arm rises with the thinking weight to the picture's hand at the chin, the forearm folding ahead of the upper
- * arm. The listening look is the gaze toward the speaker, the head's larger share of its yaw, the slower yaw
- * and the lean, and a nod every 2.5 to 5 seconds, which the picture times and which `spreadPosture` shares between neck and head. Under
- * reduced motion the pose is reached and left at once, and no nod comes. The speaking look is the five mouth
+ * The thinking look is the gaze up and to the figure's side, the head's turn, the blink at 0.8 of its idle weight and on its
+ * idle schedule, the idle glance suppressed, and the easing rates. The right arm rises with the thinking weight to the hand at
+ * the chin, the forearm folding ahead of the upper arm. The listening look is the gaze toward the speaker, the head's larger
+ * share of its yaw, the slower yaw and the lean, and a nod every 2.5 to 5 seconds, which `spreadPosture` shares between neck
+ * and head. Under reduced motion the pose is reached and left at once, and no nod comes. The speaking look is the five mouth
  * weights easing at 38 a second up and 22 down, and the head nodding with the voice by the weights' eased level. A mood the sentence
  * names shows while the agent speaks: its weight eases toward its peak at 9 a second and away at 4, the mouth's weights shrink to 0.72 of
- * themselves while any mood is shown, and each mood leans the head, the trunk and the shoulders by its share of the picture's offsets. A
+ * themselves while any mood is shown, and each mood leans the head, the trunk and the shoulders by its own share of fixed offsets. A
  * gesture the host asks for starts at the next frame and runs its clip's length on the clock the motion owns, the step of every other
  * blend; the pose names it and its seconds, and the clip over the base pose is the frame's, and while one plays the base pose's arm
  * leaves the chin by the share its clip shows, so the hand travels below the frame instead of across the face. Under reduced motion none
@@ -152,7 +151,7 @@ const noMood: MoodWeights = { happy: 0, angry: 0, sad: 0, relaxed: 0, surprised:
 const stillMouth: VowelWeights = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
 /** The head turns half the gaze's yaw, three quarters of it while listening, and tilts 0.55 of its pitch; the look-at turns 2.4 times the gaze. */
 const headShare = { yaw: 0.5, listeningYaw: 0.75, pitch: 0.55 };
-/** The look-at turns 2.4 times the gaze plus the eyes' jump, and no further than 90 degrees either way, as the picture clamps it. */
+/** The look-at turns 2.4 times the gaze plus the eyes' jump, and no further than 90 degrees either way, so a turn never looks over the shoulder. */
 const lookGain = 2.4;
 const lookReachDegrees = 90;
 /** The listening nod: a half sine of `durationSeconds` to a forward pitch of `peakRadians`, and the seconds from one nod's start to the next's, drawn from `gapSeconds`. */
@@ -161,12 +160,12 @@ const nod = { durationSeconds: 0.9, peakRadians: 0.09, gapSeconds: [2.5, 5] as c
 const radiansPerDegree = Math.PI / 180;
 
 /**
- * The arms at rest, from the picture's applyPose: each upper arm is turned down 1.38 rad about its forward axis, the left one negative
+ * The arms at rest, each upper arm is turned down 1.38 rad about its forward axis, the left one negative
  * because its bone runs along +X; the shoulders rise by 0.012 rad at the top of a breath, the left upper arm swings 0.01 rad about x.
  */
 const restingArm = { upperArmRoll: 1.38, shoulderRise: 0.012, upperArmSwing: 0.01 };
 const restTurn: Turn = { yaw: 0, pitch: 0, roll: 0 };
-/** The right arm at the full thinking look, the hand at the chin: the values of the picture's THINK_POSE; the arm blends from rest to it in these angles. */
+/** The right arm at the full thinking look, the hand at the chin: the angles of the fully raised arm; the arm blends from rest to it in these angles. */
 const chinArm = { upperArm: { pitch: -0.6, yaw: 0.5, roll: 0.6 }, lowerArm: { pitch: 0, yaw: 2.4, roll: 0 } };
 
 /** The turn `weight` of the way from `from` to `to`, each angle on its own. */
@@ -176,7 +175,7 @@ function blendedTurn(from: Turn, to: Turn, weight: number): Turn {
 
 /**
  * The share of the way to the chin that the forearm has folded when the arm is `armWeight` of the way there: it leads the upper arm, so
- * the hand rises close to the body and stays inside the picture's side, where a forearm still hanging straight would swing out beyond it.
+ * the hand rises close to the body and stays inside the frame's side, where a forearm still hanging straight would swing out beyond it.
  */
 function forearmFoldShare(armWeight: number): number {
 	return 1 - (1 - armWeight) ** 4;
@@ -250,7 +249,7 @@ interface NodMotion {
 }
 
 /**
- * The listening nod as the picture times it: the first comes at the first frame the figure listens, each next one a gap from the last
+ * The listening nod: the first comes at the first frame the figure listens, each next one a gap from the last
  * one's start, and listening that ends cuts a nod under way. The clock runs through every step, so the gaps stay on one timeline.
  */
 function createNod(random: () => number): NodMotion {
@@ -292,7 +291,7 @@ interface MouthMotion {
 }
 
 /**
- * The mouth as the picture eases it: each weight toward its goal at 38 a second while it rises and 22 while it falls, the level of the
+ * The mouth's easing: each weight toward its goal at 38 a second while it rises and 22 while it falls, the level of the
  * eased weights' sum at 12 a second, and the head's nod with the voice from the level, which reduced motion leaves out.
  */
 function createMouth(): MouthMotion {
@@ -324,7 +323,7 @@ interface MoodMotion {
 }
 
 /**
- * The moods as the picture eases them: each weight toward its peak at 9 a second while the sentence has that mood and toward zero at 4
+ * The moods' easing: each weight toward its peak at 9 a second while the sentence has that mood and toward zero at 4
  * otherwise, and the posture each adds by its weight's share of its peak. A goal that is no key of `figureMood` matches none.
  */
 function createMood(): MoodMotion {

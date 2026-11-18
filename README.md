@@ -47,7 +47,7 @@ export async function showFigure(canvas: HTMLCanvasElement, figureUrl: string, s
 and the figure decides its motion. Each method's behaviour, including its edge cases, is the doc comment of
 `FigureHandle` in `src/mountOptions.ts`, which ships in the package's types, as does `MountOptions`, whose `gestures`
 option takes a persona's own `.vrma` clip for a key of `figureGesture` (`wave` today). The gesture names are the keys of
-`figureGesture`, exported from the package root; the moods are the `FigureMood` values the `speak` comment lists.
+`figureGesture`, exported from the package root; the moods are the `FigureMood` type from `overnightworks-figure/draw` and the `moods` of `vocabulary.json`.
 
 | Signal | Means | The app |
 |---|---|---|

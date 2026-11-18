@@ -7,9 +7,9 @@
  * The values are the breath's period and the spine's lean (the figure's required bones have no chest, so the spine carries
  * the chest's share); the sway's three slow sines; the blink's duration, 0.17 s, and 0.28 s under reduced motion, which keeps
  * the blink; the glance's targets and hold. A blink starts 2 to 6 s after the last one ended and a glance 3 to 8 s after the
- * last one began; there is no double blink, which would leave no gap. A large shift of the gaze, which the figure's motion reports, brings the next blink forward to that moment, but
- * never to less than the shortest gap after the last blink; the gap after it is drawn as after any blink. Under reduced motion the
- * breath, the sway, the glance and the eyes' jumps rest at once.
+ * last one began; there is no double blink, which would leave no gap. A large shift of the gaze, which the figure's motion
+ * reports, brings the next blink forward to that moment, but never to less than the shortest gap after the last blink; the gap
+ * after it is drawn as after any blink. Under reduced motion the breath, the sway, the glance and the eyes' jumps rest at once.
  */
 
 /** Radians the spine leans forward at the top of a breath. */
