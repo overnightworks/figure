@@ -3,5 +3,5 @@ agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
 role = "builder"
 base = "6244d63199e59c808febfdb68bc03b6efda32e6f"
 branch = "dependabot/npm_and_yarn/vitest-002069436a"
-scope = ["package.json", "pnpm-lock.yaml"]
+scope = ["package.json", "pnpm-lock.yaml", "src/drawSpeaking.browser.test.ts"]
 opened_commit = "acafae69ad6b7df21cb34e74613e25335e132b56"
