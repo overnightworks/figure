@@ -23,12 +23,11 @@ const swayPixels = 2;
 /** The pictures in which a mouth that should not move is judged, every one of them, and over which the head's resting pose is read. */
 const stillPictures = 15;
 /**
- * The nose's lift, in pixels at a canvas 200 wide, below which a glance leaves a closed mouth's rows as they are, and the rows the mouth's window gains
- * for each pixel of lift past it: a head turned up shows more of the mouth below the nose. A closed mouth stays within these of its resting rows at
- * every pose the idle glance reaches, and an open vowel's mouth lies beyond them at every one.
+ * The rows a closed mouth's window gains or loses for each pixel, at a canvas 200 wide, that the nose rises or sinks from another pose: the nose stands
+ * out of the face just above the mouth, and a head turned up shows more of the mouth below it, one turned down less, from the first fraction of a pixel.
+ * A closed mouth stays within these of a picture of it at every pose the idle glance reaches, and an open vowel's mouth lies beyond them at every one.
  */
-const unmovedLift = 1;
-const rowsPerLiftedPixel = 1.25;
+const rowsPerShiftedPixel = 1.25;
 /** The dark pixels of the face a neutral picture differs from the neutral baseline by, at most, even with the sway's drift, and the fewest a shown mood's differs by; the least any of the five moods moves is well over the first. */
 const neutralFaceDifference = 60;
 const shownFaceDifference = 100;
@@ -121,22 +120,25 @@ describe('a figure whose agent speaks', () => {
 		return { rows: mouthRows(features), nose: centreOf(features.nose) };
 	}
 
-	/** The mouth of the head's most common pose in the next `stillPictures` pictures, which the idle glance cannot outvote. */
+	/**
+	 * The picture with the median mouth among those at the head's most common pose in the next `stillPictures` pictures, which the idle glance cannot
+	 * outvote; its rows and its nose come from one picture, as the sway's reach around that pose spans more than a pixel of the nose's height.
+	 */
 	async function restingMouth(canvas: HTMLCanvasElement): Promise<Picture> {
 		const pictures: Picture[] = [];
 		for (let picture = 0; picture < stillPictures; picture++) pictures.push(await pictureNow(canvas));
 		const atPose = (pose: Picture) => pictures.filter((picture) => atRest(picture, pose));
 		const commonest = pictures.reduce((best, picture) => (atPose(picture).length > atPose(best).length ? picture : best));
-		const rows = atPose(commonest).map((picture) => picture.rows).sort((first, second) => first - second);
-		return { rows: rows[Math.floor(rows.length / 2)]!, nose: commonest.nose };
+		const byRows = atPose(commonest).sort((first, second) => first.rows - second.rows);
+		return byRows[Math.floor(byRows.length / 2)]!;
 	}
 
-	/** Expects the mouth to lie, in each of the next `stillPictures` pictures, within the flat vowel's distance of `resting` plus what the head's lift adds to a closed mouth's rows. */
+	/** Expects the mouth to lie, in each of the next `stillPictures` pictures, within the flat vowel's distance of `resting` plus what the nose's rise or sink from it adds to or takes from a closed mouth's rows. */
 	async function expectMouthStays(canvas: HTMLCanvasElement, resting: Picture): Promise<void> {
 		for (let read = 0; read < stillPictures; read++) {
 			const picture = await pictureNow(canvas);
-			const lift = Math.max(0, resting.nose.y - picture.nose.y - unmovedLift);
-			expect(Math.abs(picture.rows - resting.rows)).toBeLessThan(flattenedRows + rowsPerLiftedPixel * lift);
+			const shift = Math.abs(resting.nose.y - picture.nose.y);
+			expect(Math.abs(picture.rows - resting.rows)).toBeLessThan(flattenedRows + rowsPerShiftedPixel * shift);
 		}
 	}
 
