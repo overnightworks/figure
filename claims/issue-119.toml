@@ -1,7 +1,0 @@
-claim_id = "f7b83bb271904edfa4fcbe82bcc4e539"
-agent = "Claude 21fd863e-01fb-442b-a634-e988b43fd9d7"
-role = "builder"
-base = "686285dcbef5c1010b85c7af939058d963249177"
-branch = "claude/issue-119-make-the-listening-nod-browser-test-dete"
-scope = ["src/figureDriving.browser.test.ts"]
-opened_commit = "9472037d8b3fe15b6724da24513af75ae4fa2746"
