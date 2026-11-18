@@ -56,12 +56,12 @@
     "@playwright/test": "^1.65.0",
     "@types/node": "^24.0.0",
     "@types/three": "~0.187.0",
-    "@vitest/browser-playwright": "~5.0.5",
-    "@vitest/coverage-v8": "~5.0.5",
+    "@vitest/browser-playwright": "~5.1.0",
+    "@vitest/coverage-v8": "~5.1.0",
     "gltf-validator": "^2.0.0-dev.3.10",
     "playwright": "^1.65.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.7",
-    "vitest": "~5.0.5"
+    "vitest": "~5.1.0"
   }
 }
