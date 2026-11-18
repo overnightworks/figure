@@ -12,6 +12,11 @@ updates:
       interval: daily
     cooldown:
       default-days: 7
+    # why: figure supports Node ^24 || ^26, so @types/node stays on the lowest
+    # supported major; the types of 26 would admit APIs a Node 24 consumer lacks.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     # why: @vitest/coverage-v8 requires exactly the installed vitest as its
     # peer, so both move in one update.
     groups:
