@@ -4,7 +4,7 @@ import { figureMood } from './expressions.js';
 import { createGestureLayer, quaternionOfTurn, type GestureLayer } from './gestureLayer.js';
 import { spreadPosture, type FigurePose, type Turn } from './figureMotion.js';
 
-/** The picture's camera, lights and clear colour are the values of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html. */
+/** The picture's camera: its field of view in degrees and its near and far planes in metres. */
 const camera = { fieldOfView: 22, near: 0.05, far: 20 };
 /** The distances, in metres from the eyes, the picture shows above the head, below it and to either side. */
 const framing = { above: 0.25, below: 0.4, halfWidth: 0.31 };
