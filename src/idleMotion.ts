@@ -4,12 +4,10 @@
  * the figure's motion (breath, sway, blink), the source of the idle glance, whose target the figure's motion eases and splits
  * between head and eyes, and of the small jumps of the eyes, which lie on the look-at alone.
  *
- * The values are those of hopin's docs/mockups/agent-tile-figure/agent-tile-figure.html in its idle state: the breath's period
- * and the spine's lean (the mockup's spine and chest shares summed, as the figure's required bones have no chest); the sway's
- * three slow sines; the blink's duration, 0.17 s, and 0.28 s under reduced motion, which keeps the blink; the glance's targets
- * and hold. Where the ruled intervals differ the ruled ones win: a blink starts 2 to 6 s after
- * the last one ended and a glance 3 to 8 s after the last one began, and the mockup's occasional double blink, which leaves no
- * gap, is not taken. A large shift of the gaze, which the figure's motion reports, brings the next blink forward to that moment, but
+ * The values are the breath's period and the spine's lean (the figure's required bones have no chest, so the spine carries
+ * the chest's share); the sway's three slow sines; the blink's duration, 0.17 s, and 0.28 s under reduced motion, which keeps
+ * the blink; the glance's targets and hold. A blink starts 2 to 6 s after the last one ended and a glance 3 to 8 s after the
+ * last one began; there is no double blink, which would leave no gap. A large shift of the gaze, which the figure's motion reports, brings the next blink forward to that moment, but
  * never to less than the shortest gap after the last blink; the gap after it is drawn as after any blink. Under reduced motion the
  * breath, the sway, the glance and the eyes' jumps rest at once.
  */

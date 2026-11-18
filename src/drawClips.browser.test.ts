@@ -25,6 +25,13 @@ const holdingClip = () => buildArmUpClip(holdSeconds);
 const afterNeutralWaveSeconds = gestureLengthSeconds(gestureClips[figureGesture.wave]) + 1;
 /** The longest a test waits for something the page does on its own. */
 const settleMilliseconds = 5000;
+/** The page's own frame request, which the tests wait on without the spy on `window` counting it. */
+const requestFrameOwn = window.requestAnimationFrame;
+const framesAfterDispose = 5;
+
+function nextFrame(): Promise<void> {
+	return new Promise((resolve) => requestFrameOwn.call(window, () => resolve()));
+}
 
 /**
  * The parse of a clip's bytes with a gate before it: it waits for `release` or `fail`, and then parses with figure's own loader or ends in
@@ -227,7 +234,7 @@ describe('mount with the clips of a persona', { timeout: 60_000 }, () => {
 		const requestedAtDispose = frameRequest.mock.calls.length;
 		gate.release();
 		await vi.waitFor(() => expect(gate.finished).toBe(1), { timeout: settleMilliseconds });
-		await new Promise((resolve) => setTimeout(resolve, 300));
+		for (let frame = 0; frame < framesAfterDispose; frame++) await nextFrame();
 
 		expect(() => handle.gesture(figureGesture.wave)).not.toThrow();
 		expect(frameRequest.mock.calls).toHaveLength(requestedAtDispose);

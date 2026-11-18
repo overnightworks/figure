@@ -6,12 +6,12 @@
 - `pnpm install --frozen-lockfile`: installs the dependencies; every command below needs it.
 - `pnpm run check`: the type check of the sources, of the modules `src/bin.ts` reaches under Node's resolution, and of the tests.
 - `pnpm run build`: emits `dist/`; the process-driven tests in `src/bin.test.ts` run it, so build first.
-- `pnpm exec vitest run <file>`: one Node test file (a `*.browser.test.ts` file runs only through `scripts/run_browser_tests.sh`). Add `--coverage` for the lcov report.
+- `pnpm exec vitest run <file>`: one Node test file (a `*.browser.test.ts` file runs only through `scripts/run_browser_tests.sh`). 
 - `scripts/check_packed_tarball.sh <tarball>`: installs a packed tarball into a temporary directory and runs `figure check [--as clip|room]` from it (on the clips `scripts/write_base_clips.mjs` and the room `scripts/write_conformant_figure.mjs --as room` write); CI and the release build both call it.
 - `node scripts/measure_bundle_size.mjs <tarball>`: prints the gzip size of a consumer bundle that only checks and of one that also mounts, built from a packed tarball; the release build calls it and puts both lines into the notes.
 - `node scripts/measure_budget_figure.mjs`: after `pnpm run build`, measures a synthetic figure, a clip and a room at the profiles' budgets in headless Chromium (frame interval at 390 px, `slow`, the renderer, the computed GPU memory, the clip's and the room's parse); it runs itself through `probe-run` and its memory cap, so run it directly and beside no other browser proof, which would skew the frame interval. A budget changes only on such a measurement.
 - `scripts/run_consumer_check.sh`: the browser layer (`pnpm run test:consumer`) through the fleet's `probe-run`.
-- `scripts/run_browser_tests.sh [vitest arguments]`: the whole vitest suite, whose browser project runs headless Chromium, through `probe-run` with one worker; add `--coverage` for the merged `lcov.info`. `pnpm run test` runs the Node project alone; CI runs `pnpm run test:coverage`. Needs `pnpm exec playwright install chromium` once; never in watch or UI mode.
+- `scripts/run_browser_tests.sh <file>`: the named vitest files, whose browser project runs headless Chromium, through `probe-run` with one worker. The full suite and the coverage run (`pnpm run test:coverage`, the merged `lcov.info`) run in CI, not locally. Needs `pnpm exec playwright install chromium` once; never in watch or UI mode.
 - `pnpm run stage`: builds and serves the demo stage on 127.0.0.1:4173 under the script policy, where a figure mounts at 390 and 1280 px, with file inputs for another figure and a clip.
 - Release: dispatch `.github/workflows/release.yml` with the version, which must equal `package.json`'s, once the commit's review and CI are green (quality's `docs/release.md`).
 - `quality check`: the shared static check. Run it at the release `.github/workflows/ci.yml` pins, after `git add` (it reads the index).
