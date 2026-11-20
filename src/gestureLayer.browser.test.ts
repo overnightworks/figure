@@ -14,6 +14,7 @@ import { createFigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
 import { boneClock, clipWeight, gestureClips, gestureLengthSeconds } from './gestureClips.js';
 import { createGestureLayer, type GestureLayer } from './gestureLayer.js';
+import { figureFraming } from './framings.js';
 import { figureGesture, type FigureGesture } from './gestures.js';
 import { figureSignal } from './signals.js';
 
@@ -324,7 +325,7 @@ describe('the frame with a clip a persona wrote', () => {
 		document.body.append(canvas);
 		renderer = new WebGLRenderer({ canvas, alpha: true });
 		vrm = await loadFigure(buildConformantVrm());
-		stage = createFigureStage(renderer, canvas, vrm);
+		stage = createFigureStage(renderer, canvas, vrm, figureFraming.shoulders);
 		resting = createFigureMotion(seededRandom(seed), ownClip).advance(idle, 0.01, false, null, null);
 	});
 
@@ -345,25 +346,25 @@ describe('the frame with a clip a persona wrote', () => {
 
 	it('leaves every bone the clip turned at the pose the state gives once the clip is over', async () => {
 		await startLoaded(holdTrack('leftLowerArm', smallTurn), holdTrack('rightIndexProximal', smallTurn), holdTrack('leftHand', smallTurn), holdTrack('chest', smallTurn));
-		stage.draw(playing(holdSeconds / 2), 0.01);
+		stage.draw(playing(holdSeconds / 2), 0.01, true);
 		const turnedBones = ['leftLowerArm', 'leftHand'] as const;
 		turnedBones.forEach((bone) => expect(turnOfBone(bone)).toBeGreaterThan(0));
 
-		stage.draw({ ...resting, gesture: null }, 0.01);
+		stage.draw({ ...resting, gesture: null }, 0.01, true);
 
 		turnedBones.forEach((bone) => expect(turnOfBone(bone)).toBe(0));
-		stage.draw({ ...resting, gesture: null }, 0.01);
+		stage.draw({ ...resting, gesture: null }, 0.01, true);
 		turnedBones.forEach((bone) => expect(turnOfBone(bone)).toBe(0));
 	});
 
 	it('shows the clip\'s turn of the trunk with the breath added on top', async () => {
 		await startLoaded(holdTrack('spine', smallTurn));
-		stage.draw(playing(holdSeconds / 2, 0), 0.01);
+		stage.draw(playing(holdSeconds / 2, 0), 0.01, true);
 		const withClip = turnOfBone('spine');
-		stage.draw({ ...resting, breath: 0, gesture: null }, 0.01);
+		stage.draw({ ...resting, breath: 0, gesture: null }, 0.01, true);
 		const withoutClip = turnOfBone('spine');
 		const breath = 0.05;
-		stage.draw(playing(holdSeconds / 2, breath), 0.01);
+		stage.draw(playing(holdSeconds / 2, breath), 0.01, true);
 
 		expect(withClip - withoutClip).toBeCloseTo(smallTurn, 2);
 		expect(turnOfBone('spine') - withClip).toBeCloseTo(breath, 3);

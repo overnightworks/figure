@@ -1,13 +1,13 @@
-import { AmbientLight, DirectionalLight, MathUtils, PerspectiveCamera, Quaternion, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
+import { AmbientLight, DirectionalLight, PerspectiveCamera, Quaternion, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
 import type { VRM } from '@pixiv/three-vrm';
 import { figureMood } from './expressions.js';
+import { easeExtents, extentsOf, fieldOfViewDegrees, placeCamera, type Extents } from './framingCamera.js';
+import type { FigureFraming } from './framings.js';
 import { createGestureLayer, quaternionOfTurn, type GestureLayer } from './gestureLayer.js';
 import { spreadPosture, type FigurePose, type Turn } from './figureMotion.js';
 
-/** The picture's camera: its field of view in degrees and its near and far planes in metres. */
-const camera = { fieldOfView: 22, near: 0.05, far: 20 };
-/** The distances, in metres from the eyes, the picture shows above the head, below it and to either side. */
-const framing = { above: 0.25, below: 0.4, halfWidth: 0.31 };
+/** The picture's camera planes in metres: the field of view is the framing camera's. */
+const camera = { near: 0.05, far: 20 };
 /** The most drawing-buffer pixels per CSS pixel: a denser screen gets this ratio, not its own. */
 const maximumPixelRatio = 2;
 
@@ -22,17 +22,6 @@ function lightedScene(vrm: VRM): Scene {
 	const scene = new Scene();
 	scene.add(key, new AmbientLight(0xffffff, 0.55), vrm.scene);
 	return scene;
-}
-
-/** A camera looking at the eyes of the figure at rest, centred on them, wide enough for the canvas's aspect. */
-function headAndShouldersCamera(eyes: Vector3, aspect: number): PerspectiveCamera {
-	const tangent = Math.tan(MathUtils.degToRad(camera.fieldOfView / 2));
-	const centreHeight = eyes.y + (framing.above - framing.below) / 2;
-	const distance = Math.max((framing.above + framing.below) / 2 / tangent, framing.halfWidth / (tangent * aspect));
-	const view = new PerspectiveCamera(camera.fieldOfView, aspect, camera.near, camera.far);
-	view.position.set(eyes.x, centreHeight, eyes.z + distance);
-	view.lookAt(eyes.x, centreHeight, eyes.z);
-	return view;
 }
 
 /** What the drawing buffer depends on: the canvas's client size and the pixel ratio it is drawn at. */
@@ -81,17 +70,24 @@ function startSpringBonesAtPose(vrm: VRM): void {
 export interface FigureStage {
 	/** The layer of gestures the stage draws, whose clips a loaded clip replaces. */
 	readonly gestures: GestureLayer;
-	/** Sets the figure to `pose` and draws it, the drawing buffer first following the canvas when its size or the pixel ratio changed. */
-	draw(pose: FigurePose, elapsedSeconds: number): void;
+	/** Sets the picture to show `framing`: the camera eases toward it in the frames `draw` is told to glide in, and is there at once in the others. */
+	frame(framing: FigureFraming): void;
+	/**
+	 * Sets the figure to `pose` and draws it, the drawing buffer first following the canvas when its size or the pixel ratio changed.
+	 * With `glides` the camera eases toward the framing the stage is set to; without it the camera is at that framing in this frame.
+	 */
+	draw(pose: FigurePose, elapsedSeconds: number, glides: boolean): void;
 }
 
-/** The stage for `vrm` at rest, on the renderer's canvas: the camera frames the eyes where they are now, so the figure moves in front of it. */
-export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasElement, vrm: VRM): FigureStage {
+/** The stage for `vrm` at rest, on the renderer's canvas, first drawn in `framing`: the camera frames the eyes where they are now, so the figure moves in front of it. */
+export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasElement, vrm: VRM, framing: FigureFraming): FigureStage {
 	vrm.scene.traverse((node) => {
 		node.frustumCulled = false;
 	});
 	vrm.scene.updateMatrixWorld(true);
 	const eyes = vrm.lookAt!.getLookAtWorldPosition(new Vector3());
+	const footHeight = Math.min(...(['leftFoot', 'rightFoot'] as const).map((name) => vrm.humanoid.getNormalizedBoneNode(name)!.getWorldPosition(new Vector3()).y));
+	const eyesAboveFeet = eyes.y - footHeight;
 	const scene = lightedScene(vrm);
 	const spine = vrm.humanoid.getNormalizedBoneNode('spine')!;
 	const head = vrm.humanoid.getNormalizedBoneNode('head')!;
@@ -109,18 +105,28 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	const armBones = new Set<Object3D>([leftUpperArm, rightUpperArm, rightLowerArm, rightHand]);
 	renderer.setClearColor(0, 0);
 	let drawn: DrawingSize | undefined;
-	let view: PerspectiveCamera;
+	// The camera looks straight down the z axis at the plane of the eyes, so it needs no turn.
+	const view = new PerspectiveCamera(fieldOfViewDegrees, 1, camera.near, camera.far);
+	let target: Extents = extentsOf(framing, eyesAboveFeet);
+	let shown = target;
 	let posed = false;
 	return {
 		gestures,
-		draw(pose, elapsedSeconds) {
+		frame(next) {
+			target = extentsOf(next, eyesAboveFeet);
+		},
+		draw(pose, elapsedSeconds, glides) {
 			const size = currentSize(canvas);
 			if (drawn === undefined || !isSameSize(drawn, size)) {
 				renderer.setPixelRatio(size.pixelRatio);
 				renderer.setSize(size.width, size.height, false);
-				view = headAndShouldersCamera(eyes, size.width / size.height);
+				view.aspect = size.width / size.height;
+				view.updateProjectionMatrix();
 				drawn = size;
 			}
+			shown = glides ? easeExtents(shown, target, elapsedSeconds) : target;
+			const { heightFromEyes, distance } = placeCamera(shown, view.aspect);
+			view.position.set(eyes.x, eyes.y + heightFromEyes, eyes.z + distance);
 			turnBone(leftUpperArm, pose.arms.leftUpperArm);
 			turnBone(rightUpperArm, pose.arms.rightUpperArm);
 			turnBone(rightLowerArm, pose.arms.rightLowerArm);

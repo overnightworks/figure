@@ -1,4 +1,5 @@
 import type { FigureMood } from './expressions.js';
+import type { FigureFraming } from './framings.js';
 import type { FigureGesture } from './gestures.js';
 import type { FigureSignal } from './signals.js';
 
@@ -9,6 +10,8 @@ export interface MountOptions {
 	 * A persona's own clips: the bytes of a `.vrma` file (`VRMC_vrm_animation` 1.0) for the base gesture a clip replaces. After the figure is drawn, each clip is judged by `checkClip`, the same check as `figure check --as clip`, and only then parsed, with no wait: `mount` resolves and the signal comes first, and a gesture that starts before a clip has parsed plays figure's own clip to its end. A clip plays the arms, hands, fingers, shoulders, spine, chest and upper chest it keys, trailing down each limb by a small lag the author does not write, on figure's fades; every other track is dropped. A key that is no `FigureGesture`, a clip that is refused or fails to load, and a clip that finishes parsing after `dispose` are dropped with no signal and nothing thrown. The option is read once, at mount.
 	 */
 	readonly gestures?: Readonly<Partial<Record<FigureGesture, Uint8Array>>>;
+	/** How the figure is seen in its first frame, which is drawn in it with no ease: a late joiner mounts straight into the framing the call is in. A value that is no `FigureFraming` is `shoulders`, the default. The option is read once, at mount; `FigureHandle.frame` changes the framing after that. */
+	readonly framing?: FigureFraming;
 }
 
 export interface FigureHandle {
@@ -28,4 +31,8 @@ export interface FigureHandle {
 	 * The agent waves, or does whatever else `name` names: the figure plays its motion from the next drawn frame, its own on the right arm or the persona's clip that `MountOptions.gestures` gave for that name once it has parsed, with no bytes from this call, and the other motions, the moods and the voice go on under it. It returns nothing, gives no signal and reports no completion, and it never throws. One gesture shows at a time and calls never queue: a call for the gesture that plays is dropped. A value that is no `FigureGesture` is dropped, and so is a call made while the page is hidden: a gesture is a moment, not a state, and none starts when the page shows again. A figure that ended or was disposed ignores the call, and so does a page that asks for reduced motion, which also ends a gesture that runs, at once. While the figure thinks, the wave lifts the hand from the chin and gives it back.
 	 */
 	gesture(name: FigureGesture): void;
+	/**
+	 * The agent changes how it is seen, from its face to its whole body: the camera eases to `name` in about 0.6 s from the next drawn frame, and a call during a change continues from the picture it is in. It returns nothing, gives no signal and reports no completion, and it never throws. A value that is no `FigureFraming` is dropped, and so is a call for the framing the figure is in. A framing is a state, not a moment: a call made while the page is hidden or the canvas is out of the viewport is kept, and the first frame drawn after both are back shows it with no ease. Under reduced motion, which is read each frame, the change is a cut. A figure that ended or was disposed ignores the call.
+	 */
+	frame(name: FigureFraming): void;
 }

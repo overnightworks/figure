@@ -7,6 +7,7 @@ import type { FigureMood } from './expressions.js';
 import { createFigureMotion, type FigureFacts, type SpeakerOffset } from './figureMotion.js';
 import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
 import type { LoadedClip } from './gestureLayer.js';
+import { defaultFraming, isFigureFraming, type FigureFraming } from './framings.js';
 import { isFigureGesture, type FigureGesture } from './gestures.js';
 import type { FigureHandle, MountOptions } from './mountOptions.js';
 import { figureSignal, type FigureSignal } from './signals.js';
@@ -26,13 +27,14 @@ interface Outcome {
 	readonly listen: (speaker: Element | null) => void;
 	readonly speak: (sentence: Sentence) => void;
 	readonly gesture: (name: unknown) => void;
+	readonly frame: (name: unknown) => void;
 	readonly replaceClip: (name: FigureGesture, clip: LoadedClip) => void;
 }
 
 /** The facts of a figure that is not drawn: nothing reads them. */
 const ignoreFacts = () => {};
 
-const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts, gesture: ignoreFacts, replaceClip: ignoreFacts };
+const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts, gesture: ignoreFacts, frame: ignoreFacts, replaceClip: ignoreFacts };
 
 function ended(signal: FigureSignal): Outcome {
 	return { signal, release: () => {}, ...endedFacts };
@@ -45,6 +47,7 @@ interface Loop {
 	readonly listen: (speaker: Element | null) => void;
 	readonly speak: (sentence: Sentence) => void;
 	readonly gesture: (name: unknown) => void;
+	readonly frame: (name: unknown) => void;
 }
 
 /** The browser's own rectangle read: it throws for anything that is not an element, whatever properties that value supplies, of any realm. */
@@ -104,10 +107,15 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	let previousTime = performance.now();
 	/** The last frame intervals the guard judges, in milliseconds; a pause starts them anew. */
 	let recentIntervals: readonly number[] = [];
-	const drawAt = (time: number) => {
+	/** Draws the frame at `time`; the camera glides to a new framing unless the page asks for reduced motion or `resuming` a pause, which shows the framing as it is now. */
+	const drawAt = (time: number, resuming = false) => {
 		const elapsedSeconds = (time - previousTime) / 1000;
 		previousTime = time;
-		stage.draw(motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker), voiceTap.weights()), elapsedSeconds);
+		stage.draw(
+			motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker), voiceTap.weights()),
+			elapsedSeconds,
+			!resuming && !reducedMotion.matches
+		);
 	};
 	let pendingFrame: number | undefined;
 	let stopped = false;
@@ -125,7 +133,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 		if (mayRun && pendingFrame === undefined) {
 			previousTime = performance.now();
 			recentIntervals = [];
-			drawAt(previousTime);
+			drawAt(previousTime, true);
 			pendingFrame = requestAnimationFrame(onFrame);
 		} else if (!mayRun && pendingFrame !== undefined) {
 			cancelAnimationFrame(pendingFrame);
@@ -169,10 +177,13 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	const gesture = (name: unknown) => {
 		if (!stopped && document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);
 	};
-	return { stop, think, listen, speak, gesture };
+	const frame = (name: unknown) => {
+		if (!stopped && isFigureFraming(name)) stage.frame(name);
+	};
+	return { stop, think, listen, speak, gesture, frame };
 }
 
-async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal: FigureSignal) => void): Promise<Outcome> {
+async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, framing: FigureFraming, give: (signal: FigureSignal) => void): Promise<Outcome> {
 	if (checkFigure(bytes).length > 0) return ended(figureSignal.refused);
 	const opened = openRenderer(canvas);
 	if (typeof opened === 'string') return ended(opened);
@@ -190,9 +201,9 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, give: (signal
 		const figure = vrm;
 		// A loss during the load fired its event before the loop listens for it, so the state is read here.
 		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release, ...endedFacts };
-		const stage = createFigureStage(renderer, canvas, figure);
+		const stage = createFigureStage(renderer, canvas, figure, framing);
 		loop = runLoop(stage, canvas, give);
-		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen, speak: loop.speak, gesture: loop.gesture, replaceClip: stage.gestures.replace };
+		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen, speak: loop.speak, gesture: loop.gesture, frame: loop.frame, replaceClip: stage.gestures.replace };
 	} catch {
 		release();
 		return ended(figureSignal.refused);
@@ -227,6 +238,16 @@ async function adoptClips(
 	}
 }
 
+/** The framing the figure's first frame is drawn in: the option's, or the default for a value that is no framing or an option that cannot be read. */
+function startingFraming(options: MountOptions | undefined): FigureFraming {
+	try {
+		const named: unknown = options?.framing;
+		return isFigureFraming(named) ? named : defaultFraming;
+	} catch {
+		return defaultFraming;
+	}
+}
+
 /** What `mount` does, with `load` as the parse of a clip's bytes: the seam through which a test controls when a clip parse ends and how. */
 export async function mountWithClipLoad(load: ClipLoad, canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
 	let current: FigureSignal = figureSignal.refused;
@@ -238,7 +259,7 @@ export async function mountWithClipLoad(load: ClipLoad, canvas: HTMLCanvasElemen
 			reportError(error);
 		}
 	};
-	const { signal, release, think, listen, speak, gesture, replaceClip } = await start(canvas, bytes, give).catch(() => ended(figureSignal.refused));
+	const { signal, release, think, listen, speak, gesture, frame, replaceClip } = await start(canvas, bytes, startingFraming(options), give).catch(() => ended(figureSignal.refused));
 	give(signal);
 	let disposed = false;
 	if (signal === figureSignal.drawn) void adoptClips(load, options, replaceClip, () => disposed);
@@ -254,6 +275,7 @@ export async function mountWithClipLoad(load: ClipLoad, canvas: HTMLCanvasElemen
 		think,
 		listen,
 		speak,
-		gesture
+		gesture,
+		frame
 	};
 }
