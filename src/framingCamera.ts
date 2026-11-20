@@ -13,18 +13,21 @@ export interface Extents {
 /** The metres a full body shows below the foot bones, until a room gives the figure a floor. */
 const footMargin = 0.05;
 
-/** The extents of each framing; the full body shows down to the feet, wherever they are. */
+/** The `below` of a framing that shows down to the feet, wherever they are. */
+const toTheFeet = Number.POSITIVE_INFINITY;
+
+/** The extents of each framing; only the full body depends on the figure, by showing down to its feet. */
 const extentsOfFraming: Readonly<Record<FigureFraming, Extents>> = {
 	face: { above: 0.15, below: 0.15, halfWidth: 0.14 },
 	shoulders: { above: 0.25, below: 0.4, halfWidth: 0.31 },
 	upperBody: { above: 0.43, below: 0.75, halfWidth: 0.45 },
-	fullBody: { above: 0.7, below: Number.POSITIVE_INFINITY, halfWidth: 0.6 }
+	fullBody: { above: 0.7, below: toTheFeet, halfWidth: 0.6 }
 };
 
-/** What `framing` shows of a figure whose eyes are `eyesAboveFeet` metres above its foot bones: never more below the eyes than the feet and a margin. */
+/** What `framing` shows of a figure whose eyes are `eyesAboveFeet` metres above its foot bones: the same for every figure, except that the full body ends at the feet and a margin. */
 export function extentsOf(framing: FigureFraming, eyesAboveFeet: number): Extents {
 	const wanted = extentsOfFraming[framing];
-	return { ...wanted, below: Math.min(wanted.below, eyesAboveFeet + footMargin) };
+	return wanted.below === toTheFeet ? { ...wanted, below: eyesAboveFeet + footMargin } : wanted;
 }
 
 /** The share of the way to its target a picture goes each second, as an exponential rate: about 95 % of the way in 0.6 s. */

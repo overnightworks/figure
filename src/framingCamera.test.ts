@@ -71,6 +71,17 @@ describe('the full body of a figure of another height', () => {
 	});
 });
 
+describe('the framings above the full body for a figure of another height', () => {
+	const fixedFramings = framingNames.filter((framing) => framing !== figureFraming.fullBody);
+
+	it.each(fixedFramings.flatMap((framing) => [0.2, 1.0, 2.4].map((height) => [framing, height] as const)))(
+		'shows %s the same extents for a figure whose eyes are %s m above its foot bones as for a standing one',
+		(framing, height) => {
+			expect(extentsOf(framing, height)).toEqual(extentsOf(framing, eyesAboveFeet));
+		}
+	);
+});
+
 const secondsPerFrame = 1 / 60;
 const coordinates = (extents: Extents) => [extents.above, extents.below, extents.halfWidth];
 
