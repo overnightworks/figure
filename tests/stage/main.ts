@@ -1,4 +1,4 @@
-import { figureFraming, isFigureFraming, type FigureFraming } from '../../src/framings.js';
+import { defaultFraming, isFigureFraming, type FigureFraming } from '../../src/framings.js';
 import { figureGesture } from '../../src/gestures.js';
 import { figureSignal, mount, type FigureHandle, type FigureMood, type FigureSignal } from '../../src/draw.js';
 import type { MouthShape } from '../../src/expressions.js';
@@ -26,7 +26,7 @@ let figureBytes: Uint8Array = buildConformantVrm();
 let clipBytes: Uint8Array | undefined;
 
 /** The framing the stage shows: a freshly mounted figure is drawn in it at once. */
-let framing: FigureFraming = figureFraming.shoulders;
+let framing: FigureFraming = defaultFraming;
 
 /** Whether the stage reports its agent as thinking: a freshly mounted figure is told at once. */
 let thinking = false;
