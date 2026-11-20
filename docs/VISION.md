@@ -2,8 +2,8 @@
 
 ## Why it exists
 
-figure draws and drives a VRM figure: the animated 3D head and shoulders of an
-AI agent, drawn by each person's own browser. No video is sent and no server
+figure draws and drives a VRM figure: the animated 3D figure of an
+AI agent, seen from its face to its whole body as its host chooses, drawn by each person's own browser. No video is sent and no server
 handles any media. One package does this for every app, so a figure looks and
 behaves the same wherever an agent appears, and no app builds its own.
 
