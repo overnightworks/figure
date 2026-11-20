@@ -87,6 +87,8 @@ async function mountSlot(slot: Slot): Promise<void> {
 		return;
 	}
 	slot.handle = handle;
+	// The mount option is the framing at the call; a choice made while it awaited is told here.
+	handle.frame(framing);
 	handle.think(thinking);
 	handle.listen(speaker);
 	handle.speak(sentence);
