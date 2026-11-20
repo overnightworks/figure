@@ -6,7 +6,7 @@ figure ships three things. The check, `figure check <file>` and `checkFigure(byt
 profile's container, VRM and budget rules; its siblings judge a gesture clip (`--as clip`, `checkClip`) and a persona's room,
 one static GLB of unlit materials (`--as room`, `checkRoom`). The drawing, `mount` from `overnightworks-figure/draw`, draws a
 figure that passes into an app's canvas and lets the app drive it: idle motion, thinking, listening, waving and speaking.
-`overnightworks-figure/vocabulary.json` lists the gesture and mood names for a consumer that does not run TypeScript.
+`overnightworks-figure/vocabulary.json` lists the gesture, framing and mood names for a consumer that does not run TypeScript.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick start
@@ -43,11 +43,13 @@ export async function showFigure(canvas: HTMLCanvasElement, figureUrl: string, s
 ```
 
 `mount` never rejects, and the first signal has reached `onSignal` before it resolves. The returned `FigureHandle` has
-`signal`, `dispose()`, `think(working)`, `listen(speaker)`, `speak(sentence)` and `gesture(name)`; the app reports facts
+`signal`, `dispose()`, `think(working)`, `listen(speaker)`, `speak(sentence)`, `gesture(name)` and `frame(name)`; the app reports facts
 and the figure decides its motion. Each method's behaviour, including its edge cases, is the doc comment of
 `FigureHandle` in `src/mountOptions.ts`, which ships in the package's types, as does `MountOptions`, whose `gestures`
 option takes a persona's own `.vrma` clip for a key of `figureGesture` (`wave` today). The gesture names are the keys of
-`figureGesture`, exported from the package root; the moods are the `FigureMood` type from `overnightworks-figure/draw` and the `moods` of `vocabulary.json`.
+`figureGesture`, exported from the package root; the `framing` option and `frame(name)` take a key of `figureFraming`
+(`face`, `shoulders`, `upperBody`, `fullBody`; `shoulders` is the default), which the figure eases to during a call and cuts to under
+reduced motion; the moods are the `FigureMood` type from `overnightworks-figure/draw` and the `moods` of `vocabulary.json`.
 
 | Signal | Means | The app |
 |---|---|---|
@@ -91,8 +93,8 @@ The package brings `three`, `@pixiv/three-vrm` and `@pixiv/three-vrm-animation` 
 `overnightworks-figure/draw` imports them: a consumer that only checks (the package root, `overnightworks-figure/codes`,
 `overnightworks-figure/profile` or the command) loads nothing of three.
 
-`overnightworks-figure/vocabulary.json` is `{"version": 1, "gestures": [...], "moods": [...]}`, the keys of `figureGesture`
-and the values of `figureMood` in their declared order; the build writes it from those sets. `version` rises only on a
+`overnightworks-figure/vocabulary.json` is `{"version": 1, "gestures": [...], "framings": [...], "moods": [...]}`, the keys of `figureGesture`
+and `figureFraming` and the values of `figureMood` in their declared order; the build writes it from those sets. `version` rises only on a
 breaking change, a new key is additive, so read the keys you know and ignore the others. Import it with
 `import vocabulary from 'overnightworks-figure/vocabulary.json' with { type: 'json' }`.
 

@@ -428,6 +428,38 @@ test.describe('the demo stage under the script policy', () => {
 		await expectNoViolations(page, pageErrors);
 	});
 
+	test('a framing chosen while a figure mounts is the framing the finished figure shows', async ({ page }) => {
+		// Under reduced motion a change is a cut, so the finished picture is the framing itself and no glide is left to wait for.
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		const figure = page.locator('canvas').nth(0);
+		await page.getByRole('button', { name: 'full body' }).click();
+		await expect.poll(async () => differingPixels(page, await figure.screenshot(), await figure.screenshot()), { timeout: drawingTimeout }).toBeLessThan(shownPixels);
+		const inFullBody = await figure.screenshot();
+		await page.getByRole('button', { name: 'shoulders' }).click();
+
+		// The choice is made the moment the pick puts fresh canvases on the stage, so it falls inside the mounts the pick starts, however fast they are.
+		await page.evaluate((figureBytes) => {
+			const chooseFullBody = () => document.querySelector<HTMLButtonElement>('#framing [data-framing="fullBody"]')!.click();
+			const observer = new MutationObserver(() => {
+				observer.disconnect();
+				chooseFullBody();
+			});
+			observer.observe(document.querySelector('#stage')!, { childList: true, subtree: true });
+			const files = new DataTransfer();
+			files.items.add(new File([new Uint8Array(figureBytes)], 'figure.vrm', { type: 'model/gltf-binary' }));
+			const picker = document.querySelector<HTMLInputElement>('#picker')!;
+			picker.files = files.files;
+			picker.dispatchEvent(new Event('change', { bubbles: true }));
+		}, [...buildConformantVrm()]);
+		await expectTwoDrawings(page);
+		await expect
+			.poll(async () => differingPixels(page, inFullBody, await page.locator('canvas').nth(0).screenshot()), { timeout: drawingTimeout })
+			.toBeLessThan(shownPixels);
+		await expectNoViolations(page, pageErrors);
+	});
+
 	test('a picked file that is no figure ends both drawings with their signal and offers mount again', async ({ page }) => {
 		const pageErrors = await openStage(page, stage);
 		await expectTwoDrawings(page);

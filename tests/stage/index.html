@@ -9,6 +9,13 @@
     <p><label>Mount a file instead: <input id="picker" type="file" accept=".vrm,.glb,model/gltf-binary" /></label></p>
     <p><label>Pick a clip file for the wave: <input id="clip-picker" type="file" accept=".vrma,model/gltf-binary" /></label></p>
     <p><button id="think" type="button" aria-pressed="false">think</button> <button id="wave" type="button">wave</button></p>
+    <fieldset id="framing">
+      <legend>framing</legend>
+      <button type="button" data-framing="face">face</button>
+      <button type="button" data-framing="shoulders" aria-pressed="true">shoulders</button>
+      <button type="button" data-framing="upperBody">upper body</button>
+      <button type="button" data-framing="fullBody">full body</button>
+    </fieldset>
     <fieldset id="speaker">
       <legend>speaker</legend>
       <label><input type="radio" name="speaker" value="nobody" checked /> nobody</label>

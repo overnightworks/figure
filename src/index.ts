@@ -4,3 +4,5 @@ export { refusalDescriptions } from './codes.js';
 export type { Refusal, RefusalCode } from './codes.js';
 export { figureGesture } from './gestures.js';
 export type { FigureGesture } from './gestures.js';
+export { figureFraming } from './framings.js';
+export type { FigureFraming } from './framings.js';

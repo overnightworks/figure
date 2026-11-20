@@ -1,3 +1,4 @@
+import { defaultFraming, isFigureFraming, type FigureFraming } from '../../src/framings.js';
 import { figureGesture } from '../../src/gestures.js';
 import { figureSignal, mount, type FigureHandle, type FigureMood, type FigureSignal } from '../../src/draw.js';
 import type { MouthShape } from '../../src/expressions.js';
@@ -6,7 +7,7 @@ import { syntheticVoice } from '../syntheticVoice.js';
 
 /** The CSS widths the stage mounts at, in pixels: a phone and a desktop. */
 const cssWidths = [390, 1280];
-/** The canvas is four units wide and five high: a portrait frame for the head and shoulders. */
+/** The canvas is four units wide and five high: a portrait frame for any of the four framings. */
 const heightPerWidth = 1.25;
 
 /** One drawing of the stage: its canvas sits in `mountPoint`, its signal is written beside it. */
@@ -23,6 +24,9 @@ let figureBytes: Uint8Array = buildConformantVrm();
 
 /** The clip the visitor picked for the wave: none until picked, and then every drawing mounts with it. */
 let clipBytes: Uint8Array | undefined;
+
+/** The framing the stage shows: a freshly mounted figure is drawn in it at once. */
+let framing: FigureFraming = defaultFraming;
 
 /** Whether the stage reports its agent as thinking: a freshly mounted figure is told at once. */
 let thinking = false;
@@ -76,13 +80,15 @@ async function mountSlot(slot: Slot): Promise<void> {
 	slot.signalText.textContent = 'mounting';
 	slot.mountAgain.hidden = true;
 	const gestures = clipBytes === undefined ? undefined : { [figureGesture.wave]: clipBytes };
-	const handle = await mount(canvas, figureBytes, { gestures, onSignal: (signal) => showSignal(slot, canvas, signal) });
+	const handle = await mount(canvas, figureBytes, { gestures, framing, onSignal: (signal) => showSignal(slot, canvas, signal) });
 	// A mount that resolves after a newer one replaced its canvas is released here, so its context and loop do not leak.
 	if (!slot.mountPoint.contains(canvas)) {
 		handle.dispose();
 		return;
 	}
 	slot.handle = handle;
+	// The mount option is the framing at the call; a choice made while it awaited is told here.
+	handle.frame(framing);
 	handle.think(thinking);
 	handle.listen(speaker);
 	handle.speak(sentence);
@@ -109,6 +115,7 @@ function createSlot(cssWidth: number, stage: HTMLElement): Slot {
 }
 
 const stage = document.querySelector<HTMLElement>('#stage')!;
+const framingButtons = document.querySelector<HTMLFieldSetElement>('#framing')!;
 const thinkButton = document.querySelector<HTMLButtonElement>('#think')!;
 const picker = document.querySelector<HTMLInputElement>('#picker')!;
 const clipPicker = document.querySelector<HTMLInputElement>('#clip-picker')!;
@@ -151,6 +158,14 @@ document.querySelector<HTMLFieldSetElement>('#speaker')!.addEventListener('chang
 	});
 	speaker = speakerMarkers.get(choice) ?? null;
 	slots.forEach((slot) => slot.handle?.listen(speaker));
+});
+
+framingButtons.addEventListener('click', (event) => {
+	const chosen = (event.target as HTMLElement).dataset.framing;
+	if (!isFigureFraming(chosen)) return;
+	framing = chosen;
+	framingButtons.querySelectorAll('button').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.framing === chosen)));
+	slots.forEach((slot) => slot.handle?.frame(chosen));
 });
 
 thinkButton.addEventListener('click', () => {
