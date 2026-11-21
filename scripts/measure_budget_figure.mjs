@@ -19,7 +19,8 @@
 // refusing plugins (the time to parsed and the longest main-thread task after it began), what the parse built, and the room's computed
 // GPU memory by part (its textures with their mip chains, its vertex and index buffers once for each mesh) alone and summed with the
 // budget figure's. It then mounts the conformant figure (as for the clip) with the room: the report gives the frame interval without
-// a room and with the room parsed and drawn, and whether `slow` came. The room's strips are sub-pixel thin, so what it adds to a frame is
+// a room and with the room drawn, and whether `slow` came; the measurement fails unless the mounted room was parsed and taken into the
+// stage within seconds, since a room that fails or is late leaves a plain figure's interval and no signal says so. The room's strips are sub-pixel thin, so what it adds to a frame is
 // its vertex and texture work, not covered pixels.
 // Usage: pnpm run build && node scripts/measure_budget_figure.mjs; needs `pnpm exec playwright install chromium` once.
 // It runs itself through the fleet's probe-run, which starts it once the machine's load leaves room, inside a 4 GiB memory cap;
@@ -27,7 +28,7 @@
 // the page by request routing, and writes the page's bundle only to a temporary directory that its outer process removes even
 // when the capped one is killed (the figure stays in memory).
 // Exit codes: 0 when the measurement ran (`slow` is a result, not a failure), 1 when the figure fails the check, no `drawn`
-// came, fewer than 300 frames came, the browser failed or probe-run could not be started, 2 when dist/ is not built, and probe-run's
+// came, the mounted room was not drawn, fewer than 300 frames came, the browser failed or probe-run could not be started, 2 when dist/ is not built, and probe-run's
 // own (`probe-run -h`) when it found no room within an hour.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -52,6 +53,8 @@ const endingSignals = ['unsupported', 'refused', 'lost', 'slow'];
 /** The seconds after a gesture starts at which the figure's own wave is over and a clip of the budget's length still plays, and the seconds the parse is watched after the mount. */
 const pictureSecondsAfterGesture = 4;
 const parseWatchSeconds = 2;
+/** The seconds, after the parse watch, within which the mounted room must be drawn before the measurement counts. */
+const roomDrawWaitSeconds = 5;
 /** The pixels a picture differs from the figure at rest, at least, for the clip to count as shown. */
 const shownPixels = 500;
 /** The keys' share of the byte budget that the clip's accessors fill, left to the JSON and the header the rest. */
@@ -157,8 +160,10 @@ const pageHtml = `<!doctype html>
 
 /** The page's one function: reads the renderer, mounts the figure and records the frame intervals until `frames` came or the figure ended. */
 const pageScript = `import { mount } from 'figure-draw';
-import { GLTFLoader } from 'three-gltf-loader';
-import { registerRefusingPlugins } from 'figure-loader';
+import { mountWithLoads } from 'figure-mount';
+import { loadClip } from 'figure-clip-loader';
+import { loadRoom } from 'figure-room-loader';
+import { parseGlbRefusingTextureFailures } from 'figure-loader';
 const endingSignals = ['unsupported', 'refused', 'lost', 'slow'];
 
 function describeRenderer() {
@@ -172,6 +177,7 @@ function describeRenderer() {
 }
 
 const maximumMounts = 30;
+const roomDrawWaitSeconds = ${roomDrawWaitSeconds};
 
 async function mountOnFreshCanvas(bytes, framesWanted, intervals) {
 	const signals = [];
@@ -289,16 +295,23 @@ window.measureClip = async (frames, parseWatchSeconds, pictureSecondsAfterGestur
 
 /** The page's third function, appended to the others: it parses the room as the package's loaders parse a file, reports what the parse built, and measures the conformant figure with the room drawn. */
 const pageRoomScript = `
+/** Whether the mounted room parsed and the stage took it into its scene, which is what draws it, within the wait; false for a room that failed, one that is late, and a figure that ended. */
+async function waitUntilRoomDrawn(mountedRoom, signals) {
+	const deadline = performance.now() + roomDrawWaitSeconds * 1000;
+	while (performance.now() < deadline && !signals.some((signal) => endingSignals.includes(signal))) {
+		if (mountedRoom()?.parent) return true;
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	return false;
+}
+
 window.measureRoom = async (frames, watchSeconds) => {
 	const bytes = new Uint8Array(await (await fetch('/room.glb')).arrayBuffer());
 	document.body.style.margin = '0';
 	const longTasks = [];
 	new PerformanceObserver((list) => longTasks.push(...list.getEntries().map((entry) => entry.duration))).observe({ type: 'longtask' });
-	let textureFailed = false;
-	const loader = new GLTFLoader();
-	registerRefusingPlugins(loader, () => (textureFailed = true));
 	const start = performance.now();
-	const gltf = await loader.parseAsync(bytes.slice().buffer, '');
+	const gltf = await parseGlbRefusingTextureFailures(bytes);
 	const parsedMilliseconds = performance.now() - start;
 	await new Promise((resolve) => setTimeout(resolve, watchSeconds * 1000));
 	let meshes = 0;
@@ -320,8 +333,11 @@ window.measureRoom = async (frames, watchSeconds) => {
 
 	const signals = [];
 	const canvas = newCanvas();
-	const handle = await mount(canvas, figure, { room: bytes, onSignal: (signal) => signals.push(signal) });
+	let mountedRoom;
+	const loads = { clip: loadClip, room: async (roomBytes) => (mountedRoom = await loadRoom(roomBytes)) };
+	const handle = await mountWithLoads(loads, canvas, figure, { room: bytes, onSignal: (signal) => signals.push(signal) });
 	await new Promise((resolve) => setTimeout(resolve, watchSeconds * 1000));
+	const roomDrawn = await waitUntilRoomDrawn(() => mountedRoom, signals);
 	await nextFrame();
 	const drawn = await intervalsOf(canvas, frames, signals);
 	handle.dispose();
@@ -329,10 +345,10 @@ window.measureRoom = async (frames, watchSeconds) => {
 	return {
 		parsedMilliseconds,
 		longestTask: Math.max(0, ...longTasks),
-		textureFailed,
 		meshes,
 		triangles,
 		unlitMeshes,
+		roomDrawn,
 		without: without.intervals,
 		withRoom: drawn.intervals,
 		plainSignals,
@@ -354,8 +370,10 @@ async function bundlePage(workDirectory) {
 		resolve: {
 			alias: {
 				'figure-draw': join(repositoryRoot, 'dist/draw.js'),
+				'figure-mount': join(repositoryRoot, 'dist/figureMount.js'),
 				'figure-loader': join(repositoryRoot, 'dist/figureLoader.js'),
-				'three-gltf-loader': join(repositoryRoot, 'node_modules/three/examples/jsm/loaders/GLTFLoader.js')
+				'figure-clip-loader': join(repositoryRoot, 'dist/clipLoader.js'),
+				'figure-room-loader': join(repositoryRoot, 'dist/roomLoader.js')
 			}
 		},
 		build: { outDir: bundleDirectory, emptyOutDir: true }
@@ -494,8 +512,12 @@ async function measureRoom(bundleDirectory, figureGpuBytes, maxTextureSize) {
 	const roomBytes = reportGpuMemory(gpuMemoryParts(readGlb(room.glb), maxTextureSize));
 	const together = figureGpuBytes + roomBytes;
 	console.log(`gpu memory, budget figure and budget room together: ${megabytes(together)} (${together} bytes)`);
-	if (measured.textureFailed || measured.meshes !== room.meshes || measured.triangles !== roomProfile.maxTriangles || measured.unlitMeshes !== measured.meshes) {
-		console.error(`the room was not parsed as built: texture failed ${measured.textureFailed}, ${measured.meshes} of ${room.meshes} meshes, ${measured.triangles} of ${roomProfile.maxTriangles} triangles, ${measured.unlitMeshes} unlit`);
+	if (!measured.roomDrawn) {
+		console.error(`the mounted room was not drawn within ${roomDrawWaitSeconds} s after the ${parseWatchSeconds} s parse watch, so the interval measured with it is of the plain figure`);
+		return 1;
+	}
+	if (measured.meshes !== room.meshes || measured.triangles !== roomProfile.maxTriangles || measured.unlitMeshes !== measured.meshes) {
+		console.error(`the room was not parsed as built: ${measured.meshes} of ${room.meshes} meshes, ${measured.triangles} of ${roomProfile.maxTriangles} triangles, ${measured.unlitMeshes} unlit`);
 		return 1;
 	}
 	const ended = [...measured.plainSignals, ...measured.signals].find((signal) => endingSignals.includes(signal));
