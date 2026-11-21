@@ -188,6 +188,19 @@ describe('mount with a room', { timeout: 60_000 }, () => {
 		expect(problems).toEqual([]);
 	});
 
+	it('leaves the room of the last call on screen when an earlier call fails after it', async () => {
+		const { canvas, handle, parses } = await mountHolding();
+		handle.room(roomOf(green));
+		handle.room(roomOf(red));
+		await parses[1]!.finish();
+		await expectEdge(canvas, isRed);
+
+		parses[0]!.fail();
+
+		expect(isRed(await edgeAfterFrames(canvas))).toBe(true);
+		expect(problems).toEqual([]);
+	});
+
 	it('keeps the room on screen until its replacement has parsed, then swaps it in and frees it', async () => {
 		const { canvas, handle, parses } = await mountHolding({ room: roomOf(green) });
 		await parses[0]!.finish();
