@@ -309,11 +309,15 @@ window.measureRoom = async (frames, watchSeconds) => {
 	const bytes = new Uint8Array(await (await fetch('/room.glb')).arrayBuffer());
 	document.body.style.margin = '0';
 	const longTasks = [];
-	new PerformanceObserver((list) => longTasks.push(...list.getEntries().map((entry) => entry.duration))).observe({ type: 'longtask' });
+	const observer = new PerformanceObserver((list) => longTasks.push(...list.getEntries().map((entry) => entry.duration)));
+	observer.observe({ type: 'longtask' });
 	const start = performance.now();
 	const gltf = await parseGlbRefusingTextureFailures(bytes);
 	const parsedMilliseconds = performance.now() - start;
 	await new Promise((resolve) => setTimeout(resolve, watchSeconds * 1000));
+	longTasks.push(...observer.takeRecords().map((entry) => entry.duration));
+	observer.disconnect();
+	const parseLongestTask = Math.max(0, ...longTasks);
 	let meshes = 0;
 	let triangles = 0;
 	let unlitMeshes = 0;
@@ -344,7 +348,7 @@ window.measureRoom = async (frames, watchSeconds) => {
 	canvas.remove();
 	return {
 		parsedMilliseconds,
-		longestTask: Math.max(0, ...longTasks),
+		longestTask: parseLongestTask,
 		meshes,
 		triangles,
 		unlitMeshes,

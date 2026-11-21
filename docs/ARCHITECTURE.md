@@ -165,7 +165,7 @@ The build is `tsc`, then `scripts/write_vocabulary.mjs`: `tsc` emits ESM and dec
 
 A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the build packs `overnightworks-figure-<version>.tgz` and proves it with `scripts/check_packed_tarball.sh`, and quality's tag job publishes the tarball, alone, on an immutable release whose notes carry its URL, its `sha512-` integrity and the gzip size of a checking and of a mounting consumer bundle (`scripts/measure_bundle_size.mjs`). quality's `docs/release.md` owns the path.
 
-`scripts/measure_budget_figure.mjs` is the measurement behind the profile's budgets, taken in headless Chromium at 390 CSS pixels; a budget changes only on such a measurement. For the room it parses a room at the budgets, mounts it with the budget figure and reports its frame interval beside the figure's, and reports its computed GPU memory beside the budget figure's.
+`scripts/measure_budget_figure.mjs` is the measurement behind the profile's budgets, taken in headless Chromium at 390 CSS pixels; a budget changes only on such a measurement. For the room it parses a room at the budgets, mounts it with a conformant figure and reports its frame interval beside the figure's, and reports its computed GPU memory beside the budget figure's.
 
 ## 5. Crosscutting Concepts
 
