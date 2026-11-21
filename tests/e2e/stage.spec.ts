@@ -211,7 +211,7 @@ test.describe('the demo stage under the script policy', () => {
 		await expectNoViolations(page, pageErrors);
 	});
 
-	test('the room control shows a room behind both figures and removes it, a picked room replaces it, and a picked file that is no room leaves the plain stage', async ({ page }) => {
+	test('the room control shows a room behind the first figure and removes it, a picked room replaces it, and a picked file that is no room leaves the plain stage', async ({ page }) => {
 		const pageErrors = await openStage(page, stage);
 		await expectTwoDrawings(page);
 		const requests: string[] = [];
