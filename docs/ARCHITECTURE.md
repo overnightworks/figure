@@ -2,7 +2,7 @@
 
 ## 1. Context and Scope
 
-figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's bytes to a list of refusals, its siblings for a persona's gesture clip (a `.vrma` file) and for a persona's room (one static GLB of unlit materials), and the command `figure check [--as clip|room] <file>` around all three; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into an app's canvas and keeps it alive: the figure breathes, blinks and glances until the app disposes it, and waves when the app asks, with a persona's clip in place of figure's wave when the app hands one. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` (or `checkClip`, `checkRoom`) in a browser before three parses the file, and an app calls `mount` on a canvas.
+figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's bytes to a list of refusals, its siblings for a persona's gesture clip (a `.vrma` file) and for a persona's room (one static GLB of unlit materials), and the command `figure check [--as clip|room] <file>` around all three; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into an app's canvas and keeps it alive: the figure breathes, blinks and glances until the app disposes it, and waves when the app asks, with a persona's clip in place of figure's wave when the app hands one, behind a room the app hands it. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` (or `checkClip`, `checkRoom`) in a browser before three parses the file, and an app calls `mount` on a canvas.
 
 ```mermaid
 flowchart LR
@@ -32,6 +32,7 @@ flowchart TD
     draw["draw.ts: mount, the handle"] --> figureMount["figureMount.ts: the mount's work and the loop"]
     figureMount --> check
     figureMount --> loaders["figureLoader.ts: GLB into three objects"]
+    figureMount --> roomLoader["roomLoader.ts: a room GLB into a three scene"]
     figureMount --> motion["figureMotion.ts, idleMotion.ts, gestureClips.ts: the pose, pure"]
     figureMount --> frame["figureFrame.ts, gestureLayer.ts: camera, lights, one frame"]
     frame --> framingCamera["framingCamera.ts: where the camera stands and how it eases, pure"]
@@ -47,14 +48,15 @@ flowchart TD
 - `check.ts` owns the container rules and their order once for all three profiles; `checkFigure`, `checkClip` and `checkRoom` differ in the profile and in the rules after the container. The rule modules judge parsed JSON and import only pure modules beside them (the codes, the profile, `json.ts`, and `clipRules.ts` also `clipKeyRules.ts`; `clipRules.ts`, `roomRules.ts` and `vrmRules.ts` also `sceneRules.ts`; `roomRules.ts` and `budgetRules.ts` also `accessorRules.ts`), no Node, three or @pixiv module; `textureRules.ts` also reads the binary chunk through `imageSize.ts` and takes the budgets of the profile it is given. `clipRules.ts` and `clipKeyRules.ts` judge a clip, and are narrower than `VRMC_vrm_animation` where a gesture needs it. `roomRules.ts` judges a room: its content, its unlit materials, and the references three's loader follows. `sceneRules.ts` walks the scenes and nodes for a clip and a room alike, each kind giving its own scene code and forbidden node properties, and refuses a cycle and a node under two parents; a figure walks no scene, and `vrmRules.ts` asks it only for the node under two parents. `accessorRules.ts` refuses an accessor a primitive names without a glTF component type, which the figure's tally and a room's references both read. `budgetRules.ts` tallies each mesh once; a figure sums the tallies over its meshes, a room over every node that draws a mesh.
 - `cli.ts` is the one filesystem boundary and the one output owner; `bin.ts` hands it the process streams.
 - `index.ts` exports `checkFigure`, `checkClip`, `checkRoom`, the codes, the three profiles, `figureGesture` and `figureFraming`; `overnightworks-figure/codes` and `/profile` export a subset. No module they reach imports three or three-vrm. `overnightworks-figure/vocabulary.json` is a published artefact beside them, owned by `figureGesture`, `figureFraming` and `figureMood`: `scripts/write_vocabulary.mjs`, which `build` runs after `tsc`, writes it from the built modules, and `scripts/check_packed_tarball.sh` compares it with the installed sets.
-- `draw.ts` is the one module of `overnightworks-figure/draw`: it exports `mount`, `figureSignal` and the types of the handle, the options, the signal, the mood, the gesture and the framing. The handle is the last signal, an idempotent `dispose`, `think`, `listen`, `speak`, `gesture` and `frame`. The types live in `mountOptions.ts`, so no declaration of the export names a three type (`scripts/check_packed_tarball.sh` follows them). `mount` is `figureMount.ts`' `mountWithClipLoad` given `clipLoader.ts`' `loadClip`; tests give it another parse.
+- `draw.ts` is the one module of `overnightworks-figure/draw`: it exports `mount`, `figureSignal` and the types of the handle, the options, the signal, the mood, the gesture and the framing. The handle is the last signal, an idempotent `dispose`, `think`, `listen`, `speak`, `gesture`, `frame` and `room`. The types live in `mountOptions.ts`, so no declaration of the export names a three type (`scripts/check_packed_tarball.sh` follows them). `mount` is `figureMount.ts`' `mountWithLoads` given `clipLoader.ts`' `loadClip` and `roomLoader.ts`' `loadRoom`; tests give it another parse of either.
 - `figureMount.ts` owns the loop: one animation frame request at a time, the one place that draws. It runs only while the page is visible and the canvas is in the viewport, reads `prefers-reduced-motion` each frame, feeds each frame's interval to the guard and ends the figure with `slow` when it says so, and ends it with `lost` on `webglcontextlost`. No context is restored.
 - Under reduced motion no gesture starts and a running one ends, and the chin share it had taken from the base arm returns to the chin at the thinking look's rate, the forearm folding ahead of the upper arm, also when the page lifts reduced motion on the way; `gesture` is also dropped for a value outside the set, while the page is hidden and on a figure that ended. A gesture is a moment, not a state.
 - `figureMotion.ts` owns the order of the states (speaking over thinking over listening over idle) and the blending between them: a pure function of the facts the host reported through `think`, `listen` and `speak`, the elapsed seconds and a source of chance. The host reports a fact and the package decides the motion. `idleMotion.ts` is its idle layer; `gestureClips.ts` owns the clips' keys, the bones a clip plays and their lags.
 - A framing is a state, not a moment: `frame` and the `framing` option are recorded also while the page is hidden or the canvas is out of the viewport, the first frame of a figure and the first after drawing resumes show the framing with no ease, and only a live change glides, which a page asking for reduced motion gets as a cut.
-- `framingCamera.ts` owns where the camera stands, a pure function of the framing, the figure's height from eyes to foot bones and the canvas's aspect, and how it eases (an exponential rate, the same at any frame rate, continuing from the picture a new target finds); the field of view is narrow and the same for all four framings. `shoulders` is the figure's head and shoulders framed on the eyes; `fullBody` ends at the foot bones plus a margin until a room gives the figure a floor.
-- `figureFrame.ts` owns the picture: camera, lights, clear colour, the drawing buffer's size and the order in which the layers write the bones: base pose, gesture, deltas, head and neck, face. `gestureLayer.ts` holds the clip per gesture name, figure's own until a persona's replaces it.
+- `framingCamera.ts` owns where the camera stands, a pure function of the framing, the figure's height from eyes to foot bones and the canvas's aspect, and how it eases (an exponential rate, the same at any frame rate, continuing from the picture a new target finds); the field of view is narrow and the same for all four framings. `shoulders` is the figure's head and shoulders framed on the eyes; `fullBody` ends at the foot bones plus a margin. The camera does not depend on the room, so a room changes none of the four extents: its floor at y = 0 and its wall show where they lie, and the far plane of 20 m bounds how deep a room can show.
+- `figureFrame.ts` owns the picture: camera, lights, clear colour (transparent), the room in its scene, the drawing buffer's size and the order in which the layers write the bones: base pose, gesture, deltas, head and neck, face. `gestureLayer.ts` holds the clip per gesture name, figure's own until a persona's replaces it.
 - `clipLoader.ts` parses a `.vrma` that `checkClip` passed. The check is the only gate: `figureMount.ts` never hands a loader a byte the check refused. A `gestures` option clip is checked and parsed after `drawn`, without `mount` waiting; a refused clip, a failed load and a parse that ends after `dispose` are dropped with no signal.
+- `roomLoader.ts` parses a room that `checkRoom` passed, through the same two refusing loader plugins as the figure, and rejects on a refused load or a texture that fails. A room is state, like a framing: the `room` option is read once at mount and `room` replaces or removes it, also while the page is hidden. `figureMount.ts` checks and parses it after `drawn`, without `mount` waiting, and the last call wins: a load an earlier call started, one that ends after `dispose` and one that fails show nothing and their geometries, materials and textures are freed when they end. The room on screen stays until its replacement has parsed and then swaps in one frame; a replacement that is refused or fails leaves none, and `room(null)` removes at once and cancels a load. The stage frees what it removes; a refused or failed room leaves the transparent canvas, with no signal.
 - `voiceTap.ts` is the package's only touch of a host's audio graph: one analyser per voice, on the voice's own context, disconnected on the next voice, `dispose` and the figure's end. It creates no context and plays nothing. Only `figureMount.ts` imports it.
 
 
@@ -87,6 +89,7 @@ sequenceDiagram
     participant K as check.ts
     participant L as figureLoader.ts
     participant P as clipLoader.ts
+    participant R as roomLoader.ts
     participant I as figureMotion.ts
     participant F as figureFrame.ts
     A->>M: mount(canvas, bytes, onSignal)
@@ -107,6 +110,14 @@ sequenceDiagram
             else
                 M->>F: first frame
                 M-->>A: onSignal(drawn), handle
+                opt options.room holds bytes, or room(bytes) is called
+                    M->>K: checkRoom(room bytes)
+                    opt no refusal
+                        M->>R: loadRoom(room bytes), without waiting
+                        R-->>M: a three scene, or an error that leaves none
+                        M->>F: the room replaces the last one, unless a later call or dispose came first
+                    end
+                end
                 opt options.gestures holds a clip under a gesture's name
                     M->>K: checkClip(clip bytes)
                     opt no refusal
@@ -154,7 +165,7 @@ The build is `tsc`, then `scripts/write_vocabulary.mjs`: `tsc` emits ESM and dec
 
 A release is made by dispatching `.github/workflows/release.yml` with a version: quality's gate judges the commit, the build packs `overnightworks-figure-<version>.tgz` and proves it with `scripts/check_packed_tarball.sh`, and quality's tag job publishes the tarball, alone, on an immutable release whose notes carry its URL, its `sha512-` integrity and the gzip size of a checking and of a mounting consumer bundle (`scripts/measure_bundle_size.mjs`). quality's `docs/release.md` owns the path.
 
-`scripts/measure_budget_figure.mjs` is the measurement behind the profile's budgets, taken in headless Chromium at 390 CSS pixels; a budget changes only on such a measurement. For the room it parses a room at the budgets and reports its computed GPU memory beside the budget figure's; no room is drawn yet.
+`scripts/measure_budget_figure.mjs` is the measurement behind the profile's budgets, taken in headless Chromium at 390 CSS pixels; a budget changes only on such a measurement. For the room it parses a room at the budgets, mounts it with the budget figure and reports its frame interval beside the figure's, and reports its computed GPU memory beside the budget figure's.
 
 ## 5. Crosscutting Concepts
 

@@ -8,6 +8,8 @@ import { clipProfile } from '../../src/profile.js';
 import { figureSignal } from '../../src/signals.js';
 import { buildArmUpClip } from '../clipFixtures.js';
 import { buildConformantVrm } from '../figureFixtures.js';
+import { buildImagePng } from '../glbBuilder.js';
+import { buildRoomGlb } from '../roomBuilder.js';
 import { origin, recordPolicyViolations, scriptPolicy, serveConsumer } from './serve-consumer.js';
 
 const stageConfig = fileURLToPath(new URL('../stage/vite.config.ts', import.meta.url));
@@ -82,6 +84,9 @@ async function expectNoViolations(page: Page, pageErrors: string[]): Promise<voi
 
 /** The part of a drawing that is bare at rest and a raised arm covers: the left quarter of its width down to three fifths of its height; the head's sway and a blink do not reach it. */
 const raisedArmArea = { width: 0.25, height: 0.6 };
+
+/** The part of a drawing the figure does not reach, so only a room changes it: the left quarter of its width, the top three fifths of its height. */
+const roomArea = raisedArmArea;
 
 /** The pixels of two screenshots that differ by more than a rounding of the colour, within the top left `area` of the drawing (all of it by default): counted in the page, which decodes the PNGs. */
 async function differingPixels(page: Page, first: Buffer, second: Buffer, area = { width: 1, height: 1 }): Promise<number> {
@@ -201,6 +206,36 @@ test.describe('the demo stage under the script policy', () => {
 				{ timeout: drawingTimeout, intervals: [0] }
 			)
 			.toBeGreaterThan(wavedPixels);
+		expect(requests).toEqual([]);
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
+	test('the room control shows a room behind both figures and removes it, a picked room replaces it, and a picked file that is no room leaves the plain stage', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		const requests: string[] = [];
+		page.on('request', (request) => requests.push(request.url()));
+		const figure = page.locator('canvas').nth(0);
+		const plain = await figure.screenshot();
+		const roomButton = page.getByRole('button', { name: 'room', exact: true });
+		const roomDiffers = (shown: Buffer, expected: 'a room' | 'none') =>
+			differingPixels(page, plain, shown, roomArea).then((differing) => (expected === 'a room' ? differing > wavedPixels : differing < shownPixels));
+
+		await roomButton.click();
+		await expect.poll(async () => roomDiffers(await figure.screenshot(), 'a room'), { timeout: drawingTimeout }).toBe(true);
+		const synthetic = await figure.screenshot();
+		await roomButton.click();
+		await expect.poll(async () => roomDiffers(await figure.screenshot(), 'none'), { timeout: drawingTimeout }).toBe(true);
+		await roomButton.click();
+		await expect.poll(async () => roomDiffers(await figure.screenshot(), 'a room'), { timeout: drawingTimeout }).toBe(true);
+
+		const green = buildRoomGlb({ look: 'textured', images: [buildImagePng(4, 2, [30, 200, 40, 255])] });
+		await page.locator('#room-picker').setInputFiles({ name: 'green.glb', mimeType: 'model/gltf-binary', buffer: Buffer.from(green) });
+		await expect.poll(async () => differingPixels(page, synthetic, await figure.screenshot(), roomArea), { timeout: drawingTimeout }).toBeGreaterThan(wavedPixels);
+		await page.locator('#room-picker').setInputFiles({ name: 'not-glb.txt', mimeType: 'text/plain', buffer: Buffer.from('plain text') });
+		await expect.poll(async () => roomDiffers(await figure.screenshot(), 'none'), { timeout: drawingTimeout }).toBe(true);
+
 		expect(requests).toEqual([]);
 		await expectTwoDrawings(page);
 		await expectNoViolations(page, pageErrors);
