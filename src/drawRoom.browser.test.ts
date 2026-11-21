@@ -271,6 +271,18 @@ describe('mount with a room', { timeout: 60_000 }, () => {
 		expect(parses).toHaveLength(2);
 	});
 
+	it('drops a value whose reads throw, and leaves the room as it is', async () => {
+		const { canvas, handle, parses } = await mountHolding({ room: roomOf(green) });
+		await parses[0]!.finish();
+		const { proxy, revoke } = Proxy.revocable(new Uint8Array(4), {});
+		revoke();
+
+		expect(() => handle.room(proxy)).not.toThrow();
+
+		await expectEdge(canvas, isGreen);
+		expect(parses).toHaveLength(1);
+	});
+
 	it('changes nothing for the same bytes as the latest call', async () => {
 		const bytes = roomOf(green);
 		const { handle, parses } = await mountHolding({ room: bytes });
