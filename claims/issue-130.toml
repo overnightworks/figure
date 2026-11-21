@@ -1,5 +1,5 @@
 claim_id = "2418453698cb44d5bfbc6055be1f00ff"
-agent = "Claude b0333a20-4c93-4cf9-ac20-11d95bf22d61"
+agent = "Claude c03cdd95-6821-4cef-9449-1338b3a44f56"
 role = "builder"
 base = "0333dd615401d9319c3e85dff3ac073253c9f305"
 branch = "claude/issue-130-m11-the-room-is-drawn"
