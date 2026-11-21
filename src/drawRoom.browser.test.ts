@@ -271,6 +271,16 @@ describe('mount with a room', { timeout: 60_000 }, () => {
 		expect(parses).toHaveLength(0);
 	});
 
+	it('ignores a call after the figure ended', async () => {
+		watch.end();
+		watch = startFigureWatch(true);
+		const { handle, parses } = await mountHolding();
+		await vi.waitFor(() => expect(handle.signal).toBe(figureSignal.slow), { timeout: 15000 });
+
+		expect(() => handle.room(roomOf(green))).not.toThrow();
+		expect(parses).toHaveLength(0);
+	});
+
 	it('ignores a value that is neither bytes nor null and leaves the room and a running load as they are', async () => {
 		const { canvas, handle, parses } = await mountHolding({ room: roomOf(green) });
 		await parses[0]!.finish();
