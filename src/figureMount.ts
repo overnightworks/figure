@@ -285,12 +285,21 @@ function createRoomAdoption(load: RoomLoad, show: (room: Object3D | null) => voi
 		show(room);
 	};
 	return (value) => {
-		if (isOver() || value === latest || (value !== null && !(value instanceof Uint8Array))) return;
+		if (isOver() || value === latest || !isRoomValue(value)) return;
 		latest = value;
 		const call = ++calls;
 		if (value === null) show(null);
 		else void adopt(value, call);
 	};
+}
+
+/** Whether a value is a room's bytes or the none, judged without ending the figure when its reads throw, as a revoked proxy's do. */
+function isRoomValue(value: unknown): value is Uint8Array | null {
+	try {
+		return value === null || value instanceof Uint8Array;
+	} catch {
+		return false;
+	}
 }
 
 /** The room the mount option names, or undefined for an option that cannot be read. */
@@ -345,12 +354,6 @@ export async function mountWithLoads(loads: Loads, canvas: HTMLCanvasElement, by
 		speak,
 		gesture,
 		frame,
-		room(bytes) {
-			try {
-				adoptRoom(bytes);
-			} catch {
-				// A value the figure cannot read is dropped, like any other it does not know.
-			}
-		}
+		room: adoptRoom
 	};
 }

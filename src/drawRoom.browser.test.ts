@@ -283,6 +283,16 @@ describe('mount with a room', { timeout: 60_000 }, () => {
 		expect(parses).toHaveLength(1);
 	});
 
+	it('still draws the figure and hands out its handle when the room option is a value whose reads throw', async () => {
+		const { proxy, revoke } = Proxy.revocable(new Uint8Array(4), {});
+		revoke();
+		const { handle, parses } = await mountHolding({ room: proxy as unknown as Uint8Array });
+
+		expect(handle.signal).toBe(figureSignal.drawn);
+		expect(parses).toHaveLength(0);
+		expect(() => handle.dispose()).not.toThrow();
+	});
+
 	it('changes nothing for the same bytes as the latest call', async () => {
 		const bytes = roomOf(green);
 		const { handle, parses } = await mountHolding({ room: bytes });
