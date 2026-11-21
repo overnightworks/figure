@@ -1,0 +1,7 @@
+claim_id = "e86559112910422eb0d618a0e4c56d9d"
+agent = "Claude b0333a20-4c93-4cf9-ac20-11d95bf22d61"
+role = "builder"
+base = "a32eca573326bc625d78bf37187ee878070e3a94"
+branch = "claude/issue-128-release-0-9-0-carries-the-four-framings"
+scope = ["README.md", "package.json"]
+opened_commit = "e2d101098d191122b253dc4a7ab2d9056083b9a6"
