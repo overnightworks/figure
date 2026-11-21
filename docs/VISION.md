@@ -10,7 +10,9 @@ behaves the same wherever an agent appears, and no app builds its own.
 A figure lives. It breathes, blinks and glances around when idle, turns toward
 whoever is speaking when it listens, shows that it works when it thinks,
 speaks with a real mouth shape per sound and a mood the agent chooses, and
-gestures on its agent's choice, starting with a neutral wave. figure
+gestures on its agent's choice, starting with a neutral wave. It is seen in its
+agent's own room, which the agent can change or leave during a call; with no
+room it stands on the transparent canvas. figure
 also owns the fleet's profile for a figure file, and a check that tells whether
 a file meets it.
 
@@ -26,7 +28,7 @@ a file meets it.
 
 ## What it is not
 
-- Not a maker of figures: it generates none, and a figure file arrives ready.
+- Not a maker of figures or rooms: it generates none, and a figure file and a room arrive ready, a room by hand from its agent's author.
 - Not a voice: it speaks nothing and owns no voices. It only reads the audio it
   is handed.
 - Not video: it draws in each browser and sends no stream. An agent's live

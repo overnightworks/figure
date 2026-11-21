@@ -12,6 +12,10 @@ export interface MountOptions {
 	readonly gestures?: Readonly<Partial<Record<FigureGesture, Uint8Array>>>;
 	/** How the figure is seen in its first frame, which is drawn in it with no ease: a late joiner mounts straight into the framing the call is in. A value that is no `FigureFraming` is `shoulders`, the default. The option is read once, at mount; `FigureHandle.frame` changes the framing after that. */
 	readonly framing?: FigureFraming;
+	/**
+	 * The agent's own room: the bytes of one static GLB that `checkRoom` passes, the same check as `figure check --as room`. The figure is drawn first and `mount` does not wait for the room: it is judged by `checkRoom`, then parsed, and appears in the frame after it has parsed, behind the figure in every framing. A room that is refused or fails to load leaves the transparent canvas; the figure lives on, with no signal and nothing thrown. The room is read once, at mount; `FigureHandle.room` replaces or removes it after that.
+	 */
+	readonly room?: Uint8Array;
 }
 
 export interface FigureHandle {
@@ -35,4 +39,8 @@ export interface FigureHandle {
 	 * The agent changes how it is seen, from its face to its whole body: the camera eases to `name` in about 0.6 s from the next drawn frame, and a call during a change continues from the picture it is in. It returns nothing, gives no signal and reports no completion, and it never throws. A value that is no `FigureFraming` is dropped, and so is a call for the framing the figure is in. A framing is a state, not a moment: a call made while the page is hidden or the canvas is out of the viewport is kept, and the first frame drawn after both are back shows it with no ease. Under reduced motion, which is read each frame, the change is a cut. A figure that ended or was disposed ignores the call.
 	 */
 	frame(name: FigureFraming): void;
+	/**
+	 * The agent changes its room, or leaves it: `bytes` replace the room, null removes it. The room is judged by `checkRoom` and parsed as `MountOptions.room` says. The last call wins: a load an earlier call started is dropped and freed when it ends, and `room(null)` removes the room at once and cancels a load. The room on screen stays until its replacement has parsed and then changes in one frame, with no fade; a replacement that is refused or fails to load leaves none. The room is a state, not a moment: a call made while the page is hidden or the canvas is out of the viewport is kept and shows when drawing resumes, and a room stays under reduced motion. It returns nothing, gives no signal and reports no completion, and it never throws. A value that is neither bytes nor null is dropped and leaves the room and a load as they are, and so are the bytes of the last call again. A figure that ended or was disposed ignores the call; a room still loading when it is disposed is freed when it has parsed.
+	 */
+	room(bytes: Uint8Array | null): void;
 }

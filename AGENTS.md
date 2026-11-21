@@ -12,7 +12,7 @@
 - `node scripts/measure_budget_figure.mjs`: after `pnpm run build`, measures a synthetic figure, a clip and a room at the profiles' budgets in headless Chromium; it runs itself through `probe-run` and its memory cap, so run it directly and beside no other browser proof, which would skew the frame interval. A budget changes only on such a measurement.
 - `scripts/run_consumer_check.sh`: builds the package and the packed consumer first, then runs the browser layer (`pnpm run test:consumer`) through the fleet's `probe-run`, which wraps only the drive.
 - `scripts/run_browser_tests.sh <file>`: the named vitest files, whose browser project runs headless Chromium, through `probe-run` with one worker. The full suite and the coverage run (`pnpm run test:coverage`, the merged `lcov.info`) run in CI, not locally. Needs `pnpm exec playwright install chromium` once; never in watch or UI mode.
-- `pnpm run stage`: builds and serves the demo stage on 127.0.0.1:4173 under the script policy, where a figure mounts at 390 and 1280 px, with file inputs for another figure and a clip.
+- `pnpm run stage`: builds and serves the demo stage on 127.0.0.1:4173 under the script policy, where a figure mounts at 390 and 1280 px, with a room toggle and file inputs for another figure, a clip and a room.
 - Release: dispatch `.github/workflows/release.yml` with the version, which must equal `package.json`'s, once the commit's review and CI are green (quality's `docs/release.md`).
 - `quality check`: the shared static check. Run it at the release `.github/workflows/ci.yml` pins, after `git add` (it reads the index).
 

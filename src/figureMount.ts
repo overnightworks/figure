@@ -1,6 +1,6 @@
-import { WebGLRenderer } from 'three';
+import { WebGLRenderer, type Object3D } from 'three';
 import { VRMUtils, type VRM } from '@pixiv/three-vrm';
-import { checkClip, checkFigure } from './check.js';
+import { checkClip, checkFigure, checkRoom } from './check.js';
 import { createFigureStage, type FigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
 import type { FigureMood } from './expressions.js';
@@ -19,6 +19,15 @@ type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood } | nul
 /** Parses the bytes of a clip that passed `checkClip`. */
 export type ClipLoad = (bytes: Uint8Array) => Promise<LoadedClip>;
 
+/** Parses the bytes of a room that passed `checkRoom`. */
+export type RoomLoad = (bytes: Uint8Array) => Promise<Object3D>;
+
+/** The parses a mount hands bytes to. */
+export interface Loads {
+	readonly clip: ClipLoad;
+	readonly room: RoomLoad;
+}
+
 /** What the mount's work gave: the signal, what to free when the app is done with it, and how the facts the host reports reach the figure. */
 interface Outcome {
 	readonly signal: FigureSignal;
@@ -29,12 +38,13 @@ interface Outcome {
 	readonly gesture: (name: unknown) => void;
 	readonly frame: (name: unknown) => void;
 	readonly replaceClip: (name: FigureGesture, clip: LoadedClip) => void;
+	readonly showRoom: (room: Object3D | null) => void;
 }
 
 /** The facts of a figure that is not drawn: nothing reads them. */
 const ignoreFacts = () => {};
 
-const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts, gesture: ignoreFacts, frame: ignoreFacts, replaceClip: ignoreFacts };
+const endedFacts = { think: ignoreFacts, listen: ignoreFacts, speak: ignoreFacts, gesture: ignoreFacts, frame: ignoreFacts, replaceClip: ignoreFacts, showRoom: ignoreFacts };
 
 function ended(signal: FigureSignal): Outcome {
 	return { signal, release: () => {}, ...endedFacts };
@@ -190,8 +200,10 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, framing: Figu
 	const renderer = opened;
 	let vrm: VRM | undefined;
 	let loop: Loop | undefined;
+	let stage: FigureStage | undefined;
 	const release = () => {
 		loop?.stop();
+		stage?.showRoom(null);
 		if (vrm !== undefined) VRMUtils.deepDispose(vrm.scene);
 		renderer.dispose();
 		renderer.forceContextLoss();
@@ -201,9 +213,20 @@ async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, framing: Figu
 		const figure = vrm;
 		// A loss during the load fired its event before the loop listens for it, so the state is read here.
 		if (renderer.getContext().isContextLost()) return { signal: figureSignal.lost, release, ...endedFacts };
-		const stage = createFigureStage(renderer, canvas, figure, framing);
-		loop = runLoop(stage, canvas, give);
-		return { signal: figureSignal.drawn, release, think: loop.think, listen: loop.listen, speak: loop.speak, gesture: loop.gesture, frame: loop.frame, replaceClip: stage.gestures.replace };
+		const drawn = createFigureStage(renderer, canvas, figure, framing);
+		stage = drawn;
+		loop = runLoop(drawn, canvas, give);
+		return {
+			signal: figureSignal.drawn,
+			release,
+			think: loop.think,
+			listen: loop.listen,
+			speak: loop.speak,
+			gesture: loop.gesture,
+			frame: loop.frame,
+			replaceClip: drawn.gestures.replace,
+			showRoom: drawn.showRoom
+		};
 	} catch {
 		release();
 		return ended(figureSignal.refused);
@@ -238,6 +261,56 @@ async function adoptClips(
 	}
 }
 
+/**
+ * The room the figure shows is the result of the last call the returned function got: bytes that pass `checkRoom` and `load` shows
+ * through `show` once they have parsed, none for bytes that fail the check or the load, and none for null, which also cancels a load.
+ * A room stays until its replacement has parsed. A load an earlier call started, one that ends when `isOver`, and one that fails
+ * show nothing, and what they parsed is freed; the stage frees a room it replaces or removes. A value that is neither bytes nor null,
+ * and the bytes of the last call again, change nothing.
+ */
+function createRoomAdoption(load: RoomLoad, show: (room: Object3D | null) => void, isOver: () => boolean): (value: unknown) => void {
+	let calls = 0;
+	let latest: Uint8Array | null | undefined;
+	const adopt = async (bytes: Uint8Array, call: number) => {
+		let room: Object3D | null = null;
+		try {
+			if (checkRoom(bytes).length === 0) room = await load(bytes);
+		} catch {
+			// A room that cannot be judged or loaded leaves none.
+		}
+		if (call !== calls || isOver()) {
+			if (room !== null) VRMUtils.deepDispose(room);
+			return;
+		}
+		show(room);
+	};
+	return (value) => {
+		if (isOver() || value === latest || !isRoomValue(value)) return;
+		latest = value;
+		const call = ++calls;
+		if (value === null) show(null);
+		else void adopt(value, call);
+	};
+}
+
+/** Whether a value is a room's bytes or the none, judged without ending the figure when its reads throw, as a revoked proxy's do. */
+function isRoomValue(value: unknown): value is Uint8Array | null {
+	try {
+		return value === null || value instanceof Uint8Array;
+	} catch {
+		return false;
+	}
+}
+
+/** The room the mount option names, or undefined for an option that cannot be read. */
+function startingRoom(options: MountOptions | undefined): unknown {
+	try {
+		return options?.room;
+	} catch {
+		return undefined;
+	}
+}
+
 /** The framing the figure's first frame is drawn in: the option's, or the default for a value that is no framing or an option that cannot be read. */
 function startingFraming(options: MountOptions | undefined): FigureFraming {
 	try {
@@ -248,8 +321,8 @@ function startingFraming(options: MountOptions | undefined): FigureFraming {
 	}
 }
 
-/** What `mount` does, with `load` as the parse of a clip's bytes: the seam through which a test controls when a clip parse ends and how. */
-export async function mountWithClipLoad(load: ClipLoad, canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
+/** What `mount` does, with `loads` as the parse of a clip's and a room's bytes: the seam through which a test controls when a parse ends and how. */
+export async function mountWithLoads(loads: Loads, canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
 	let current: FigureSignal = figureSignal.refused;
 	const give = (signal: FigureSignal) => {
 		current = signal;
@@ -259,10 +332,14 @@ export async function mountWithClipLoad(load: ClipLoad, canvas: HTMLCanvasElemen
 			reportError(error);
 		}
 	};
-	const { signal, release, think, listen, speak, gesture, frame, replaceClip } = await start(canvas, bytes, startingFraming(options), give).catch(() => ended(figureSignal.refused));
+	const { signal, release, think, listen, speak, gesture, frame, replaceClip, showRoom } = await start(canvas, bytes, startingFraming(options), give).catch(() => ended(figureSignal.refused));
 	give(signal);
 	let disposed = false;
-	if (signal === figureSignal.drawn) void adoptClips(load, options, replaceClip, () => disposed);
+	const adoptRoom = createRoomAdoption(loads.room, showRoom, () => disposed || current !== figureSignal.drawn);
+	if (signal === figureSignal.drawn) {
+		void adoptClips(loads.clip, options, replaceClip, () => disposed);
+		adoptRoom(startingRoom(options));
+	}
 	return {
 		get signal() {
 			return current;
@@ -276,6 +353,7 @@ export async function mountWithClipLoad(load: ClipLoad, canvas: HTMLCanvasElemen
 		listen,
 		speak,
 		gesture,
-		frame
+		frame,
+		room: adoptRoom
 	};
 }

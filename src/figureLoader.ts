@@ -1,5 +1,5 @@
 import { FileLoader, Texture, TextureLoader, type LoadingManager } from 'three';
-import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMExpressionOverrideType, VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRM } from '@pixiv/three-vrm';
 import { figureMood } from './expressions.js';
 
@@ -76,18 +76,27 @@ function letMoodsKeepTheMouth(vrm: VRM): void {
 	for (const mood of Object.values(figureMood)) vrm.expressionManager!.getExpression(mood)!.overrideMouth = VRMExpressionOverrideType.None;
 }
 
-/** Parses the bytes into a VRM, its moods letting the mouth move; rejects when the loader refuses them or any texture fails, which three itself swallows. */
-export async function loadFigure(bytes: Uint8Array): Promise<VRM> {
+/**
+ * Parses the bytes of a GLB with the refusing plugins, `extend` registering the ones its caller adds; rejects when the loader
+ * refuses the bytes or any texture fails, which three itself swallows, and then frees what was parsed.
+ */
+export async function parseGlbRefusingTextureFailures(bytes: Uint8Array, extend: (loader: GLTFLoader) => void = () => {}): Promise<GLTF> {
 	let textureFailed = false;
 	const loader = new GLTFLoader();
 	registerRefusingPlugins(loader, () => (textureFailed = true));
-	loader.register(loaderPluginFor);
+	extend(loader);
 	const gltf = await loader.parseAsync(bytes.slice().buffer, '');
-	const vrm = gltf.userData.vrm as VRM;
 	if (textureFailed) {
-		VRMUtils.deepDispose(vrm.scene);
+		VRMUtils.deepDispose(gltf.scene);
 		throw new Error('a texture failed to load');
 	}
+	return gltf;
+}
+
+/** Parses the bytes into a VRM, its moods letting the mouth move; rejects when the loader refuses them or any texture fails. */
+export async function loadFigure(bytes: Uint8Array): Promise<VRM> {
+	const gltf = await parseGlbRefusingTextureFailures(bytes, (loader) => loader.register(loaderPluginFor));
+	const vrm = gltf.userData.vrm as VRM;
 	letMoodsKeepTheMouth(vrm);
 	return vrm;
 }

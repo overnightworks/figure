@@ -5,7 +5,7 @@ The fleet's VRM 1.0 profile as a check: the framework-free TypeScript ESM packag
 figure ships three things. The check, `figure check <file>` and `checkFigure(bytes)`, tells whether a figure file meets the
 profile's container, VRM and budget rules; its siblings judge a gesture clip (`--as clip`, `checkClip`) and a persona's room,
 one static GLB of unlit materials (`--as room`, `checkRoom`). The drawing, `mount` from `overnightworks-figure/draw`, draws a
-figure that passes into an app's canvas and lets the app drive it: idle motion, thinking, listening, waving and speaking.
+figure that passes into an app's canvas and lets the app drive it: idle motion, thinking, listening, waving and speaking, and the agent's own room behind it.
 `overnightworks-figure/vocabulary.json` lists the gesture, framing and mood names for a consumer that does not run TypeScript.
 Why figure exists and what it is not: [docs/VISION.md](docs/VISION.md). Its parts: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -43,13 +43,13 @@ export async function showFigure(canvas: HTMLCanvasElement, figureUrl: string, s
 ```
 
 `mount` never rejects, and the first signal has reached `onSignal` before it resolves. The returned `FigureHandle` has
-`signal`, `dispose()`, `think(working)`, `listen(speaker)`, `speak(sentence)`, `gesture(name)` and `frame(name)`; the app reports facts
+`signal`, `dispose()`, `think(working)`, `listen(speaker)`, `speak(sentence)`, `gesture(name)`, `frame(name)` and `room(bytes)`; the app reports facts
 and the figure decides its motion. Each method's behaviour, including its edge cases, is the doc comment of
 `FigureHandle` in `src/mountOptions.ts`, which ships in the package's types, as does `MountOptions`, whose `gestures`
 option takes a persona's own `.vrma` clip for a key of `figureGesture` (`wave` today). The gesture names are the keys of
 `figureGesture`, exported from the package root; the `framing` option and `frame(name)` take a key of `figureFraming`
 (`face`, `shoulders`, `upperBody`, `fullBody`; `shoulders` is the default), which the figure eases to during a call and cuts to under
-reduced motion; the moods are the `FigureMood` type from `overnightworks-figure/draw` and the `moods` of `vocabulary.json`.
+reduced motion; the `room` option and `room(bytes)` take a room's bytes, or null to remove it (see below); the moods are the `FigureMood` type from `overnightworks-figure/draw` and the `moods` of `vocabulary.json`.
 
 | Signal | Means | The app |
 |---|---|---|
@@ -125,9 +125,14 @@ headless Chromium (`scripts/measure_budget_figure.mjs`).
   Its budgets are provisional until a room is drawn on a phone.
 - A room follows a convention the check does not judge: metres, +Y up, the floor at y = 0, the figure at the origin facing
   +Z, and the side toward the camera open or back-face culled. A room that breaks it shows wrongly and corrupts nothing.
+  The camera stands in front of the figure and sees 20 m at most, so nothing of a room deeper than that shows.
+- A room is drawn behind the figure in all four framings and does not change them. `mount` does not wait for it: the
+  figure is `drawn` first, and the room is judged by `checkRoom`, parsed and shown in the frame after. `room(bytes)` replaces
+  it during a call, as a cut once the new one has parsed, and `room(null)` removes it. A room that is refused or fails to load
+  leaves the transparent canvas and gives no signal; the last call wins. A room is static and stays under reduced motion.
 
 ## Develop
 
 `pnpm run check` type-checks, `pnpm exec vitest run <file>` runs one test file (build first), and `quality check` runs the
 shared static check. `pnpm run stage` serves a demo page on localhost, where a figure mounts at 390 and 1280 px, waves on
-a button and plays a clip picked from a file for the wave. [AGENTS.md](AGENTS.md) lists the commands and rules for agents.
+a button, plays a clip picked from a file for the wave and shows a room, a synthetic one or one picked from a file. [AGENTS.md](AGENTS.md) lists the commands and rules for agents.

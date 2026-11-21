@@ -77,6 +77,12 @@ export function mouthDepthBelowNose(spots: Record<FaceFeature, Spot[]>): number 
 	return Math.max(...mouthPixels(spots).map(({ y }) => y)) - centreOf(spots.nose).y;
 }
 
+/** The RGBA of the pixel `fromLeft` columns from the left and `fromTop` rows from the top of a drawing buffer read from the bottom row up. */
+export function pixelAt(pixels: Uint8Array, width: number, height: number, fromLeft: number, fromTop: number): readonly [number, number, number, number] {
+	const offset = 4 * ((height - 1 - fromTop) * width + fromLeft);
+	return [pixels[offset]!, pixels[offset + 1]!, pixels[offset + 2]!, pixels[offset + 3]!];
+}
+
 /** Whether the pixels hold any the figure covers: a buffer nothing was drawn into is transparent everywhere. */
 export function coversSomething(pixels: Uint8Array): boolean {
 	return pixels.some((value, index) => index % 4 === 3 && value > 0);

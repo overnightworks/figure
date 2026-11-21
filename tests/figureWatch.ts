@@ -1,7 +1,9 @@
 // What the browser tests share to watch drawn figures: mounting on canvases, reading each canvas in the task that drew it, and ending the figures.
 import { expect, vi } from 'vitest';
 import { mount, type FigureHandle, type MountOptions } from '../src/draw.js';
-import { mountWithClipLoad, type ClipLoad } from '../src/figureMount.js';
+import { loadClip } from '../src/clipLoader.js';
+import { mountWithLoads, type ClipLoad, type RoomLoad } from '../src/figureMount.js';
+import { loadRoom } from '../src/roomLoader.js';
 import { buildConformantVrm } from './figureFixtures.js';
 import { slowMedianMilliseconds } from '../src/frameTimeGuard.js';
 import { coversSomething, readPixels, spotsOf, type FaceFeature, type Spot } from './browserCanvas.js';
@@ -15,6 +17,13 @@ const slowFrameMilliseconds = 60;
 /** The most a frame the watch hands to a figure lasts unless it makes the frames slow: not past the median the frame-time guard keeps, so a slow runner never ends the figure under test. */
 const longestKeptFrameMilliseconds = slowMedianMilliseconds;
 
+/** The drawing buffer of a frame as RGBA bytes, read from the bottom row up. */
+export interface Picture {
+	readonly width: number;
+	readonly height: number;
+	readonly pixels: Uint8Array;
+}
+
 /** A figure the watch mounted, with the canvas it is drawn on. */
 export interface WatchedFigure {
 	readonly canvas: HTMLCanvasElement;
@@ -22,8 +31,10 @@ export interface WatchedFigure {
 }
 
 export interface FigureWatch {
-	/** Mounts a 200 by 250 pixel canvas into the page and draws the figure of `bytes` on it, with the mount `options`; with `load` the parse of a clip's bytes is `load`, otherwise it is figure's own. */
-	mountFigure(bytes?: Uint8Array, options?: MountOptions, load?: ClipLoad): Promise<WatchedFigure>;
+	/** Mounts a 200 by 250 pixel canvas into the page and draws the figure of `bytes` on it, with the mount `options`; with `load` the parse of a clip's bytes is `load` and with `loadRoomBytes` the parse of a room's, otherwise they are figure's own. */
+	mountFigure(bytes?: Uint8Array, options?: MountOptions, load?: ClipLoad, loadRoomBytes?: RoomLoad): Promise<WatchedFigure>;
+	/** The picture the first frame drawn after this call shows on `canvas`, with no frames waited for beyond it. */
+	pictureOfNextFrame(canvas: HTMLCanvasElement): Promise<Picture>;
 	/** The face features of the next picture `canvas` shows after the frames the watch has seen by now, read in the task that drew it. */
 	featuresNow(canvas: HTMLCanvasElement): Promise<Record<FaceFeature, Spot[]>>;
 	/** The face features of the picture the first frame drawn after this call shows on `canvas`, with no frames waited for beyond it. */
@@ -56,13 +67,15 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 	}
 
 	return {
-		async mountFigure(bytes = buildConformantVrm(), options, load) {
+		async mountFigure(bytes = buildConformantVrm(), options, load, loadRoomBytes) {
 			const canvas = document.createElement('canvas');
 			canvas.style.width = '200px';
 			canvas.style.height = '250px';
 			document.body.append(canvas);
 			canvases.push(canvas);
-			const handle = await (load === undefined ? mount(canvas, bytes, options) : mountWithClipLoad(load, canvas, bytes, options));
+			const handle = await (load === undefined && loadRoomBytes === undefined
+				? mount(canvas, bytes, options)
+				: mountWithLoads({ clip: load ?? loadClip, room: loadRoomBytes ?? loadRoom }, canvas, bytes, options));
 			// The figure draws once before `mount` returns; the buffer still holds that first frame in the task that drew it.
 			readIfDrawn(canvas);
 			handles.push(handle);
@@ -74,10 +87,13 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 			const picture = shown.get(canvas)!;
 			return spotsOf(picture.pixels, picture.width, picture.height);
 		},
-		async featuresOfNextFrame(canvas) {
+		async pictureOfNextFrame(canvas) {
 			// The figure's own frame request is older than this one, so its frame draws and is read before this callback runs.
 			await new Promise<void>((resolve) => requestFrameOwn.call(window, () => resolve()));
-			const picture = shown.get(canvas)!;
+			return shown.get(canvas)!;
+		},
+		async featuresOfNextFrame(canvas) {
+			const picture = await this.pictureOfNextFrame(canvas);
 			return spotsOf(picture.pixels, picture.width, picture.height);
 		},
 		end() {

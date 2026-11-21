@@ -1,5 +1,5 @@
 import { AmbientLight, DirectionalLight, PerspectiveCamera, Quaternion, Scene, Vector3, type Object3D, type WebGLRenderer } from 'three';
-import type { VRM } from '@pixiv/three-vrm';
+import { VRMUtils, type VRM } from '@pixiv/three-vrm';
 import { figureMood } from './expressions.js';
 import { easeExtents, extentsOf, fieldOfViewDegrees, placeCamera, type Extents } from './framingCamera.js';
 import type { FigureFraming } from './framings.js';
@@ -70,6 +70,8 @@ function startSpringBonesAtPose(vrm: VRM): void {
 export interface FigureStage {
 	/** The layer of gestures the stage draws, whose clips a loaded clip replaces. */
 	readonly gestures: GestureLayer;
+	/** Shows `room` in the scene behind the figure, in the next frame drawn, and frees the room it replaces; null removes the room. The stage owns the room it holds: whoever hands one over does not free it. */
+	showRoom(room: Object3D | null): void;
 	/** Sets the picture to show `framing`: the camera eases toward it in the frames `draw` is told to glide in, and is there at once in the others. */
 	frame(framing: FigureFraming): void;
 	/**
@@ -110,8 +112,17 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 	let target: Extents = extentsOf(framing, eyesAboveFeet);
 	let shown = target;
 	let posed = false;
+	let room: Object3D | null = null;
 	return {
 		gestures,
+		showRoom(next) {
+			if (room !== null) {
+				scene.remove(room);
+				VRMUtils.deepDispose(room);
+			}
+			room = next;
+			if (next !== null) scene.add(next);
+		},
 		frame(next) {
 			target = extentsOf(next, eyesAboveFeet);
 		},
