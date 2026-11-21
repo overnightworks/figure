@@ -3,6 +3,6 @@ agent = "Claude c03cdd95-6821-4cef-9449-1338b3a44f56"
 role = "builder"
 base = "0333dd615401d9319c3e85dff3ac073253c9f305"
 branch = "claude/issue-130-m11-the-room-is-drawn"
-scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "docs/VISION.md", "scripts/measure_budget_figure.mjs", "src/draw.ts", "src/drawRoom.browser.test.ts", "src/figureFrame.ts", "src/figureLoader.ts", "src/figureMount.ts", "src/framingCamera.ts", "src/mountOptions.ts", "src/roomLoader.browser.test.ts", "src/roomLoader.ts", "tests/browserCanvas.ts", "tests/e2e/stage.spec.ts", "tests/figureWatch.ts", "tests/stage/index.html", "tests/stage/main.ts"]
+scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "docs/VISION.md", "scripts/measure_budget_figure.mjs", "src/draw.ts", "src/drawFraming.browser.test.ts", "src/drawRoom.browser.test.ts", "src/figureFrame.ts", "src/figureLoader.ts", "src/figureMount.ts", "src/framingCamera.ts", "src/mountOptions.ts", "src/roomLoader.browser.test.ts", "src/roomLoader.ts", "tests/browserCanvas.ts", "tests/e2e/stage.spec.ts", "tests/figureWatch.ts", "tests/stage/index.html", "tests/stage/main.ts"]
 opened_commit = "5f83ed6dbaa97d7e4a3a9c8ab2d861fcf34da26e"
 whole_reason = "One room load with its option, handle method, stage control and the places that describe it, which a consumer reads together."
