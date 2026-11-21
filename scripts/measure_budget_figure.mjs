@@ -18,7 +18,9 @@
 // script refuses unless checkRoom passes it. The report gives the parse in the page through three's GLTFLoader with the package's
 // refusing plugins (the time to parsed and the longest main-thread task after it began), what the parse built, and the room's computed
 // GPU memory by part (its textures with their mip chains, its vertex and index buffers once for each mesh) alone and summed with the
-// budget figure's. No room is drawn here, so its frame interval waits for the room loader.
+// budget figure's. It then mounts the conformant figure (as for the clip) with the room: the report gives the frame interval without
+// a room and with the room parsed and drawn, and whether `slow` came. The room's strips are sub-pixel thin, so what it adds to a frame is
+// its vertex and texture work, not covered pixels.
 // Usage: pnpm run build && node scripts/measure_budget_figure.mjs; needs `pnpm exec playwright install chromium` once.
 // It runs itself through the fleet's probe-run, which starts it once the machine's load leaves room, inside a 4 GiB memory cap;
 // a frame interval measured beside another browser proof is not the figure's own, so run it alone. It fetches nothing, serves
@@ -285,9 +287,9 @@ window.measureClip = async (frames, parseWatchSeconds, pictureSecondsAfterGestur
 };
 `;
 
-/** The page's third function, appended to the others: it parses the room as the package's loaders parse a file and reports what the parse built. */
+/** The page's third function, appended to the others: it parses the room as the package's loaders parse a file, reports what the parse built, and measures the conformant figure with the room drawn. */
 const pageRoomScript = `
-window.measureRoom = async (watchSeconds) => {
+window.measureRoom = async (frames, watchSeconds) => {
 	const bytes = new Uint8Array(await (await fetch('/room.glb')).arrayBuffer());
 	document.body.style.margin = '0';
 	const longTasks = [];
@@ -308,7 +310,34 @@ window.measureRoom = async (watchSeconds) => {
 		triangles += (object.geometry.index === null ? object.geometry.attributes.position.count : object.geometry.index.count) / 3;
 		if (object.material.isMeshBasicMaterial) unlitMeshes++;
 	});
-	return { parsedMilliseconds, longestTask: Math.max(0, ...longTasks), textureFailed, meshes, triangles, unlitMeshes };
+	const figure = new Uint8Array(await (await fetch('/conformant.vrm')).arrayBuffer());
+	const plainSignals = [];
+	const plainCanvas = newCanvas();
+	const plain = await mount(plainCanvas, figure, { onSignal: (signal) => plainSignals.push(signal) });
+	const without = await intervalsOf(plainCanvas, frames, plainSignals);
+	plain.dispose();
+	plainCanvas.remove();
+
+	const signals = [];
+	const canvas = newCanvas();
+	const handle = await mount(canvas, figure, { room: bytes, onSignal: (signal) => signals.push(signal) });
+	await new Promise((resolve) => setTimeout(resolve, watchSeconds * 1000));
+	await nextFrame();
+	const drawn = await intervalsOf(canvas, frames, signals);
+	handle.dispose();
+	canvas.remove();
+	return {
+		parsedMilliseconds,
+		longestTask: Math.max(0, ...longTasks),
+		textureFailed,
+		meshes,
+		triangles,
+		unlitMeshes,
+		without: without.intervals,
+		withRoom: drawn.intervals,
+		plainSignals,
+		signals
+	};
 };
 `;
 
@@ -445,7 +474,7 @@ async function measureClip(bundleDirectory) {
 
 /** Measures the budget room: the check must pass it, the page parses it, and its computed GPU memory is reported alone and summed with the budget figure's. */
 async function measureRoom(bundleDirectory, figureGpuBytes, maxTextureSize) {
-	const { roomProfile } = await import(join(repositoryRoot, 'dist/profile.js'));
+	const { figureProfile, roomProfile } = await import(join(repositoryRoot, 'dist/profile.js'));
 	const { checkRoom } = await import(join(repositoryRoot, 'dist/check.js'));
 	const room = buildBudgetRoom(roomProfile);
 	const refusals = checkRoom(room.glb);
@@ -453,15 +482,25 @@ async function measureRoom(bundleDirectory, figureGpuBytes, maxTextureSize) {
 		console.error(`the budget room fails the check: ${refusals.map(({ code }) => code).join(' ')}`);
 		return 1;
 	}
-	const measured = await measureInChromium(bundleDirectory, { '/room.glb': room.glb }, (page) => page.evaluate((seconds) => window.measureRoom(seconds), parseWatchSeconds));
+	const measured = await measureInChromium(bundleDirectory, { '/room.glb': room.glb, '/conformant.vrm': buildConformantVrmGlb(figureProfile) },
+		(page) => page.evaluate(([frames, seconds]) => window.measureRoom(frames, seconds), [frameCount, parseWatchSeconds])
+	);
 	console.log(`room: ${room.meshes} meshes of one primitive and ${room.images} images, file ${room.glb.length} bytes (the file budget is ${roomProfile.fileBudgetBytes} and is not filled), check passes`);
 	console.log(`room parse: time to parsed ${milliseconds(measured.parsedMilliseconds)}, longest main-thread task from the start to ${parseWatchSeconds} s after it ${milliseconds(measured.longestTask)}`);
+	console.log(`conformant figure without a room, frame interval: ${describeIntervals(measured.without)}`);
+	console.log(`conformant figure with the room drawn, frame interval: ${describeIntervals(measured.withRoom)}`);
+	console.log(`slow came: ${[...measured.plainSignals, ...measured.signals].includes('slow') ? 'yes' : 'no'}`);
 	console.log(`room parsed into ${measured.meshes} meshes of ${measured.triangles} triangles in total, ${measured.unlitMeshes} with an unlit material`);
 	const roomBytes = reportGpuMemory(gpuMemoryParts(readGlb(room.glb), maxTextureSize));
 	const together = figureGpuBytes + roomBytes;
 	console.log(`gpu memory, budget figure and budget room together: ${megabytes(together)} (${together} bytes)`);
 	if (measured.textureFailed || measured.meshes !== room.meshes || measured.triangles !== roomProfile.maxTriangles || measured.unlitMeshes !== measured.meshes) {
 		console.error(`the room was not parsed as built: texture failed ${measured.textureFailed}, ${measured.meshes} of ${room.meshes} meshes, ${measured.triangles} of ${roomProfile.maxTriangles} triangles, ${measured.unlitMeshes} unlit`);
+		return 1;
+	}
+	const ended = [...measured.plainSignals, ...measured.signals].find((signal) => endingSignals.includes(signal));
+	if (ended !== undefined) {
+		console.error(`the figure with the room ended with ${ended}`);
 		return 1;
 	}
 	return 0;
