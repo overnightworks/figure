@@ -1,0 +1,7 @@
+claim_id = "96d39ff92dca4af6b6b373cfb265ce64"
+agent = "Claude c03cdd95-6821-4cef-9449-1338b3a44f56"
+role = "builder"
+base = "4e465a44fef6892e06333d35de365fc0421582de"
+branch = "claude/issue-132-release-0-10-0-carries-the-agent-s-room"
+scope = ["README.md", "package.json"]
+opened_commit = "274bcf314bf78bfa50f7e775afbdba7637cbaf2d"
