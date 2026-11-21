@@ -3,6 +3,7 @@ import { figureGesture } from '../../src/gestures.js';
 import { figureSignal, mount, type FigureHandle, type FigureMood, type FigureSignal } from '../../src/draw.js';
 import type { MouthShape } from '../../src/expressions.js';
 import { buildConformantVrm } from '../figureFixtures.js';
+import { buildRoomGlb } from '../roomBuilder.js';
 import { syntheticVoice } from '../syntheticVoice.js';
 
 /** The CSS widths the stage mounts at, in pixels: a phone and a desktop. */
@@ -27,6 +28,12 @@ let clipBytes: Uint8Array | undefined;
 
 /** The framing the stage shows: a freshly mounted figure is drawn in it at once. */
 let framing: FigureFraming = defaultFraming;
+
+/** The room the stage shows while it is on: the synthetic one until the visitor picks a file. */
+let roomBytes: Uint8Array = buildRoomGlb();
+
+/** Whether the stage shows its room: a freshly mounted figure is handed it at once. */
+let roomShown = false;
 
 /** Whether the stage reports its agent as thinking: a freshly mounted figure is told at once. */
 let thinking = false;
@@ -80,7 +87,7 @@ async function mountSlot(slot: Slot): Promise<void> {
 	slot.signalText.textContent = 'mounting';
 	slot.mountAgain.hidden = true;
 	const gestures = clipBytes === undefined ? undefined : { [figureGesture.wave]: clipBytes };
-	const handle = await mount(canvas, figureBytes, { gestures, framing, onSignal: (signal) => showSignal(slot, canvas, signal) });
+	const handle = await mount(canvas, figureBytes, { gestures, framing, room: roomShown ? roomBytes : undefined, onSignal: (signal) => showSignal(slot, canvas, signal) });
 	// A mount that resolves after a newer one replaced its canvas is released here, so its context and loop do not leak.
 	if (!slot.mountPoint.contains(canvas)) {
 		handle.dispose();
@@ -89,6 +96,7 @@ async function mountSlot(slot: Slot): Promise<void> {
 	slot.handle = handle;
 	// The mount option is the framing at the call; a choice made while it awaited is told here.
 	handle.frame(framing);
+	handle.room(roomShown ? roomBytes : null);
 	handle.think(thinking);
 	handle.listen(speaker);
 	handle.speak(sentence);
@@ -119,6 +127,8 @@ const framingButtons = document.querySelector<HTMLFieldSetElement>('#framing')!;
 const thinkButton = document.querySelector<HTMLButtonElement>('#think')!;
 const picker = document.querySelector<HTMLInputElement>('#picker')!;
 const clipPicker = document.querySelector<HTMLInputElement>('#clip-picker')!;
+const roomButton = document.querySelector<HTMLButtonElement>('#room')!;
+const roomPicker = document.querySelector<HTMLInputElement>('#room-picker')!;
 const voiceStatus = document.querySelector<HTMLElement>('#voice-status')!;
 const voicePicker = document.querySelector<HTMLInputElement>('#voice-picker')!;
 const moodChoice = document.querySelector<HTMLFieldSetElement>('#mood')!;
@@ -172,6 +182,25 @@ thinkButton.addEventListener('click', () => {
 	thinking = !thinking;
 	thinkButton.setAttribute('aria-pressed', String(thinking));
 	slots.forEach((slot) => slot.handle?.think(thinking));
+});
+
+/** Tells every figure the room the stage shows now, and shows the choice on the button. */
+function showRoomChoice(): void {
+	roomButton.setAttribute('aria-pressed', String(roomShown));
+	slots.forEach((slot) => slot.handle?.room(roomShown ? roomBytes : null));
+}
+
+roomButton.addEventListener('click', () => {
+	roomShown = !roomShown;
+	showRoomChoice();
+});
+
+roomPicker.addEventListener('change', async () => {
+	const picked = roomPicker.files?.[0];
+	if (picked === undefined) return;
+	roomBytes = new Uint8Array(await picked.arrayBuffer());
+	roomShown = true;
+	showRoomChoice();
 });
 
 document.querySelector<HTMLButtonElement>('#wave')!.addEventListener('click', () => {

@@ -113,14 +113,29 @@ describe('a figure seen from its face to its whole body', () => {
 	});
 
 	it('turns back toward the framing of a call made during a change, from the picture it is in', async () => {
+		const wide = await spanMountedIn(figureFraming.fullBody);
 		const { canvas, handle } = await mountDrawing();
 		const near = eyeSpan(await watch.featuresNow(canvas));
+		const halfway = (near + wide) / 2;
 		handle.frame(figureFraming.fullBody);
-		const underway = eyeSpan(await watch.featuresNow(canvas));
+		// Frame by frame, so the picture it is in does not depend on how long the frames last.
+		let underway = near;
+		await vi.waitFor(
+			async () => {
+				underway = eyeSpan(await watch.featuresOfNextFrame(canvas));
+				expect(underway).toBeLessThan(halfway);
+			},
+			{ timeout: arrivalTimeoutMilliseconds, interval: 0 }
+		);
 		handle.frame(figureFraming.face);
-		const turned = eyeSpan(await watch.featuresNow(canvas));
-		expect(underway).toBeLessThan(near - sameFramingPixels);
-		expect(turned).toBeGreaterThan(underway + sameFramingPixels);
+		let turned = underway;
+		await vi.waitFor(
+			async () => {
+				turned = eyeSpan(await watch.featuresOfNextFrame(canvas));
+				expect(turned).toBeGreaterThan(underway + sameFramingPixels);
+			},
+			{ timeout: arrivalTimeoutMilliseconds, interval: 0 }
+		);
 		expect(turned).toBeLessThan(near);
 		await vi.waitFor(async () => expect(eyeSpan(await watch.featuresNow(canvas))).toBeGreaterThan(near + sameFramingPixels), { timeout: arrivalTimeoutMilliseconds });
 	});

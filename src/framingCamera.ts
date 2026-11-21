@@ -10,7 +10,7 @@ export interface Extents {
 	readonly halfWidth: number;
 }
 
-/** The metres a full body shows below the foot bones, until a room gives the figure a floor. */
+/** The metres a full body shows below the foot bones: the camera does not depend on a room, so a room's floor at y = 0 is seen where it lies. */
 const footMargin = 0.05;
 
 /** The `below` of a framing that shows down to the feet, wherever they are. */

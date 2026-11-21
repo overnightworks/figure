@@ -1,5 +1,6 @@
 import { loadClip } from './clipLoader.js';
-import { mountWithClipLoad } from './figureMount.js';
+import { mountWithLoads } from './figureMount.js';
+import { loadRoom } from './roomLoader.js';
 import type { FigureHandle, MountOptions } from './mountOptions.js';
 
 export { figureSignal, type FigureSignal } from './signals.js';
@@ -17,5 +18,5 @@ export type { FigureHandle, MountOptions } from './mountOptions.js';
  * It resolves to a handle holding the first signal, which `onSignal` has had by then. It never rejects: an error `onSignal` throws is reported to the window's error handlers.
  */
 export function mount(canvas: HTMLCanvasElement, bytes: Uint8Array, options?: MountOptions): Promise<FigureHandle> {
-	return mountWithClipLoad(loadClip, canvas, bytes, options);
+	return mountWithLoads({ clip: loadClip, room: loadRoom }, canvas, bytes, options);
 }
