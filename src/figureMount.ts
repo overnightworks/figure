@@ -165,6 +165,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 		stopped = true;
 		speaker = null;
 		voiceTap.follow(undefined);
+		soundMouth.follow(undefined);
 		syncWithPage();
 		document.removeEventListener('visibilitychange', syncWithPage);
 		viewport.disconnect();
@@ -185,6 +186,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 		const speaking = typeof sentence === 'object' && sentence !== null;
 		facts = { ...facts, speaking, mood: speaking ? sentence.mood : undefined };
 		voiceTap.follow(speaking ? sentence.voice : undefined);
+		soundMouth.follow(speaking ? sentence.sounds : undefined);
 	};
 	const gesture = (name: unknown) => {
 		if (!stopped && document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);
