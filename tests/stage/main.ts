@@ -1,10 +1,10 @@
 import { defaultFraming, isFigureFraming, type FigureFraming } from '../../src/framings.js';
 import { figureGesture } from '../../src/gestures.js';
-import { figureSignal, mount, type FigureHandle, type FigureMood, type FigureSignal } from '../../src/draw.js';
+import { figureSignal, mount, type FigureHandle, type FigureMood, type FigureSignal, type SpokenSounds } from '../../src/draw.js';
 import type { MouthShape } from '../../src/expressions.js';
 import { buildConformantVrm } from '../figureFixtures.js';
 import { buildRoomGlb } from '../roomBuilder.js';
-import { syntheticVoice } from '../syntheticVoice.js';
+import { syntheticSequence, syntheticVoice, type SyntheticSequence } from '../syntheticVoice.js';
 
 /** The CSS widths the stage mounts at, in pixels: a phone and a desktop. */
 const cssWidths = [390, 1280];
@@ -48,7 +48,7 @@ const speakerMarkers = new Map<SpeakerChoice, HTMLElement>();
 let speaker: HTMLElement | null = null;
 
 /** What the stage reports its agent as saying: nothing until the visitor starts a sentence. A freshly mounted figure is told at once. */
-type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood } | null;
+type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood; readonly sounds?: SpokenSounds } | null;
 
 let sentence: Sentence = null;
 
@@ -214,15 +214,15 @@ function tell(next: Sentence, status: string): void {
 	slots.forEach((slot) => slot.handle?.speak(sentence));
 }
 
-/** The sentence `voice` speaks in the chosen mood. */
-function sentenceOf(voice?: AudioNode): Sentence {
-	return { ...(voice === undefined ? {} : { voice }), ...(mood === undefined ? {} : { mood }) };
+/** The sentence `voice` speaks in the chosen mood, timed by `sounds` where it has them. */
+function sentenceOf(voice?: AudioNode, sounds?: SpokenSounds): Sentence {
+	return { ...(voice === undefined ? {} : { voice }), ...(sounds === undefined ? {} : { sounds }), ...(mood === undefined ? {} : { mood }) };
 }
 
 moodChoice.addEventListener('change', (event) => {
 	const chosen = (event.target as HTMLInputElement).value;
 	mood = chosen === '' ? undefined : (chosen as FigureMood);
-	if (sentence !== null) tell(sentenceOf(sentence.voice), voiceStatus.textContent ?? '');
+	if (sentence !== null) tell(sentenceOf(sentence.voice, sentence.sounds), voiceStatus.textContent ?? '');
 });
 
 /** The number of the control that took the stage last. */
@@ -304,6 +304,44 @@ voicePicker.addEventListener('change', async () => {
 		player.disconnect();
 	});
 });
+
+/** The sequence's sounds: lips that close on m, b and p between vowels, and `ʘ`, a sound the figure has no shape for, which the voice's own vowel shows. */
+const sequenceSounds = ['m', 'a', 'm', 'a', 'b', 'iː', 'b', 'ʊ', 'p', 'ɔ', 'p', 'ɛ', 'ʘ', 'a'];
+const sequenceSoundSeconds = 0.22;
+/** How long the stall button holds the sequence's position still while its audio goes on, in milliseconds. */
+const stallMilliseconds = 1500;
+
+/** The sequence that speaks now, which the stall button holds. */
+let sequence: SyntheticSequence | undefined;
+
+document.querySelector<HTMLButtonElement>('#speak-sequence')!.addEventListener('click', async () => {
+	const stillMine = takeControl();
+	const { context, speakers } = await runningAudio();
+	if (!stillMine()) return;
+	const vowel = pickedVowel();
+	const speaking = syntheticSequence(
+		context,
+		vowel,
+		sequenceSounds.map((ipa, index) => ({ ipa, start: index * sequenceSoundSeconds, end: (index + 1) * sequenceSoundSeconds }))
+	);
+	speaking.output.connect(speakers);
+	sequence = speaking;
+	replaceSentence(sentenceOf(speaking.output, speaking.sounds), `speaking a sequence over ${vowel} (audio ${context.state})`, () => {
+		sequence = undefined;
+		speaking.stop();
+		speaking.output.disconnect();
+	});
+});
+
+document.querySelector<HTMLButtonElement>('#stall-sequence')!.addEventListener('click', () => {
+	const stalled = sequence;
+	if (stalled === undefined) return;
+	stalled.hold();
+	setTimeout(() => stalled.release(), stallMilliseconds);
+});
+
+document.querySelector<HTMLButtonElement>('#pause-audio')!.addEventListener('click', () => void audio?.context.suspend());
+document.querySelector<HTMLButtonElement>('#resume-audio')!.addEventListener('click', () => void audio?.context.resume());
 
 document.querySelector<HTMLButtonElement>('#speak-without-voice')!.addEventListener('click', () => {
 	takeControl();
