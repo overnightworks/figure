@@ -1,0 +1,7 @@
+claim_id = "b0ce5244302148c98f3097a1767be154"
+agent = "Claude 7b851af9-5109-480c-92be-127320c6ddee"
+role = "builder"
+base = "183928c54efa3439c9f90358327cc4423a7c90f6"
+branch = "docs/vision-stale-facts"
+scope = ["docs/VISION.md"]
+opened_commit = "c1ce6674a70c69b10354080f5ded39763bc6e307"
