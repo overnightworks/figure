@@ -13,16 +13,19 @@ speaks with a real mouth shape per sound and a mood the agent chooses, and
 gestures on its agent's choice, starting with a neutral wave. It is seen in its
 agent's own room, which the agent can change or leave during a call; with no
 room it stands on the transparent canvas. figure
-also owns the fleet's profile for a figure file, and a check that tells whether
-a file meets it.
+also owns the fleet's three profiles, for a figure file, a persona's gesture
+clip and an agent's room, and a check for each that tells whether a file meets
+it.
 
 ## For whom today
 
-- The apps that show an agent: hopin's agent tile and presentator's
-  co-presenter. They take figure, hand it a file and an audio source, and show
-  their own symbol whenever figure says it cannot draw.
-- personas, whose release check runs the profile check on each agent's figure
-  file before the agent ships.
+- The app that shows an agent: hopin's agent tile. It takes figure, hands it a
+  file and an audio source, and shows its own symbol whenever figure says it
+  cannot draw.
+- personas, whose release check runs the profile checks on each agent's figure
+  file and room before the agent ships.
+- agents, which reads figure's vocabulary of gesture, framing and mood names to
+  generate the choices an agent has.
 - Through them, the person in a call who sees the agent as a living figure
   instead of a symbol.
 
