@@ -143,19 +143,21 @@ export interface SoundMouth {
 	/**
 	 * The goal for one drawn frame, or null where the analyser's mouth goes on: no sounds, no clock (a null `voice`, or a read of the position that throws or is not finite),
 	 * a context that does not run, a moment no known sound covers, and the moments past the last sound. While the position stands still though the voice's context has run on, and it
-	 * is not past the last sound, the goal is the still mouth, which the mouth eases to at its ordinary fall.
+	 * is not past the last sound, the goal is the still mouth, which the mouth eases to at its ordinary fall; the rest lasts until the position moves.
 	 */
 	goal(voice: VoiceClock | null): MouthGoal | null;
 }
 
-/** The mouth the sounds drive: the sounds being followed, and the last good read of the position and of the voice's clock, which a stall is told from. */
+/** The mouth the sounds drive: the sounds being followed, the last good read of the position and of the voice's clock, which a stall is told from, and whether the position stands stalled. */
 export function createSoundMouth(): SoundMouth {
 	let followed: Followed | undefined;
 	let baseline: { readonly position: number; readonly seconds: number } | undefined;
+	let stalled = false;
 	return {
 		follow(sounds) {
 			followed = followedOf(sounds);
 			baseline = undefined;
+			stalled = false;
 		},
 		goal(voice) {
 			if (followed === undefined || voice === null) return null;
@@ -164,7 +166,8 @@ export function createSoundMouth(): SoundMouth {
 			const previous = baseline;
 			baseline = { position, seconds: voice.seconds };
 			if (!voice.running) return null;
-			const stalled = previous !== undefined && voice.seconds > previous.seconds && position <= previous.position;
+			if (previous === undefined || position > previous.position) stalled = false;
+			else if (voice.seconds > previous.seconds) stalled = true;
 			if (stalled && position <= followed.end) return stillMouth;
 			return goalAt(followed.spans, position + soundLeadSeconds);
 		}

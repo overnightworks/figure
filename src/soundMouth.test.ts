@@ -200,6 +200,15 @@ describe('the stall of the position while the voice waits', () => {
 		expect(set(0.25, 0.1)?.lipsClosed).not.toBe(true);
 	});
 
+	it('keeps resting through frames where neither the position nor the context\'s clock moves, until the position does', () => {
+		const { set } = following();
+		set(0.25, 1);
+		expect(set(0.25, 1.01)).toEqual(closedLipsFalling);
+		expect(set(0.25, 1.01)).toEqual(closedLipsFalling);
+		expect(set(0.25, 1.01)).toEqual(closedLipsFalling);
+		expect(set(0.25 + 0.016, 1.02)).toBe(mouthGoalOfSound('a'));
+	});
+
 	it('does not rest the mouth when the context\'s clock has not moved either, as two frames inside one audio callback read it', () => {
 		const { set } = following();
 		set(0.25, 0);
