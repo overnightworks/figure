@@ -9,11 +9,11 @@
 - `pnpm exec vitest run <file>`: one Node test file (a `*.browser.test.ts` file runs only through `scripts/run_browser_tests.sh`).
 - `scripts/check_packed_tarball.sh <tarball>`: installs a packed tarball into a temporary directory and runs `figure check [--as clip|room]` from it (on the clips `scripts/write_base_clips.mjs` and the room `scripts/write_conformant_figure.mjs --as room` write); CI and the release build both call it.
 - `node scripts/measure_bundle_size.mjs <tarball>`: prints the gzip size of a consumer bundle that only checks and of one that also mounts, built from a packed tarball; the release build calls it and puts both lines into the notes.
-- `node scripts/measure_budget_figure.mjs`: after `pnpm run build`, measures a synthetic figure, a clip and a room at the profiles' budgets in headless Chromium; it runs itself through `probe-run` and its memory cap, so run it directly and beside no other browser proof, which would skew the frame interval. A budget changes only on such a measurement.
-- `scripts/run_consumer_check.sh`: builds the package and the packed consumer first, then runs the browser layer (`pnpm run test:consumer`) through the fleet's `probe-run`, which wraps only the drive.
-- `scripts/run_browser_tests.sh <file>`: the named vitest files, whose browser project runs headless Chromium, through `probe-run` with one worker. The full suite and the coverage run (`pnpm run test:coverage`, the merged `lcov.info`) run in CI, not locally. Needs `pnpm exec playwright install chromium` once; never in watch or UI mode.
+- `node scripts/measure_budget_figure.mjs`: after `pnpm run build`, measures a synthetic figure, a clip and a room at the profiles' budgets in headless Chromium; it runs itself through `probe-run`, so run it directly, beside no other browser proof (it skews the frame interval). A budget changes only on such a measurement.
+- `scripts/run_consumer_check.sh`: builds the package and the packed consumer, then runs the browser layer (`pnpm run test:consumer`) through `probe-run`, which wraps only the drive.
+- `scripts/run_browser_tests.sh <file>`: the named vitest files, whose browser project runs headless Chromium, through `probe-run` with one worker. The full suite and the coverage run (`pnpm run test:coverage`) run in CI, not locally. Needs `pnpm exec playwright install chromium` once; never in watch or UI mode.
 - `pnpm run stage`: builds and serves the demo stage on 127.0.0.1:4173 under the script policy, where a figure mounts at 390 and 1280 px, with a room toggle and file inputs for another figure, a clip and a room.
-- Release: dispatch `.github/workflows/release.yml` with the version, which must equal `package.json`'s, once the commit's review and CI are green (quality's `docs/release.md`).
+- Release: dispatch `.github/workflows/release.yml` with the version equal to `package.json`'s, once the commit's review and CI are green (quality's `docs/release.md`).
 - `quality check`: the shared static check. Run it at the release `.github/workflows/ci.yml` pins, after `git add` (it reads the index).
 
 ## Rules
@@ -22,6 +22,7 @@
 - A figure signal is a key of `figureSignal` in `src/signals.ts` and nowhere else. `mount` never rejects; a browser-only branch is driven in the browser project, never by a mock of WebGL.
 - A gesture name is a key of `figureGesture` in `src/gestures.ts`, a framing name one of `figureFraming` in `src/framings.ts`, each nowhere else; both import nothing.
 - A refusal code is a key of `refusalDescriptions` in `src/codes.ts` and nowhere else; a new rule adds its key there.
+- A sound's mouth goal is a row of the table in `src/soundMouth.ts`, nowhere else.
 - `src/cli.ts` is the only module that reads a file or prints; `src/bin.ts` only wires the process to it.
 - Test files sit beside the module they test (`quality`'s test-layout rule); the builders in `tests/glbBuilder.ts`, `tests/clipBuilder.ts` and `tests/roomBuilder.ts` write bytes and never call the check.
 - No third-party model bytes enter the tree; fixtures come from the builder.
