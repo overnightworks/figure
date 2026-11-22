@@ -136,8 +136,8 @@ describe('the goal the sounds give a frame', () => {
 			{ played: () => 0.3, sounds: [{ ipa: 'a', start: '0', end: 1 }] },
 			{ played: () => 0.3, sounds: [{ ipa: 'a', start: 0, end: Number.NaN }] },
 			{ played: () => 0.3, sounds: [{ ipa: 'a', start: 0, end: Infinity }] },
-			{ played: () => 0.3, sounds: [{ ipa: 'a', start: 1, end: 0.5 }] },
-			{ played: () => 0.3, sounds: [{ ipa: 'a', start: 0.5, end: 1 }, { ipa: 'a', start: 0.1, end: 0.2 }] },
+			{ played: () => 0.3, sounds: [{ ipa: 'm', start: 0, end: 1 }, { ipa: 'a', start: 0.5, end: 0.2 }] },
+			{ played: () => 0.3, sounds: [{ ipa: 'a', start: 0.5, end: 1 }, { ipa: 'm', start: 0, end: 0.4 }] },
 			{
 				get played(): never {
 					throw new Error('a getter that throws');
