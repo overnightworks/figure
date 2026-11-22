@@ -9,12 +9,13 @@ import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
 import type { LoadedClip } from './gestureLayer.js';
 import { defaultFraming, isFigureFraming, type FigureFraming } from './framings.js';
 import { isFigureGesture, type FigureGesture } from './gestures.js';
-import type { FigureHandle, MountOptions } from './mountOptions.js';
+import type { FigureHandle, MountOptions, SpokenSounds } from './mountOptions.js';
 import { figureSignal, type FigureSignal } from './signals.js';
+import { createSoundMouth } from './soundMouth.js';
 import { createVoiceTap } from './voiceTap.js';
 
-/** What the agent speaks: the voice its mouth follows and the mood its face shows. */
-type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood } | null;
+/** What the agent speaks: the voice its mouth follows, the sounds that time the voice's mouth and the mood its face shows. */
+type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood; readonly sounds?: SpokenSounds } | null;
 
 /** Parses the bytes of a clip that passed `checkClip`. */
 export type ClipLoad = (bytes: Uint8Array) => Promise<LoadedClip>;
@@ -111,6 +112,7 @@ type LoopEnding = typeof figureSignal.lost | typeof figureSignal.slow;
 function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: LoopEnding) => void): Loop {
 	const motion = createFigureMotion(Math.random, stage.gestures.clipOf);
 	const voiceTap = createVoiceTap();
+	const soundMouth = createSoundMouth();
 	let facts: FigureFacts = { thinking: false, speaking: false };
 	let speaker: Element | null = null;
 	const reducedMotion = matchMedia(reducedMotionQuery);
@@ -122,7 +124,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 		const elapsedSeconds = (time - previousTime) / 1000;
 		previousTime = time;
 		stage.draw(
-			motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker), voiceTap.weights()),
+			motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker), soundMouth.goal(voiceTap.clock()) ?? voiceTap.weights()),
 			elapsedSeconds,
 			!resuming && !reducedMotion.matches
 		);

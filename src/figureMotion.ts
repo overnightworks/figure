@@ -2,6 +2,7 @@ import { figureMood, mouthShape, type FigureMood } from './expressions.js';
 import { armShare, gestureLengthSeconds, type ClipTiming } from './gestureClips.js';
 import type { FigureGesture } from './gestures.js';
 import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.js';
+import type { MouthGoal } from './soundMouth.js';
 import type { VowelWeights } from './vowelWeights.js';
 
 /**
@@ -109,7 +110,7 @@ export interface FigureMotion {
 	/** Asks for `name` to start at the next `advance`; a call while a gesture plays is ignored, with no restart and no queue. */
 	gesture(name: FigureGesture): void;
 	/** The pose `elapsedSeconds` after the last call, given the facts now, where the speaker is, if anyone speaks, and the mouth weights the agent's voice asks for, if any, while the page asks for reduced motion or not. */
-	advance(facts: FigureFacts, elapsedSeconds: number, reducedMotion: boolean, speaker: SpeakerOffset | null, mouth: VowelWeights | null): FigurePose;
+	advance(facts: FigureFacts, elapsedSeconds: number, reducedMotion: boolean, speaker: SpeakerOffset | null, mouth: MouthGoal | null): FigurePose;
 }
 
 type Gaze = { readonly yaw: number; readonly pitch: number };
@@ -128,8 +129,8 @@ const eyeEaseRate = 40;
 const largeGazeShiftDegrees = 18;
 /** The eyes' small jumps while the agent speaks, as a share of their size at rest. */
 const speakingJumpShare = 0.4;
-/** The easing rates per second: the head's gaze yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, and the voice's level. */
-const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3, mouthRise: 38, mouthFall: 22, voiceLevel: 12, moodRise: 9, moodFall: 4 };
+/** The easing rates per second: the head's gaze yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, the mouth's weights when the lips close (they reach closed within 50 ms, within a short sound) and the voice's level. */
+const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3, mouthRise: 38, mouthFall: 22, lipsClose: 80, voiceLevel: 12, moodRise: 9, moodFall: 4 };
 /** The head's nod with the voice: its forward pitch at a full level in radians, and its angular frequency in radians a second. */
 const voiceNod = { peakRadians: 0.045, radiansPerSecond: 5.1 };
 const mouthShapes = Object.values(mouthShape);
@@ -287,11 +288,11 @@ function scaled(weights: VowelWeights, factor: number): VowelWeights {
 
 /** What the voice does to the figure in one frame: the eased mouth weights and the head's pitch the voice adds. */
 interface MouthMotion {
-	advance(step: number, goal: VowelWeights | null, reducedMotion: boolean): { readonly weights: VowelWeights; readonly headPitch: number };
+	advance(step: number, goal: MouthGoal | null, reducedMotion: boolean): { readonly weights: VowelWeights; readonly headPitch: number };
 }
 
 /**
- * The mouth's easing: each weight toward its goal at 38 a second while it rises and 22 while it falls, the level of the
+ * The mouth's easing: each weight toward its goal at 38 a second while it rises and 22 while it falls, or 80 while the goal is closed lips, the level of the
  * eased weights' sum at 12 a second, and the head's nod with the voice from the level, which reduced motion leaves out.
  */
 function createMouth(): MouthMotion {
@@ -301,12 +302,13 @@ function createMouth(): MouthMotion {
 	return {
 		advance(step, goal, reducedMotion) {
 			clock += step;
-			const wanted = goal ?? stillMouth;
+			const wanted: MouthGoal = goal ?? stillMouth;
+			const fallRate = wanted.lipsClosed === true ? easing.lipsClose : easing.mouthFall;
 			const eased = { ...weights };
 			let sum = 0;
 			for (const shape of mouthShapes) {
 				const target = wanted[shape];
-				eased[shape] = easeToward(weights[shape], target, target > weights[shape] ? easing.mouthRise : easing.mouthFall, step, reducedMotion);
+				eased[shape] = easeToward(weights[shape], target, target > weights[shape] ? easing.mouthRise : fallRate, step, reducedMotion);
 				sum += eased[shape];
 			}
 			weights = eased;
