@@ -18,7 +18,7 @@ const afterTheLast = answer.length * soundSeconds + 10;
 
 describe('a figure whose agent speaks with sounds', () => {
 	let watch: FigureWatch;
-	const { pictureNow, waitForMouth, restingMouth } = mouthReader(() => watch);
+	const { pictureNow, pictureOfNextFrame, waitForMouth, restingMouth } = mouthReader(() => watch);
 	const contexts: AudioContext[] = [];
 	const voices: SyntheticSequence[] = [];
 
@@ -47,12 +47,14 @@ describe('a figure whose agent speaks with sounds', () => {
 		return { ...(await watch.mountFigure()), context, sequence };
 	}
 
-	/** Expects the mouth, in each of the next `stillPictures` pictures, to hold what `holds` says of its rows given the rows the nose's rise or sink from `resting`'s pose adds to a mouth. */
+	/** Expects the mouth in `picture` to hold what `holds` says of its rows given the rows the nose's rise or sink from `resting`'s pose adds to a mouth. */
+	function expectPictureHolds(picture: MouthPicture, resting: MouthPicture, holds: (rows: number, shiftRows: number) => boolean): void {
+		expect(holds(picture.rows, rowsPerShiftedPixel * Math.abs(picture.nose.y - resting.nose.y))).toBe(true);
+	}
+
+	/** Expects the mouth, in each of the next `stillPictures` pictures, to hold what `holds` says of its rows. */
 	async function expectMouthHolds(canvas: HTMLCanvasElement, resting: MouthPicture, holds: (rows: number, shiftRows: number) => boolean): Promise<void> {
-		for (let read = 0; read < stillPictures; read++) {
-			const picture = await pictureNow(canvas);
-			expect(holds(picture.rows, rowsPerShiftedPixel * Math.abs(picture.nose.y - resting.nose.y))).toBe(true);
-		}
+		for (let read = 0; read < stillPictures; read++) expectPictureHolds(await pictureNow(canvas), resting, holds);
 	}
 
 	describe.each([
@@ -191,18 +193,20 @@ describe('a figure whose agent speaks with sounds', () => {
 		await expectMouthHolds(canvas, resting, (rows, shift) => rows <= resting.rows + flattenedRows + shift);
 	});
 
+	/** The mouth is open before the call: the silent voice opens it through the sounds it has, the loud one through its analyser. */
 	it.each([
-		['a longer list for the same clock', sounds.slice(0, 1)],
-		['sounds for a sentence that had none', undefined]
-	])('goes on from the mouth it has when the next call brings %s', async (_, before) => {
-		const { canvas, handle, sequence } = await figureWithSequence(mouthShape.aa, 0);
+		['a longer list for the same clock', 0, sounds.slice(0, 1)],
+		['sounds for a sentence that had none', undefined, undefined]
+	])('goes on from the open mouth it has when the next call brings %s', async (_, gain, before) => {
+		const { canvas, handle, sequence } = await figureWithSequence(mouthShape.aa, gain);
 		const resting = await restingMouth(canvas);
 		handle.speak({ voice: sequence.output, ...(before === undefined ? {} : { sounds: { played: sequence.sounds.played, sounds: before } }) });
-		if (before !== undefined) await waitForMouth(canvas, (rows) => rows >= resting.rows + openedRows);
+		await waitForMouth(canvas, (rows) => rows >= resting.rows + openedRows);
 
 		handle.speak({ voice: sequence.output, sounds: sequence.sounds });
 
-		await waitForMouth(canvas, (rows) => rows >= resting.rows + openedRows);
+		// The first frame after the call shows the mouth as open as it was, which a mouth that went to rest and began to rise again falls short of.
+		expectPictureHolds(await pictureOfNextFrame(canvas), resting, (rows, shift) => rows >= resting.rows + openedRows + swayRows - shift);
 		await expectMouthHolds(canvas, resting, (rows, shift) => rows >= resting.rows + openedRows - shift - swayRows);
 	});
 

@@ -30,6 +30,11 @@ function atRest(picture: MouthPicture, pose: MouthPicture): boolean {
 	return Math.abs(picture.nose.x - pose.nose.x) <= swayPixels && Math.abs(picture.nose.y - pose.nose.y) <= swayPixels;
 }
 
+/** The mouth and the nose among a picture's features. */
+function pictureOf(features: Awaited<ReturnType<FigureWatch['featuresNow']>>): MouthPicture {
+	return { rows: mouthRows(features), nose: centreOf(features.nose) };
+}
+
 /** The readings of a test's watch, which `watch` hands over when they are read, as a test starts its watch only in `beforeEach`. */
 export function mouthReader(watch: () => FigureWatch) {
 	/** The rows the mouth covers in the figure's next picture. */
@@ -39,8 +44,12 @@ export function mouthReader(watch: () => FigureWatch) {
 
 	/** The mouth and the nose in the figure's next picture. */
 	async function pictureNow(canvas: HTMLCanvasElement): Promise<MouthPicture> {
-		const features = await watch().featuresNow(canvas);
-		return { rows: mouthRows(features), nose: centreOf(features.nose) };
+		return pictureOf(await watch().featuresNow(canvas));
+	}
+
+	/** The mouth and the nose in the picture of the first frame drawn after this call, with no frames waited for beyond it. */
+	async function pictureOfNextFrame(canvas: HTMLCanvasElement): Promise<MouthPicture> {
+		return pictureOf(await watch().featuresOfNextFrame(canvas));
 	}
 
 	/** Waits until the rows the mouth covers are rows for which `test` holds. */
@@ -61,5 +70,5 @@ export function mouthReader(watch: () => FigureWatch) {
 		return byRows[Math.floor(byRows.length / 2)]!;
 	}
 
-	return { mouthNow, pictureNow, waitForMouth, restingMouth };
+	return { mouthNow, pictureNow, pictureOfNextFrame, waitForMouth, restingMouth };
 }
