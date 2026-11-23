@@ -9,13 +9,17 @@ behaves the same wherever an agent appears, and no app builds its own.
 
 A figure lives. It breathes, blinks and glances around when idle, turns toward
 whoever is speaking when it listens, shows that it works when it thinks,
-speaks with a real mouth shape per sound, lips closing on m, b and p, and a mood the agent chooses, and
+speaks with a mouth that follows its voice, and a mood the agent chooses, and
 gestures on its agent's choice, starting with a neutral wave. It is seen in its
 agent's own room, which the agent can change or leave during a call; with no
 room it stands on the transparent canvas. figure
 also owns the fleet's three profiles, for a figure file, a persona's gesture
 clip and an agent's room, and a check for each that tells whether a file meets
 it.
+
+The mouth has two sources. Where the host hands over the sounds its speech timed for the answer, each known sound shows its own shape on the
+voice's clock, and the lips close on m, b and p. Wherever no known sound covers the moment, or the host gave none, the mouth follows the loudness and vowel it
+analyses in the audio itself.
 
 ## For whom today
 
