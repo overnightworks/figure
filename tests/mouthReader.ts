@@ -3,6 +3,17 @@ import { expect, vi } from 'vitest';
 import { centreOf, mouthRows } from './browserCanvas.js';
 import type { FigureWatch } from './figureWatch.js';
 
+/** The rows by which an open vowel's mouth has to exceed the closed one, and by which the flat vowel's has to fall short of it, at a canvas 200 wide; the sway of the head moves a closed mouth by a row. */
+export const openedRows = 4;
+export const flattenedRows = 3;
+export const swayRows = 1;
+/**
+ * The rows a closed mouth's window gains or loses for each pixel, at a canvas 200 wide, that the nose rises or sinks from another pose: the nose stands
+ * out of the face just above the mouth, and a head turned up shows more of the mouth below it, one turned down less, from the first fraction of a pixel.
+ * A closed mouth stays within these of a picture of it at every pose the idle glance reaches, and an open vowel's mouth lies beyond them at every one.
+ */
+export const rowsPerShiftedPixel = 1.25;
+
 /** How far the sway moves the nose, in pixels at a canvas 200 wide; the idle glance turns it by far more, and the glance moves a closed mouth's rows by more than the sway does. */
 const swayPixels = 2;
 /** The pictures in which a mouth that should not move is judged, every one of them, and over which the head's resting pose is read. */

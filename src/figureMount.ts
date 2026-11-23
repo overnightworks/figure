@@ -17,6 +17,15 @@ import { createVoiceTap } from './voiceTap.js';
 /** What the agent speaks: the voice its mouth follows, the sounds that time the voice's mouth and the mood its face shows. */
 type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood; readonly sounds?: SpokenSounds } | null;
 
+/** The sounds of a sentence, or undefined where reading them throws: the host's own getter is judged like the value it gives. */
+function soundsOf(sentence: NonNullable<Sentence>): unknown {
+	try {
+		return sentence.sounds;
+	} catch {
+		return undefined;
+	}
+}
+
 /** Parses the bytes of a clip that passed `checkClip`. */
 export type ClipLoad = (bytes: Uint8Array) => Promise<LoadedClip>;
 
@@ -186,7 +195,7 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 		const speaking = typeof sentence === 'object' && sentence !== null;
 		facts = { ...facts, speaking, mood: speaking ? sentence.mood : undefined };
 		voiceTap.follow(speaking ? sentence.voice : undefined);
-		soundMouth.follow(speaking ? sentence.sounds : undefined);
+		soundMouth.follow(speaking ? soundsOf(sentence) : undefined);
 	};
 	const gesture = (name: unknown) => {
 		if (!stopped && document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);

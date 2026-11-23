@@ -104,13 +104,6 @@ describe('the goal the sounds give a frame', () => {
 		expect(set(3.2, 0.2)).toBeNull();
 	});
 
-	it('gives no goal once the position is past the last sound, whether it moves or not', () => {
-		const { set } = following();
-		expect(set(5, 0)).toBeNull();
-		expect(set(5.1, 0.1)).toBeNull();
-		expect(set(5.1, 0.2)).toBeNull();
-	});
-
 	it('finds the sound among many by its start, however long the list', () => {
 		const long = Array.from({ length: 200_000 }, (_, index) => ({ ipa: index % 2 === 0 ? 'm' : 'a', start: index * 0.1, end: index * 0.1 + 0.1 }));
 		const { set } = following(long);

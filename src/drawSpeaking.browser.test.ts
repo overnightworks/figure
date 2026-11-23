@@ -4,27 +4,17 @@ import { centreOf, emulateReducedMotion, faceDifference, restorePageVisibility, 
 import { vrmParts } from '../tests/figureFixtures.js';
 import { buildGlb } from '../tests/glbBuilder.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
-import { mouthReader, stillPictures, type MouthPicture } from '../tests/mouthReader.js';
+import { flattenedRows, mouthReader, openedRows, rowsPerShiftedPixel, stillPictures, swayRows, type MouthPicture } from '../tests/mouthReader.js';
 import { syntheticVoice, type SyntheticVoice } from '../tests/syntheticVoice.js';
 import { figureMood, mouthShape, type FigureMood, type MouthShape } from './expressions.js';
 import type { FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 import { analysisWindowLength } from './vowelWeights.js';
 
-/** The rows by which an open vowel's mouth has to exceed the closed one, and by which the flat vowel's has to fall short of it, at a canvas 200 wide; the sway of the head moves a closed mouth by a row. */
-const openedRows = 4;
-const flattenedRows = 3;
-const swayRows = 1;
 /** The page's own frame request, which the tests wait on without the watch counting it. */
 const requestFrameOwn = window.requestAnimationFrame;
 /** How far a speaker at the far side of the page turns the nose, in pixels at a canvas 200 wide, and how far the thinking look turns it the other way. */
 const turnedPixels = 10;
-/**
- * The rows a closed mouth's window gains or loses for each pixel, at a canvas 200 wide, that the nose rises or sinks from another pose: the nose stands
- * out of the face just above the mouth, and a head turned up shows more of the mouth below it, one turned down less, from the first fraction of a pixel.
- * A closed mouth stays within these of a picture of it at every pose the idle glance reaches, and an open vowel's mouth lies beyond them at every one.
- */
-const rowsPerShiftedPixel = 1.25;
 /** The dark pixels of the face a neutral picture differs from the neutral baseline by, at most, even with the sway's drift, and the fewest a shown mood's differs by; the least any of the five moods moves is well over the first. */
 const neutralFaceDifference = 60;
 const shownFaceDifference = 100;
