@@ -325,7 +325,8 @@ function createMouth(): MouthMotion {
 			let sum = 0;
 			for (const shape of mouthShapes) {
 				const target = wanted[shape];
-				eased[shape] = closing === undefined ? easeToward(weights[shape], target, target > weights[shape] ? easing.mouthRise : easing.mouthFall, step, reducedMotion) : weights[shape] * (1 - closing);
+				const rate = target > weights[shape] ? easing.mouthRise : easing.mouthFall;
+				eased[shape] = closing === undefined ? easeToward(weights[shape], target, rate, step, reducedMotion) : weights[shape] * (1 - closing);
 				sum += eased[shape];
 			}
 			weights = eased;
