@@ -314,7 +314,11 @@ const stallMilliseconds = 1500;
 /** The sequence that speaks now, which the stall button holds. */
 let sequence: SyntheticSequence | undefined;
 
-document.querySelector<HTMLButtonElement>('#speak-sequence')!.addEventListener('click', async () => {
+/** The sounds the figures are told first by the sequence told in parts; the rest follows on the button, on the same voice and clock. */
+const soundsToldFirst = 6;
+
+/** Speaks a sequence over the picked vowel and tells the figures its first `told` sounds. */
+async function speakSequence(told: number): Promise<void> {
 	const stillMine = takeControl();
 	const { context, speakers } = await runningAudio();
 	if (!stillMine()) return;
@@ -326,11 +330,18 @@ document.querySelector<HTMLButtonElement>('#speak-sequence')!.addEventListener('
 	);
 	speaking.output.connect(speakers);
 	sequence = speaking;
-	replaceSentence(sentenceOf(speaking.output, speaking.sounds), `speaking a sequence over ${vowel} (audio ${context.state})`, () => {
-		sequence = undefined;
+	replaceSentence(sentenceOf(speaking.output, { played: speaking.sounds.played, sounds: speaking.sounds.sounds.slice(0, told) }), `speaking a sequence over ${vowel} (audio ${context.state})`, () => {
+		if (sequence === speaking) sequence = undefined;
 		speaking.stop();
 		speaking.output.disconnect();
 	});
+}
+
+document.querySelector<HTMLButtonElement>('#speak-sequence')!.addEventListener('click', () => void speakSequence(sequenceSounds.length));
+document.querySelector<HTMLButtonElement>('#speak-sequence-in-parts')!.addEventListener('click', () => void speakSequence(soundsToldFirst));
+
+document.querySelector<HTMLButtonElement>('#tell-rest-of-sequence')!.addEventListener('click', () => {
+	if (sequence !== undefined) tell(sentenceOf(sequence.output, sequence.sounds), voiceStatus.textContent ?? '');
 });
 
 document.querySelector<HTMLButtonElement>('#stall-sequence')!.addEventListener('click', () => {
