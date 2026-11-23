@@ -338,6 +338,28 @@ test.describe('the demo stage under the script policy', () => {
 		await expectNoViolations(page, pageErrors);
 	});
 
+	test('the sequence control tells both figures a sentence timed by sounds, and they stay drawn through a stall, a pause and a mood', async ({ page }) => {
+		const pageErrors = await openStage(page, stage);
+		await expectTwoDrawings(page);
+		const status = page.locator('#voice-status');
+
+		await page.getByRole('button', { name: 'speak a sequence' }).click();
+		await expect(status).toHaveText('speaking a sequence over aa (audio running)');
+		await page.getByRole('button', { name: 'stall the sequence' }).click();
+		await page.getByLabel('happy', { exact: true }).check();
+		await page.getByRole('button', { name: 'pause audio' }).click();
+		await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+		await expectTwoDrawings(page);
+		await page.getByRole('button', { name: 'resume audio' }).click();
+		await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+		await expectTwoDrawings(page);
+
+		await page.getByRole('button', { name: 'stop' }).click();
+		await expect(status).toHaveText('quiet');
+		await expectTwoDrawings(page);
+		await expectNoViolations(page, pageErrors);
+	});
+
 	test('the mood choice changes the face of the figure that speaks, a fresh figure is told at once, and none returns the face, with both figures still drawn', async ({ page }) => {
 		// Held still, a figure's face changes only with the mood. The phone-wide figure lies in the viewport; both are told by the one control.
 		await page.emulateMedia({ reducedMotion: 'reduce' });

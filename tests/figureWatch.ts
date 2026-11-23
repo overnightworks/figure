@@ -43,19 +43,27 @@ export interface FigureWatch {
 	end(): void;
 }
 
+/** The frame times a watched figure is handed from the page's own: the page's, but never a frame longer than `longestKeptFrameMilliseconds` after the one before, so a slow runner cannot end the figure under test; with `slow` every frame lasts `slowFrameMilliseconds`. */
+export function handedFrameTimes(slow = false): (pageTime: number) => number {
+	let handedTime: number | undefined;
+	return (pageTime) => {
+		const previousTime = handedTime ?? pageTime;
+		handedTime = slow ? previousTime + slowFrameMilliseconds : Math.min(pageTime, previousTime + longestKeptFrameMilliseconds);
+		return handedTime;
+	};
+}
+
 /** Starts a watch; `slowFrames` hands the figures frame times that make them too slow to keep, otherwise the frame times follow the page's but for any frame longer than `longestKeptFrameMilliseconds`. */
 export function startFigureWatch(slowFrames = false): FigureWatch {
 	const canvases: HTMLCanvasElement[] = [];
 	const handles: FigureHandle[] = [];
 	const shown = new Map<HTMLCanvasElement, { width: number; height: number; pixels: Uint8Array }>();
 	let frames = 0;
-	let handedTime: number | undefined;
+	const handTime = handedFrameTimes(slowFrames);
 	vi.spyOn(Math, 'random').mockImplementation(seededRandom(7));
 	window.requestAnimationFrame = (callback) =>
 		requestFrameOwn.call(window, (time) => {
-			const previousTime = handedTime ?? time;
-			handedTime = slowFrames ? previousTime + slowFrameMilliseconds : Math.min(time, previousTime + longestKeptFrameMilliseconds);
-			callback(handedTime);
+			callback(handTime(time));
 			frames++;
 			canvases.forEach(readIfDrawn);
 		});

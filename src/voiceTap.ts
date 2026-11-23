@@ -1,3 +1,4 @@
+import type { VoiceClock } from './soundMouth.js';
 import { analysisWindowLength, vowelWeights, type VowelWeights } from './vowelWeights.js';
 
 /**
@@ -10,6 +11,8 @@ export interface VoiceTap {
 	follow(voice: AudioNode | undefined): void;
 	/** The mouth weights of the voice's latest samples, or null when no voice is tapped, its context does not run or the analyser cannot be read. */
 	weights(): VowelWeights | null;
+	/** Whether the tapped voice's context runs and how many seconds it has run, or null when no voice is tapped or the context cannot be read. */
+	clock(): VoiceClock | null;
 }
 
 /** What a tapped voice holds: the node, its analyser, the buffer the analyser fills and the rate it was made for. */
@@ -59,6 +62,16 @@ export function createVoiceTap(): VoiceTap {
 			if (voice !== undefined && voice === tapped?.voice) return;
 			release();
 			if (voice !== undefined) tapped = tapOf(voice);
+		},
+		clock() {
+			if (tapped === undefined) return null;
+			try {
+				const { state, currentTime } = tapped.analyser.context;
+				return { running: state === 'running', seconds: currentTime };
+			} catch {
+				release();
+				return null;
+			}
 		},
 		weights() {
 			if (tapped === undefined) return null;

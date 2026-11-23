@@ -44,7 +44,8 @@ export async function showFigure(canvas: HTMLCanvasElement, figureUrl: string, s
 
 `mount` never rejects, and the first signal has reached `onSignal` before it resolves. The returned `FigureHandle` has
 `signal`, `dispose()`, `think(working)`, `listen(speaker)`, `speak(sentence)`, `gesture(name)`, `frame(name)` and `room(bytes)`; the app reports facts
-and the figure decides its motion. Each method's behaviour, including its edge cases, is the doc comment of
+and the figure decides its motion. A sentence's mouth follows the loudness of its voice, or, where the app also passes the sounds the speech service timed for
+the answer and the player's played position (`speak({ voice, sounds })`), the sound itself: the lips close on m, b and p, and the voice's own mouth goes on wherever no known sound covers the moment. Each method's behaviour, including its edge cases, is the doc comment of
 `FigureHandle` in `src/mountOptions.ts`, which ships in the package's types, as does `MountOptions`, whose `gestures`
 option takes a persona's own `.vrma` clip for a key of `figureGesture` (`wave` today). The gesture names are the keys of
 `figureGesture`, exported from the package root; the `framing` option and `frame(name)` take a key of `figureFraming`

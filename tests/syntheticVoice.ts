@@ -1,5 +1,6 @@
 // A voice made of real Web Audio nodes: a glottal-like pulse source through two formant resonators, for the browser tests and the stage.
 import { mouthShape, type MouthShape } from '../src/expressions.js';
+import type { SpokenSound, SpokenSounds } from '../src/mountOptions.js';
 
 /**
  * The first two formants in Hz of the vowel each mouth shape opens for (Peterson and Barney, 1952, table V, the men's averages):
@@ -47,4 +48,45 @@ export function syntheticVoice(context: AudioContext, vowel: MouthShape, gain = 
 		.connect(output);
 	source.start();
 	return { output, stop: () => source.stop() };
+}
+
+/** A voice that plays one vowel while its sounds are timed on a clock of their own: the clock of an answer a host's player has played, which a test can move and hold. */
+export interface SyntheticSequence extends SyntheticVoice {
+	/** What a host passes to `speak` beside `output`: the sounds, and the position the sequence has played. */
+	readonly sounds: SpokenSounds;
+	/** Moves the played position to `seconds` of the answer, from where it runs on with the context's clock. */
+	seek(seconds: number): void;
+	/** Stands the played position still while the context's clock runs on, as a player does while it waits for a late chunk. */
+	hold(): void;
+	/** Lets the position run on from where `hold` left it. */
+	release(): void;
+}
+
+/**
+ * A `syntheticVoice` of `vowel` whose position starts at 0 with the context's clock and runs with it, as speech's player derives its
+ * played position from the context's `currentTime`; the voice's own vowel and the sounds are independent, so a test sees which one the mouth follows.
+ */
+export function syntheticSequence(context: AudioContext, vowel: MouthShape, sounds: readonly SpokenSound[], gain?: number): SyntheticSequence {
+	const voice = syntheticVoice(context, vowel, gain);
+	let base = 0;
+	let anchor = context.currentTime;
+	let held: number | undefined;
+	const position = () => held ?? base + context.currentTime - anchor;
+	return {
+		...voice,
+		sounds: { played: position, sounds },
+		seek(seconds) {
+			base = seconds;
+			anchor = context.currentTime;
+		},
+		hold() {
+			held ??= position();
+		},
+		release() {
+			if (held === undefined) return;
+			base = held;
+			anchor = context.currentTime;
+			held = undefined;
+		}
+	};
 }

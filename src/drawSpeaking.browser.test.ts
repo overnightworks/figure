@@ -1,33 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, userEvent } from 'vitest/browser';
-import { centreOf, emulateReducedMotion, faceDifference, mouthRows, restorePageVisibility, setPageVisibility } from '../tests/browserCanvas.js';
+import { centreOf, emulateReducedMotion, faceDifference, restorePageVisibility, setPageVisibility } from '../tests/browserCanvas.js';
 import { vrmParts } from '../tests/figureFixtures.js';
 import { buildGlb } from '../tests/glbBuilder.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
+import { flattenedRows, mouthReader, openedRows, rowsPerShiftedPixel, stillPictures, swayRows, type MouthPicture } from '../tests/mouthReader.js';
 import { syntheticVoice, type SyntheticVoice } from '../tests/syntheticVoice.js';
 import { figureMood, mouthShape, type FigureMood, type MouthShape } from './expressions.js';
 import type { FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 import { analysisWindowLength } from './vowelWeights.js';
 
-/** The rows by which an open vowel's mouth has to exceed the closed one, and by which the flat vowel's has to fall short of it, at a canvas 200 wide; the sway of the head moves a closed mouth by a row. */
-const openedRows = 4;
-const flattenedRows = 3;
-const swayRows = 1;
 /** The page's own frame request, which the tests wait on without the watch counting it. */
 const requestFrameOwn = window.requestAnimationFrame;
 /** How far a speaker at the far side of the page turns the nose, in pixels at a canvas 200 wide, and how far the thinking look turns it the other way. */
 const turnedPixels = 10;
-/** How far the sway moves the nose, in pixels at a canvas 200 wide; the idle glance turns it by far more, and the glance moves a closed mouth's rows by more than the sway does. */
-const swayPixels = 2;
-/** The pictures in which a mouth that should not move is judged, every one of them, and over which the head's resting pose is read. */
-const stillPictures = 15;
-/**
- * The rows a closed mouth's window gains or loses for each pixel, at a canvas 200 wide, that the nose rises or sinks from another pose: the nose stands
- * out of the face just above the mouth, and a head turned up shows more of the mouth below it, one turned down less, from the first fraction of a pixel.
- * A closed mouth stays within these of a picture of it at every pose the idle glance reaches, and an open vowel's mouth lies beyond them at every one.
- */
-const rowsPerShiftedPixel = 1.25;
 /** The dark pixels of the face a neutral picture differs from the neutral baseline by, at most, even with the sway's drift, and the fewest a shown mood's differs by; the least any of the five moods moves is well over the first. */
 const neutralFaceDifference = 60;
 const shownFaceDifference = 100;
@@ -39,19 +26,9 @@ const shownPictures = 7;
 const farRight = 5000;
 const level = 100;
 
-/** The mouth's rows and the nose's centre in one picture. */
-interface Picture {
-	readonly rows: number;
-	readonly nose: { readonly x: number; readonly y: number };
-}
-
-/** Whether `picture` shows the nose where the sway leaves it around `pose`'s. */
-function atRest(picture: Picture, pose: Picture): boolean {
-	return Math.abs(picture.nose.x - pose.nose.x) <= swayPixels && Math.abs(picture.nose.y - pose.nose.y) <= swayPixels;
-}
-
 describe('a figure whose agent speaks', () => {
 	let watch: FigureWatch;
+	const { mouthNow, pictureNow, waitForMouth, restingMouth } = mouthReader(() => watch);
 	const contexts: AudioContext[] = [];
 	const voices: SyntheticVoice[] = [];
 	const speakers: HTMLElement[] = [];
@@ -99,42 +76,13 @@ describe('a figure whose agent speaks', () => {
 		return () => creation.mock.results.flatMap((result) => (result.type === 'return' ? [result.value] : []));
 	}
 
-	/** The rows the mouth covers in the figure's next picture. */
-	async function mouthNow(canvas: HTMLCanvasElement): Promise<number> {
-		return mouthRows(await watch.featuresNow(canvas));
-	}
-
 	/** The nose in the figure's next picture. */
 	async function noseNow(canvas: HTMLCanvasElement) {
 		return centreOf((await watch.featuresNow(canvas)).nose);
 	}
 
-	/** Waits until the mouth covers at least `rows`, or at most `rows` when `atMost`. */
-	async function waitForMouth(canvas: HTMLCanvasElement, test: (rows: number) => boolean): Promise<void> {
-		await vi.waitFor(async () => expect(test(await mouthNow(canvas))).toBe(true), { timeout: 15000 });
-	}
-
-	/** The mouth and the nose in the figure's next picture. */
-	async function pictureNow(canvas: HTMLCanvasElement): Promise<Picture> {
-		const features = await watch.featuresNow(canvas);
-		return { rows: mouthRows(features), nose: centreOf(features.nose) };
-	}
-
-	/**
-	 * The picture with the median mouth among those at the head's most common pose in the next `stillPictures` pictures, which the idle glance cannot
-	 * outvote; its rows and its nose come from one picture, as the sway's reach around that pose spans more than a pixel of the nose's height.
-	 */
-	async function restingMouth(canvas: HTMLCanvasElement): Promise<Picture> {
-		const pictures: Picture[] = [];
-		for (let picture = 0; picture < stillPictures; picture++) pictures.push(await pictureNow(canvas));
-		const atPose = (pose: Picture) => pictures.filter((picture) => atRest(picture, pose));
-		const commonest = pictures.reduce((best, picture) => (atPose(picture).length > atPose(best).length ? picture : best));
-		const byRows = atPose(commonest).sort((first, second) => first.rows - second.rows);
-		return byRows[Math.floor(byRows.length / 2)]!;
-	}
-
 	/** Expects the mouth to lie, in each of the next `stillPictures` pictures, within the flat vowel's distance of `resting` plus what the nose's rise or sink from it adds to or takes from a closed mouth's rows. */
-	async function expectMouthStays(canvas: HTMLCanvasElement, resting: Picture): Promise<void> {
+	async function expectMouthStays(canvas: HTMLCanvasElement, resting: MouthPicture): Promise<void> {
 		for (let read = 0; read < stillPictures; read++) {
 			const picture = await pictureNow(canvas);
 			const shift = Math.abs(resting.nose.y - picture.nose.y);
@@ -478,7 +426,7 @@ describe('a figure whose agent speaks', () => {
 		}
 
 		/** The mouth of a figure that speaks `mood` with no voice once the mood has eased in: what a voice has to open further. */
-		async function moodMouth(canvas: HTMLCanvasElement, handle: FigureHandle): Promise<Picture> {
+		async function moodMouth(canvas: HTMLCanvasElement, handle: FigureHandle): Promise<MouthPicture> {
 			handle.speak({ mood: figureMood.angry });
 			await waitForSettledFace(canvas);
 			return restingMouth(canvas);
