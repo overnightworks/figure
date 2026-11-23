@@ -1,8 +1,0 @@
-claim_id = "3bd9fbb994f24bf88bf9c2d0ac37e317"
-agent = "Claude 4fd468aa-a5d8-4484-9aa4-cdf7cb916fe0"
-role = "builder"
-base = "8688c2df481e22480047261a1b5fef22b895577e"
-branch = "claude/issue-133-m7-sounds-drive-the-mouth"
-scope = ["AGENTS.md", "README.md", "docs/ARCHITECTURE.md", "docs/VISION.md", "src/draw.ts", "src/drawSounds.browser.test.ts", "src/drawSpeaking.browser.test.ts", "src/figureDriving.browser.test.ts", "src/figureMotion.test.ts", "src/figureMotion.ts", "src/figureMount.ts", "src/mountOptions.ts", "src/soundMouth.test.ts", "src/soundMouth.ts", "src/voiceTap.ts", "tests/e2e/stage.spec.ts", "tests/figureWatch.ts", "tests/mouthReader.ts", "tests/stage/index.html", "tests/stage/main.ts", "tests/syntheticVoice.ts"]
-opened_commit = "7f8ace590e24349cdacdb32225646006048ec14d"
-whole_reason = "One input from speech's sounds to the mouth, with its table, its clock, its handle type, its stage control and the places that describe it, which a consumer reads together."
