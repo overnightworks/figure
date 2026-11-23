@@ -1,0 +1,8 @@
+claim_id = "8852953f01634ab697d115f649d7d269"
+agent = "Claude 4fd468aa-a5d8-4484-9aa4-cdf7cb916fe0"
+role = "builder"
+base = "4459cff7e61e0eadff01a8d1bbb8a66c8247a677"
+branch = "claude/issue-143-figure-pins-quality-v0-25-0"
+scope = [".github/workflows/ci.yml", ".github/workflows/code-scanning.yml", ".github/workflows/release.yml", "quality/baseline.toml", "quality/config.toml", "vitest.config.ts"]
+opened_commit = "dace8f3816a1bacf3ca42010bf6eeef8265e51dc"
+whole_reason = "One pin move to quality v0.25.0 with the fixes it requires: the pins, vitest's shuffled order, and the size entries with their declared loosenings, which the release's verdict judges together."
