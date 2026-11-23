@@ -458,6 +458,20 @@ describe('the figure motion while the agent speaks', () => {
 		expect(ordinary[100]!.mouth.aa).toBeGreaterThan(0.2);
 	});
 
+	it('has the lips closed in the next frame even where it arrives after the sound ended, and gives the next goal the frame after', () => {
+		const motion = createFigureMotion(seededRandom(seed), ownClip);
+		const frame = (goal: VowelWeights & { lipsClosed?: true; closeWithinSeconds?: number }, step: number) => motion.advance(speaking, step, false, null, goal);
+		for (let held = 0; held < 100; held++) frame(only(mouthShape.aa), frameSeconds);
+
+		const closing = frame({ ...stillMouth, lipsClosed: true, closeWithinSeconds: 0.025 }, frameSeconds);
+		const late = frame(only(mouthShape.ee), 0.035);
+		const after = frame(only(mouthShape.ee), frameSeconds);
+
+		expect(closing.mouth.aa).toBeGreaterThan(0.1);
+		expect(late.mouth).toEqual(stillMouth);
+		expect(after.mouth.ee).toBeGreaterThan(0.2);
+	});
+
 	it('opens again from closed lips at the ordinary rate, and shows closed lips at once under reduced motion and under a mood as zeros', () => {
 		const closing = { ...stillMouth, lipsClosed: true } as const;
 		const reopened = watch(200, () => speaking, false, () => null, (frame) => (frame < 100 ? closing : aa));
