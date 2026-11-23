@@ -9,7 +9,7 @@ import type { VowelWeights } from './vowelWeights.js';
  */
 export type MouthGoal = VowelWeights & {
 	readonly lipsClosed?: true;
-	/** For closed lips: how many seconds of the sound are left, by whose end the lips are to be closed however short it is. */
+	/** For closed lips: how many seconds of the sound are left, so the frame that covers them closes the lips however short the sound is. */
 	readonly closeWithinSeconds?: number;
 };
 

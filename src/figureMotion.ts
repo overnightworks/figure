@@ -129,7 +129,7 @@ const eyeEaseRate = 40;
 const largeGazeShiftDegrees = 18;
 /** The eyes' small jumps while the agent speaks, as a share of their size at rest. */
 const speakingJumpShare = 0.4;
-/** The easing rates per second: the head's gaze yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, the mouth's weights when the lips close (at least this fast; a sound shorter than that has them closed by its end) and the voice's level. */
+/** The easing rates per second: the head's gaze yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, the mouth's weights when the lips close (at least this fast; a sound that ends before they are closed has them closed by the frame whose step covers what is left of it, or by the next frame where one skips its end) and the voice's level. */
 const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3, mouthRise: 38, mouthFall: 22, lipsClose: 80, voiceLevel: 12, moodRise: 9, moodFall: 4 };
 /** The head's nod with the voice: its forward pitch at a full level in radians, and its angular frequency in radians a second. */
 const voiceNod = { peakRadians: 0.045, radiansPerSecond: 5.1 };
@@ -283,7 +283,7 @@ function easeToward(value: number, goal: number, rate: number, step: number, red
 
 /**
  * The share of the open mouth a closing frame takes away: the ordinary closing ease, or the share of what is left of the sound that the frame covers where that is more, so
- * the frame that reaches the sound's end has the lips closed however short the sound is; a closing goal with no time left is closed at once.
+ * the frame that covers the rest of the sound has the lips closed however short the sound is; a closing goal with no time left is closed at once.
  */
 function closingShare(step: number, secondsLeft: number | undefined, reducedMotion: boolean): number {
 	if (reducedMotion) return 1;

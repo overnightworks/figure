@@ -158,7 +158,10 @@ describe('a figure whose agent speaks with sounds', () => {
 		await waitForMouth(canvas, (rows) => rows <= resting.rows + swayRows);
 	});
 
-	/** Sentences a host should not send, each of which would close the lips at `inside('m')`, where the loud voice's analyser opens the mouth, if its sounds were kept or read. */
+	/**
+	 * Sentences a host should not send. The last three would close the lips at `inside('m')`, where the loud voice's analyser opens the mouth, if their sounds were kept or read;
+	 * the first two, whose `played` is no function and whose list is no list, pin only that the call does not throw and the analyser goes on.
+	 */
 	it.each([
 		['a `played` that is no function', (voice: AudioNode) => ({ voice, sounds: { sounds, played: 5 } })],
 		['a list that is not a list', (voice: AudioNode, played: () => number) => ({ voice, sounds: { sounds: 'm', played } })],
