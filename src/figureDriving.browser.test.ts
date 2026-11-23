@@ -3,6 +3,7 @@ import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng } from '../tests/glbBuilder.js';
 import { centreOf, coversSomething, emulateReducedMotion, mouthDepthBelowNose, readPixels, spotsOf, type FaceFeature, type Spot } from '../tests/browserCanvas.js';
+import { handedFrameTimes } from '../tests/figureWatch.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 
@@ -59,9 +60,10 @@ describe('a figure driven by the host', () => {
 		shownEarly.clear();
 		// A seeded source of chance keeps the idle glance and the blink the same in every run.
 		vi.spyOn(Math, 'random').mockImplementation(seededRandom(7));
+		const handTime = handedFrameTimes();
 		window.requestAnimationFrame = (callback) =>
 			requestFrameOwn.call(window, (time) => {
-				callback(time);
+				callback(handTime(time));
 				frames++;
 				canvases.forEach(readIfDrawn);
 			});
