@@ -1,5 +1,5 @@
 claim_id = "3bd9fbb994f24bf88bf9c2d0ac37e317"
-agent = "Claude 7b851af9-5109-480c-92be-127320c6ddee"
+agent = "Claude 4fd468aa-a5d8-4484-9aa4-cdf7cb916fe0"
 role = "builder"
 base = "8688c2df481e22480047261a1b5fef22b895577e"
 branch = "claude/issue-133-m7-sounds-drive-the-mouth"
