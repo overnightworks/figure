@@ -3,6 +3,7 @@ import { figureMood, mouthShape, type FigureMood, type MouthShape } from './expr
 import { eyeJumpReach } from './idleMotion.js';
 import { createFigureMotion, spreadPosture, type FigureFacts, type FigurePose } from './figureMotion.js';
 import { atSecond, frameSeconds, idle, ownClip, seededRandom, seed, speaking, speakerLeft, thinking, thinkingAndSpeaking, thinkingHead, thinkingLook, watch } from '../tests/figureMotionWatch.js';
+import type { MouthGoal } from './soundMouth.js';
 import type { VowelWeights } from './vowelWeights.js';
 
 /** The turn the thinking look adds to the head, from the picture, in radians. */
@@ -460,16 +461,29 @@ describe('the figure motion while the agent speaks', () => {
 
 	it('has the lips closed in the next frame even where it arrives after the sound ended, and gives the next goal the frame after', () => {
 		const motion = createFigureMotion(seededRandom(seed), ownClip);
-		const frame = (goal: VowelWeights & { lipsClosed?: true; closeWithinSeconds?: number }, step: number) => motion.advance(speaking, step, false, null, goal);
+		const frame = (goal: MouthGoal | null, step: number) => motion.advance(speaking, step, false, null, goal);
 		for (let held = 0; held < 100; held++) frame(only(mouthShape.aa), frameSeconds);
 
 		const closing = frame({ ...stillMouth, lipsClosed: true, closeWithinSeconds: 0.025 }, frameSeconds);
-		const late = frame(only(mouthShape.ee), 0.035);
+		const late = frame({ ...only(mouthShape.ee), followsClosedLips: true }, 0.035);
 		const after = frame(only(mouthShape.ee), frameSeconds);
 
 		expect(closing.mouth.aa).toBeGreaterThan(0.1);
 		expect(late.mouth).toEqual(stillMouth);
 		expect(after.mouth.ee).toBeGreaterThan(0.2);
+	});
+
+	it.each([
+		['the analyser\'s weights', only(mouthShape.ee), 1 - Math.exp(-38 * 0.035)],
+		['no goal at all', null, 0]
+	])('eases from the open mouth at its own rates for %s in the frame after a closing one that left time', (_name, goal, risen) => {
+		const motion = createFigureMotion(seededRandom(seed), ownClip);
+		for (let held = 0; held < 100; held++) motion.advance(speaking, frameSeconds, false, null, only(mouthShape.aa));
+		const closing = motion.advance(speaking, frameSeconds, false, null, { ...stillMouth, lipsClosed: true, closeWithinSeconds: 0.025 });
+		const late = motion.advance(speaking, 0.035, false, null, goal);
+
+		expect(late.mouth.aa).toBeCloseTo(closing.mouth.aa * Math.exp(-22 * 0.035), 9);
+		expect(late.mouth.ee).toBeCloseTo(risen, 9);
 	});
 
 	it('opens again from closed lips at the ordinary rate, and shows closed lips at once under reduced motion and under a mood as zeros', () => {

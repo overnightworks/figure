@@ -304,8 +304,8 @@ interface MouthMotion {
 
 /**
  * The mouth's easing: each weight toward its goal at 38 a second while it rises and 22 while it falls, or, while the goal is closed lips, at 80 a second or the pace
- * that has them closed by the sound's end; a frame that follows a closing frame which left time on the sound, and brings another goal, closes the lips at once and
- * takes that goal in the frame after, so a frame that skips the sound's end leaves them closed; the level of the eased weights' sum at 12 a second, and the head's nod with the voice from the level, which reduced motion leaves out.
+ * that has them closed by the sound's end; a goal marked as following closed lips, in the frame after a closing frame which left time on the sound, closes the lips at once and
+ * takes that goal in the frame after, so a frame that skips the sound's end leaves them closed, while any other goal, the analyser's included, eases from the shape the mouth has; the level of the eased weights' sum at 12 a second, and the head's nod with the voice from the level, which reduced motion leaves out.
  */
 function createMouth(): MouthMotion {
 	let weights = stillMouth;
@@ -319,7 +319,7 @@ function createMouth(): MouthMotion {
 			const lipsClosed = wanted.lipsClosed === true;
 			let closing: number | undefined;
 			if (lipsClosed) closing = closingShare(step, wanted.closeWithinSeconds, reducedMotion);
-			else if (closingUnfinished) closing = 1;
+			else if (closingUnfinished && wanted.followsClosedLips === true) closing = 1;
 			closingUnfinished = lipsClosed && !reducedMotion && wanted.closeWithinSeconds !== undefined && wanted.closeWithinSeconds > step;
 			const eased = { ...weights };
 			let sum = 0;

@@ -11,6 +11,8 @@ export type MouthGoal = VowelWeights & {
 	readonly lipsClosed?: true;
 	/** For closed lips: how many seconds of the sound are left, so the frame that covers them closes the lips however short the sound is. */
 	readonly closeWithinSeconds?: number;
+	/** For a goal that comes in the frame after one of closed lips of the same sounds: the mouth closes the lips first if that frame left time on the sound, so a frame that skips the sound's end leaves them closed. */
+	readonly followsClosedLips?: true;
 };
 
 /** The two clocks of the voice a frame reads: whether its audio context runs and how many seconds that context has run. */
@@ -149,6 +151,7 @@ export interface SoundMouth {
 	 * The goal for one drawn frame, or null where the analyser's mouth goes on: no sounds, no clock (a null `voice`, or a read of the position that throws or is not finite),
 	 * a context that does not run, a moment no known sound covers, and the moments past the last sound. While the position stands still though the voice's context has run on, and it
 	 * is not past the last sound, the goal is the still mouth, which the mouth eases to at its ordinary fall; the rest lasts until the position moves.
+	 * A sound's goal in the frame right after a frame of closed lips from the same sounds is marked `followsClosedLips`.
 	 */
 	goal(voice: VoiceClock | null): MouthGoal | null;
 }
@@ -158,13 +161,17 @@ export function createSoundMouth(): SoundMouth {
 	let followed: Followed | undefined;
 	let baseline: { readonly position: number; readonly seconds: number } | undefined;
 	let stalled = false;
+	let closedLipsGiven = false;
 	return {
 		follow(sounds) {
 			followed = followedOf(sounds);
 			baseline = undefined;
 			stalled = false;
+			closedLipsGiven = false;
 		},
 		goal(voice) {
+			const afterClosedLips = closedLipsGiven;
+			closedLipsGiven = false;
 			if (followed === undefined || voice === null) return null;
 			const position = positionOf(followed);
 			if (position === undefined) return null;
@@ -174,7 +181,9 @@ export function createSoundMouth(): SoundMouth {
 			if (previous === undefined || position > previous.position) stalled = false;
 			else if (voice.seconds > previous.seconds) stalled = true;
 			if (stalled && position <= followed.end) return stillMouth;
-			return goalAt(followed.spans, position + soundLeadSeconds);
+			const goal = goalAt(followed.spans, position + soundLeadSeconds);
+			closedLipsGiven = goal?.lipsClosed === true;
+			return afterClosedLips && goal !== null && goal.lipsClosed !== true ? { ...goal, followsClosedLips: true } : goal;
 		}
 	};
 }

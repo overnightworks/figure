@@ -87,7 +87,7 @@ describe('the goal the sounds give a frame', () => {
 	it('gives the sound that covers the position, ahead by the lead', () => {
 		const { set } = following();
 		expect(set(0.2 - soundLeadSeconds - 0.01, 0)?.lipsClosed).toBe(true);
-		expect(set(0.3 - soundLeadSeconds, 0.1)).toBe(mouthGoalOfSound('a'));
+		expect(set(0.3 - soundLeadSeconds, 0.1)).toMatchObject(mouthGoalOfSound('a')!);
 	});
 
 	it('closes the lips for m and b and shows a between them', () => {
@@ -114,7 +114,7 @@ describe('the goal the sounds give a frame', () => {
 		const long = Array.from({ length: 200_000 }, (_, index) => ({ ipa: index % 2 === 0 ? 'm' : 'a', start: index * 0.1, end: index * 0.1 + 0.1 }));
 		const { set } = following(long);
 		expect(set(10_000.05 - soundLeadSeconds, 0)?.lipsClosed).toBe(true);
-		expect(set(10_000.15 - soundLeadSeconds, 0.1)).toBe(mouthGoalOfSound('a'));
+		expect(set(10_000.15 - soundLeadSeconds, 0.1)).toMatchObject(mouthGoalOfSound('a')!);
 	});
 
 	it('gives no goal without sounds, without a clock and for sounds that are not well formed', () => {
@@ -178,6 +178,40 @@ describe('the goal the sounds give a frame', () => {
 		expect(set(0.1, 0, false)).toBeNull();
 		expect(set(0.1, 0, true)?.lipsClosed).toBe(true);
 		expect(set(0.12, 0.5, true)?.lipsClosed).toBe(true);
+	});
+});
+
+describe('the sound that follows closed lips', () => {
+	const marked = (goal: ReturnType<SoundMouth['goal']>) => goal?.followsClosedLips === true;
+
+	it('marks the sound of the frame right after a frame of closed lips from the same sounds, and no frame after that', () => {
+		const { set } = following();
+		expect(marked(set(0.1))).toBe(false);
+		expect(marked(set(0.25, 0.1))).toBe(true);
+		expect(marked(set(0.3, 0.2))).toBe(false);
+	});
+
+	it.each([
+		['a moment no sound covers between them', [{ ipa: 'm', start: 0, end: 0.2 }, { ipa: 'a', start: 0.5, end: 1 }], [0.1, 0.35, 0.6]],
+		['a sound of an unknown kind between them', [{ ipa: 'm', start: 0, end: 0.2 }, { ipa: 'ʘ', start: 0.2, end: 0.4 }, { ipa: 'a', start: 0.4, end: 1 }], [0.1, 0.3, 0.5]]
+	])('does not mark the sound after %s, which the analyser covered', (_name, sounds, positions) => {
+		const { set } = following(sounds);
+		const goals = positions.map((position, frame) => set(position, frame * 0.1));
+		expect(goals[1]).toBeNull();
+		expect(marked(goals[2])).toBe(false);
+	});
+
+	it('does not mark the first sound of sounds that replace the ones whose closed lips came before', () => {
+		const { mouth, set } = following();
+		set(0.1);
+		mouth.follow({ played: () => 0.25, sounds: sequence });
+		expect(marked(mouth.goal({ seconds: 0.1, running: true }))).toBe(false);
+	});
+
+	it('does not mark the rest the mouth takes at a stall', () => {
+		const { set } = following();
+		set(0.1, 0);
+		expect(marked(set(0.1, 0.1))).toBe(false);
 	});
 });
 
