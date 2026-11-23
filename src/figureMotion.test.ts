@@ -445,6 +445,19 @@ describe('the figure motion while the agent speaks', () => {
 		expect(ordinary[99 + Math.round(0.05 / frameSeconds)]!.mouth.aa).toBeGreaterThan(0.3);
 	});
 
+	it('has the lips of a closing goal closed by the end of the sound however short it is, in the frame that reaches it', () => {
+		const left = (frame: number, last: number) => (last - frame) * frameSeconds;
+		const closing = (last: number) => (frame: number) => (frame < 100 ? aa : { ...stillMouth, lipsClosed: true as const, closeWithinSeconds: left(frame, last) });
+		const oneFrame = watch(200, () => speaking, false, () => null, closing(100));
+		const threeFrames = watch(200, () => speaking, false, () => null, closing(102));
+		const ordinary = watch(200, () => speaking, false, () => null, (frame) => (frame < 100 ? aa : { ...stillMouth, lipsClosed: true }));
+
+		expect(oneFrame[99]!.mouth.aa).toBeCloseTo(1, 9);
+		expect(oneFrame[100]!.mouth.aa).toBe(0);
+		expect(threeFrames[102]!.mouth.aa).toBe(0);
+		expect(ordinary[100]!.mouth.aa).toBeGreaterThan(0.2);
+	});
+
 	it('opens again from closed lips at the ordinary rate, and shows closed lips at once under reduced motion and under a mood as zeros', () => {
 		const closing = { ...stillMouth, lipsClosed: true } as const;
 		const reopened = watch(200, () => speaking, false, () => null, (frame) => (frame < 100 ? closing : aa));

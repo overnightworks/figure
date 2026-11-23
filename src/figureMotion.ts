@@ -129,7 +129,7 @@ const eyeEaseRate = 40;
 const largeGazeShiftDegrees = 18;
 /** The eyes' small jumps while the agent speaks, as a share of their size at rest. */
 const speakingJumpShare = 0.4;
-/** The easing rates per second: the head's gaze yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, the mouth's weights when the lips close (they reach closed within 50 ms, within a short sound) and the voice's level. */
+/** The easing rates per second: the head's gaze yaw and pitch, the thinking look's weight and the lean's, the yaw while listening, the mouth's weights up and down, the mouth's weights when the lips close (at least this fast; a sound shorter than that has them closed by its end) and the voice's level. */
 const easing = { yaw: 7, listeningYaw: 5, pitch: 6, thinking: 4, lean: 3, mouthRise: 38, mouthFall: 22, lipsClose: 80, voiceLevel: 12, moodRise: 9, moodFall: 4 };
 /** The head's nod with the voice: its forward pitch at a full level in radians, and its angular frequency in radians a second. */
 const voiceNod = { peakRadians: 0.045, radiansPerSecond: 5.1 };
@@ -281,6 +281,17 @@ function easeToward(value: number, goal: number, rate: number, step: number, red
 	return value + (goal - value) * (reducedMotion ? 1 : 1 - Math.exp(-rate * step));
 }
 
+/**
+ * The share of the open mouth a closing frame takes away: the ordinary closing ease, or the share of what is left of the sound that the frame covers where that is more, so
+ * the frame that reaches the sound's end has the lips closed however short the sound is; a closing goal with no time left is closed at once.
+ */
+function closingShare(step: number, secondsLeft: number | undefined, reducedMotion: boolean): number {
+	if (reducedMotion) return 1;
+	const ordinary = 1 - Math.exp(-easing.lipsClose * step);
+	if (secondsLeft === undefined) return ordinary;
+	return Math.max(ordinary, secondsLeft <= step ? 1 : step / secondsLeft);
+}
+
 /** The mouth's weights, each multiplied by `factor`. */
 function scaled(weights: VowelWeights, factor: number): VowelWeights {
 	return { aa: weights.aa * factor, ih: weights.ih * factor, ou: weights.ou * factor, ee: weights.ee * factor, oh: weights.oh * factor };
@@ -292,8 +303,8 @@ interface MouthMotion {
 }
 
 /**
- * The mouth's easing: each weight toward its goal at 38 a second while it rises and 22 while it falls, or 80 while the goal is closed lips, the level of the
- * eased weights' sum at 12 a second, and the head's nod with the voice from the level, which reduced motion leaves out.
+ * The mouth's easing: each weight toward its goal at 38 a second while it rises and 22 while it falls, or, while the goal is closed lips, at 80 a second or the pace
+ * that has them closed by the sound's end, the level of the eased weights' sum at 12 a second, and the head's nod with the voice from the level, which reduced motion leaves out.
  */
 function createMouth(): MouthMotion {
 	let weights = stillMouth;
@@ -303,12 +314,12 @@ function createMouth(): MouthMotion {
 		advance(step, goal, reducedMotion) {
 			clock += step;
 			const wanted: MouthGoal = goal ?? stillMouth;
-			const fallRate = wanted.lipsClosed === true ? easing.lipsClose : easing.mouthFall;
+			const closing = wanted.lipsClosed === true ? closingShare(step, wanted.closeWithinSeconds, reducedMotion) : undefined;
 			const eased = { ...weights };
 			let sum = 0;
 			for (const shape of mouthShapes) {
 				const target = wanted[shape];
-				eased[shape] = easeToward(weights[shape], target, target > weights[shape] ? easing.mouthRise : fallRate, step, reducedMotion);
+				eased[shape] = closing === undefined ? easeToward(weights[shape], target, target > weights[shape] ? easing.mouthRise : easing.mouthFall, step, reducedMotion) : weights[shape] * (1 - closing);
 				sum += eased[shape];
 			}
 			weights = eased;

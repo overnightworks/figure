@@ -7,7 +7,11 @@ import type { VowelWeights } from './vowelWeights.js';
  * frame, of the goal the voice's position asks for. A goal is the five mouth weights, or closed lips, which `lipsClosed` marks and
  * which the mouth's easing reaches fast. A moment no known sound covers has no goal, and the analyser's mouth goes on there.
  */
-export type MouthGoal = VowelWeights & { readonly lipsClosed?: true };
+export type MouthGoal = VowelWeights & {
+	readonly lipsClosed?: true;
+	/** For closed lips: how many seconds of the sound are left, by whose end the lips are to be closed however short it is. */
+	readonly closeWithinSeconds?: number;
+};
 
 /** The two clocks of the voice a frame reads: whether its audio context runs and how many seconds that context has run. */
 export interface VoiceClock {
@@ -114,7 +118,7 @@ function followedOf(value: unknown): Followed | undefined {
 	}
 }
 
-/** The goal of the sound that covers `seconds`, found by the last start at or before it, or null where none does or the sound is unknown. */
+/** The goal of the sound that covers `seconds`, found by the last start at or before it, or null where none does or the sound is unknown; closed lips carry what is left of the sound. */
 function goalAt(spans: readonly Span[], seconds: number): MouthGoal | null {
 	let low = 0;
 	let high = spans.length;
@@ -124,7 +128,8 @@ function goalAt(spans: readonly Span[], seconds: number): MouthGoal | null {
 		else high = middle;
 	}
 	const span = spans[low - 1];
-	return span !== undefined && seconds < span.end ? span.goal : null;
+	if (span === undefined || seconds >= span.end) return null;
+	return span.goal?.lipsClosed === true ? { ...span.goal, closeWithinSeconds: span.end - seconds } : span.goal;
 }
 
 /** The player's position in seconds, or undefined for a read that throws or gives no finite number. */

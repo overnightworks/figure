@@ -86,7 +86,7 @@ function following(sounds: unknown = sequence): { mouth: SoundMouth; set: (posit
 describe('the goal the sounds give a frame', () => {
 	it('gives the sound that covers the position, ahead by the lead', () => {
 		const { set } = following();
-		expect(set(0.2 - soundLeadSeconds - 0.01, 0)).toBe(mouthGoalOfSound('m'));
+		expect(set(0.2 - soundLeadSeconds - 0.01, 0)?.lipsClosed).toBe(true);
 		expect(set(0.3 - soundLeadSeconds, 0.1)).toBe(mouthGoalOfSound('a'));
 	});
 
@@ -95,6 +95,12 @@ describe('the goal the sounds give a frame', () => {
 		expect(set(0.1)?.lipsClosed).toBe(true);
 		expect(set(0.25, 0.1)?.lipsClosed).not.toBe(true);
 		expect(set(0.6, 0.2)?.lipsClosed).toBe(true);
+	});
+
+	it('tells closed lips how much of the sound is left, so a short one is closed by its end', () => {
+		const { set } = following();
+		expect(set(0.1)?.closeWithinSeconds).toBeCloseTo(0.2 - 0.1 - soundLeadSeconds, 9);
+		expect(set(0.25, 0.1)?.closeWithinSeconds).toBeUndefined();
 	});
 
 	it('gives no goal for a pause, for an unknown sound, between sounds and before the first one', () => {
@@ -107,7 +113,7 @@ describe('the goal the sounds give a frame', () => {
 	it('finds the sound among many by its start, however long the list', () => {
 		const long = Array.from({ length: 200_000 }, (_, index) => ({ ipa: index % 2 === 0 ? 'm' : 'a', start: index * 0.1, end: index * 0.1 + 0.1 }));
 		const { set } = following(long);
-		expect(set(10_000.05 - soundLeadSeconds, 0)).toBe(mouthGoalOfSound('m'));
+		expect(set(10_000.05 - soundLeadSeconds, 0)?.lipsClosed).toBe(true);
 		expect(set(10_000.15 - soundLeadSeconds, 0.1)).toBe(mouthGoalOfSound('a'));
 	});
 
