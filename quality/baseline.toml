@@ -1,3 +1,21 @@
 # Measured by `quality check --fix`. Entries only ever go down.
 
 [clones]
+
+[ccn."src/clipKeyRules.ts"]
+locate = 16
+
+[ccn."src/soundMouth.ts"]
+followedOf = 16
+
+[function_lines."src/figureFrame.ts"]
+createFigureStage = 85
+
+[function_lines."src/figureMotion.ts"]
+createFigureMotion = 63
+
+[function_lines."src/figureMount.ts"]
+runLoop = 87
+
+[function_lines."src/idleMotion.ts"]
+createIdleMotion = 64
