@@ -30,6 +30,8 @@ const earlyFrames = 3;
 const nodPixels = 3;
 const nodTraceSamples = 60;
 const nodReturnSamples = 20;
+/** The pictures the reduced-motion test reads with no speaker and again with one: each trace is longer than a nod at 60 frames a second, and the two together are as many frames as the nod test reads, so a slow runner stays within the test's time. */
+const reducedTraceSamples = 30;
 /** The pictures a listening figure takes to reach its pose under reduced motion, after which its nose holds still. */
 const settledFromSample = 2;
 
@@ -661,9 +663,9 @@ describe('a figure driven by the host', () => {
 	it('does not nod under reduced motion, with no speaker or with one', async () => {
 		await emulateReducedMotion();
 		const { canvas, handle } = await mountFigure();
-		const resting = await noseTrace(canvas, nodTraceSamples);
+		const resting = await noseTrace(canvas, reducedTraceSamples);
 		handle.listen(speakerOnCentre(canvas));
-		const listening = await noseTrace(canvas, nodTraceSamples);
+		const listening = await noseTrace(canvas, reducedTraceSamples);
 
 		expect(Math.max(...resting) - Math.min(...resting)).toBeLessThan(0.5);
 		expect(Math.max(...listening.slice(settledFromSample)) - Math.min(...listening.slice(settledFromSample))).toBeLessThan(0.5);

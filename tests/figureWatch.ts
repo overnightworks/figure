@@ -39,6 +39,8 @@ export interface FigureWatch {
 	featuresNow(canvas: HTMLCanvasElement): Promise<Record<FaceFeature, Spot[]>>;
 	/** The face features of the picture the first frame drawn after this call shows on `canvas`, with no frames waited for beyond it. */
 	featuresOfNextFrame(canvas: HTMLCanvasElement): Promise<Record<FaceFeature, Spot[]>>;
+	/** The seconds the frames handed to the figures add up to since the first: the figures' own time, which on a slow runner falls behind the page's. */
+	figureSeconds(): number;
 	/** Stops reading, disposes the figures and removes their canvases. */
 	end(): void;
 }
@@ -53,17 +55,32 @@ export function handedFrameTimes(slow = false): (pageTime: number) => number {
 	};
 }
 
+/** The frame times `handedFrameTimes` hands, and the seconds they add up to since the first. */
+function countedFrameTimes(slow: boolean): { hand(pageTime: number): number; seconds(): number } {
+	const handTime = handedFrameTimes(slow);
+	let firstMilliseconds: number | undefined;
+	let lastMilliseconds = 0;
+	return {
+		hand(pageTime) {
+			lastMilliseconds = handTime(pageTime);
+			firstMilliseconds ??= lastMilliseconds;
+			return lastMilliseconds;
+		},
+		seconds: () => (firstMilliseconds === undefined ? 0 : (lastMilliseconds - firstMilliseconds) / 1000)
+	};
+}
+
 /** Starts a watch; `slowFrames` hands the figures frame times that make them too slow to keep, otherwise the frame times follow the page's but for any frame longer than `longestKeptFrameMilliseconds`. */
 export function startFigureWatch(slowFrames = false): FigureWatch {
 	const canvases: HTMLCanvasElement[] = [];
 	const handles: FigureHandle[] = [];
 	const shown = new Map<HTMLCanvasElement, { width: number; height: number; pixels: Uint8Array }>();
 	let frames = 0;
-	const handTime = handedFrameTimes(slowFrames);
+	const frameClock = countedFrameTimes(slowFrames);
 	vi.spyOn(Math, 'random').mockImplementation(seededRandom(7));
 	window.requestAnimationFrame = (callback) =>
 		requestFrameOwn.call(window, (time) => {
-			callback(handTime(time));
+			callback(frameClock.hand(time));
 			frames++;
 			canvases.forEach(readIfDrawn);
 		});
@@ -104,6 +121,7 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 			const picture = await this.pictureOfNextFrame(canvas);
 			return spotsOf(picture.pixels, picture.width, picture.height);
 		},
+		figureSeconds: () => frameClock.seconds(),
 		end() {
 			window.requestAnimationFrame = requestFrameOwn;
 			vi.restoreAllMocks();
