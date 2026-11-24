@@ -1,7 +1,0 @@
-claim_id = "f1297cb421e84c7497c53605a5bef0b8"
-agent = "Claude 9f77f834-b072-40ab-9852-5b8bc7b9d5f4"
-role = "builder"
-base = "4459cff7e61e0eadff01a8d1bbb8a66c8247a677"
-branch = "fix/dependabot-playwright-group"
-scope = [".github/dependabot.yml"]
-opened_commit = "dd372797f8ed22283158d169b57762f106947728"
