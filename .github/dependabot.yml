@@ -26,3 +26,7 @@ updates:
       # version, so the three move in one update.
       three:
         patterns: ["three", "@pixiv/three-vrm", "@pixiv/three-vrm-animation", "@types/three"]
+      # why: @playwright/test depends on exactly its own playwright version, so two versions
+      # installed side by side make the test runner reject its tests; both move in one update.
+      playwright:
+        patterns: ["playwright", "@playwright/test"]
