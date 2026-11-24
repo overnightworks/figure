@@ -1,0 +1,7 @@
+claim_id = "43590d109cbd42e691bbf930687d6cf0"
+agent = "Claude 9f77f834-b072-40ab-9852-5b8bc7b9d5f4"
+role = "builder"
+base = "4459cff7e61e0eadff01a8d1bbb8a66c8247a677"
+branch = "claude/issue-141-release-0-11-0-carries-the-mouth-that-fo"
+scope = ["README.md", "package.json"]
+opened_commit = "6e5c3eabd0f8454690104439460fda1a8253bc50"
