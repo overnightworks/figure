@@ -1,5 +1,5 @@
 claim_id = "8852953f01634ab697d115f649d7d269"
-agent = "Claude 4fd468aa-a5d8-4484-9aa4-cdf7cb916fe0"
+agent = "Claude 9f77f834-b072-40ab-9852-5b8bc7b9d5f4"
 role = "builder"
 base = "4459cff7e61e0eadff01a8d1bbb8a66c8247a677"
 branch = "claude/issue-143-figure-pins-quality-v0-25-0"
