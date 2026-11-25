@@ -87,19 +87,19 @@ describe('mount with the clips of a persona', { timeout: 60_000 }, () => {
 		watch.end();
 	});
 
-	/** The features of each picture over the next `seconds` of the page's time, the last one returned. */
+	/** The features of each picture over the next `seconds` of the figure's time, the last one returned; the figure's time falls behind the page's on a slow runner, and a clip's length is in the figure's. */
 	async function featuresAfter(canvas: HTMLCanvasElement, seconds: number): Promise<Features> {
-		const start = performance.now();
+		const start = watch.figureSeconds();
 		let features = await watch.featuresOfNextFrame(canvas);
-		while (performance.now() - start < seconds * 1000) features = await watch.featuresOfNextFrame(canvas);
+		while (watch.figureSeconds() - start < seconds) features = await watch.featuresOfNextFrame(canvas);
 		return features;
 	}
 
-	/** Whether any picture over the next `seconds` shows the arm raised. */
+	/** Whether any picture over the next `seconds` of the figure's time shows the arm raised. */
 	async function raisedWithin(canvas: HTMLCanvasElement, resting: Features, seconds: number): Promise<boolean> {
-		const start = performance.now();
+		const start = watch.figureSeconds();
 		let raised = false;
-		while (performance.now() - start < seconds * 1000) raised = isRaised(await watch.featuresOfNextFrame(canvas), resting) || raised;
+		while (watch.figureSeconds() - start < seconds) raised = isRaised(await watch.featuresOfNextFrame(canvas), resting) || raised;
 		return raised;
 	}
 
