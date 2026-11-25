@@ -10,6 +10,8 @@ import { figureFraming, type FigureFraming } from './framings.js';
 const sameFramingPixels = 4;
 /** The pictures watched after a change, enough seconds for it to arrive. */
 const arrivalTimeoutMilliseconds = 8000;
+/** The figure's own seconds a framing may take to settle. */
+const settleSeconds = 8;
 /** How far the eye span may move between two pictures for a framing to count as arrived. */
 const settledPixels = 1;
 const framingsWidestLast = [figureFraming.face, figureFraming.shoulders, figureFraming.upperBody, figureFraming.fullBody];
@@ -33,17 +35,22 @@ describe('a figure seen from its face to its whole body', () => {
 		await cdp().send('Emulation.setEmulatedMedia', { features: [] });
 	});
 
-	/** The eye span of the picture a figure mounted in `framing` shows once it has stopped changing. */
+	/** The eye span of the picture a figure mounted in `framing` shows once it has stopped changing; a picture with no eyes (a blink) is skipped, and the wait counts the figure's own seconds. */
 	async function spanMountedIn(framing?: unknown): Promise<number> {
 		const { canvas } = await watch.mountFigure(undefined, { framing: framing as FigureFraming });
-		let previous = Number.POSITIVE_INFINITY;
-		let span = previous;
-		await vi.waitFor(async () => {
+		const start = watch.figureSeconds();
+		let previous: number | undefined;
+		while (watch.figureSeconds() - start < settleSeconds) {
+			const features = await watch.featuresNow(canvas);
+			if (features.eye.length === 0) {
+				previous = undefined;
+				continue;
+			}
+			const span = eyeSpan(features);
+			if (previous !== undefined && Math.abs(span - previous) <= settledPixels) return span;
 			previous = span;
-			span = eyeSpan(await watch.featuresNow(canvas));
-			expect(Math.abs(span - previous)).toBeLessThanOrEqual(settledPixels);
-		}, { timeout: arrivalTimeoutMilliseconds });
-		return span;
+		}
+		throw new Error(`the eye span did not settle within ${settleSeconds} figure seconds`);
 	}
 
 	/** Expects `span` to be that of the framing `framing`, as a figure mounted in it shows. */
