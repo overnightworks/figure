@@ -42,7 +42,7 @@ describe('a figure seen from its face to its whole body', () => {
 			previous = span;
 			span = eyeSpan(await watch.featuresNow(canvas));
 			expect(Math.abs(span - previous)).toBeLessThanOrEqual(settledPixels);
-		});
+		}, { timeout: arrivalTimeoutMilliseconds });
 		return span;
 	}
 
