@@ -21,7 +21,7 @@ node dist/bin.js check --as clip path/to/gesture.vrma
 node dist/bin.js check --as room path/to/room.glb
 ```
 
-In an app or a release check, `checkFigure(bytes)` from the package root returns the list of refusals for a file's bytes;
+`mount` runs the check itself before three parses a byte. An app that wants the verdict earlier, before it keeps a file, calls `checkFigure(bytes)` from the package root, which returns the list of refusals for a file's bytes;
 it runs in a browser and in Node. `checkClip(bytes)` and `checkRoom(bytes)` do the same for a clip and a room.
 
 ## Mount a figure
