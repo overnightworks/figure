@@ -2,13 +2,13 @@
 
 ## 1. Context and Scope
 
-figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's bytes to a list of refusals, its siblings for a persona's gesture clip (a `.vrma` file) and for a persona's room (one static GLB of unlit materials), and the command `figure check [--as clip|room] <file>` around all three; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into an app's canvas and keeps it alive: the figure breathes, blinks and glances until the app disposes it, and waves when the app asks, with a persona's clip in place of figure's wave when the app hands one, behind a room the app hands it. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `checkFigure` (or `checkClip`, `checkRoom`) in a browser before three parses the file, and an app calls `mount` on a canvas.
+figure is a framework-free TypeScript ESM package. It holds the check, the profile's rules for a VRM 1.0 figure: a pure function from a figure file's bytes to a list of refusals, its siblings for a persona's gesture clip (a `.vrma` file) and for a persona's room (one static GLB of unlit materials), and the command `figure check [--as clip|room] <file>` around all three; and the drawing export `overnightworks-figure/draw`, whose `mount` draws a figure into an app's canvas and keeps it alive: the figure breathes, blinks and glances until the app disposes it, and waves when the app asks, with a persona's clip in place of figure's wave when the app hands one, behind a room the app hands it. Three callers use it: a person or a CI job (personas' release check) runs the command in Node, an app calls `mount` on a canvas, which runs the check before three parses a byte, and an app may run the same check itself, `checkFigure` (or `checkClip`, `checkRoom`), before it keeps a file, as the fleet's calling standard allows.
 
 ```mermaid
 flowchart LR
     caller["person or CI job"] -->|"figure check [--as clip|room] file"| package
-    app["an app in a browser"] -->|"checkFigure(bytes), checkClip(bytes), checkRoom(bytes)"| package
-    app -->|"mount(canvas, bytes)"| package
+    app["an app in a browser"] -->|"mount(canvas, bytes)"| package
+    app -.->|"optionally checkFigure(bytes), checkClip(bytes), checkRoom(bytes)"| package
     package["overnightworks-figure"] -->|"exit code, lines"| caller
     package -->|"list of refusals"| app
     package -->|"one drawn frame, a signal"| app

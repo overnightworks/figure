@@ -1,0 +1,9 @@
+[[code]]
+path = "src/soundMouth.ts"
+item = "overnightworks/hopin#800"
+reason = "The timed sounds of speak shape the mouth, and no app hands them to speak until hopin builds the release in."
+
+[[code]]
+path = "src/figureMount.ts"
+item = "overnightworks/agents#1068"
+reason = "The room swap behind the handle's room, in-call change and room(null), waits for the member tool that changes or leaves the room; hopin calls room only for a late first room."
