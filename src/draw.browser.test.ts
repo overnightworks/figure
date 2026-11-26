@@ -184,7 +184,7 @@ describe('mount in a browser', () => {
 		expect(signalsBeforeResolve).toEqual([handle.signal]);
 	});
 
-	it('resolves when the app\'s signal callback throws and reports the error to the window', async () => {
+	it('resolves when the app\'s signal callback throws, reports the error to the window and throws no other after the figure is disposed', async () => {
 		const reported: unknown[] = [];
 		const report = (event: ErrorEvent) => {
 			event.preventDefault();
@@ -192,17 +192,25 @@ describe('mount in a browser', () => {
 			reported.push(event.error);
 		};
 		window.addEventListener('error', report, { capture: true });
-		const thrown = new Error('the app failed');
-		const handle = await mount(newCanvas(), buildConformantVrm(), {
-			onSignal: () => {
-				throw thrown;
-			}
-		});
-		window.removeEventListener('error', report, { capture: true });
-		handles.push(handle);
+		try {
+			const thrown = new Error('the app failed');
+			let throwsNext = true;
+			const handle = await mount(newCanvas(), buildConformantVrm(), {
+				onSignal: () => {
+					if (!throwsNext) return;
+					throwsNext = false;
+					throw thrown;
+				}
+			});
+			handles.push(handle);
+			handle.dispose();
+			await new Promise((settled) => requestAnimationFrame(settled));
 
-		expect(handle.signal).toBe(figureSignal.drawn);
-		expect(reported).toEqual([thrown]);
+			expect(handle.signal).toBe(figureSignal.drawn);
+			expect(reported).toEqual([thrown]);
+		} finally {
+			window.removeEventListener('error', report, { capture: true });
+		}
 	});
 
 	it('disposes twice without an error', async () => {
