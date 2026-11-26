@@ -1,0 +1,7 @@
+claim_id = "8ba304942ebe4ec1a37b503fc7054709"
+agent = "Claude bb3a18eb-12f9-4741-b9ee-f7fbb93af003"
+role = "builder"
+base = "0cd139885cb191691cc372cf8f8b99bd19fd6cad"
+branch = "claude/issue-153-no-browser-test-s-error-escapes-into-ano"
+scope = ["src/draw.browser.test.ts"]
+opened_commit = "0ea9d3d643a544d41bc49360f228af8148c0f3ce"
