@@ -1,0 +1,7 @@
+claim_id = "6e7352b4530e4972bd9ad6b752520cce"
+agent = "Claude bb3a18eb-12f9-4741-b9ee-f7fbb93af003"
+role = "builder"
+base = "b09a097046e999fd1f9179cccf73b9f8119fa516"
+branch = "claude/issue-155-figure-s-documents-and-ahead-of-caller-l"
+scope = [".aco/ahead-of-caller.toml", "README.md", "docs/ARCHITECTURE.md"]
+opened_commit = "08e80d67dc176416679406f59e7e1f7a013f3dcd"
