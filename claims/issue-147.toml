@@ -1,7 +1,0 @@
-claim_id = "ffbc7dd340504b049ea6e4b0972f70f5"
-agent = "Claude bb3a18eb-12f9-4741-b9ee-f7fbb93af003"
-role = "builder"
-base = "ede9f82b40b546b2ebbef0e701102e88a12742d3"
-branch = "claude/issue-147-figure-pins-quality-v0-26-0"
-scope = [".github/workflows/ci.yml", ".github/workflows/code-scanning.yml", ".github/workflows/release.yml"]
-opened_commit = "d780158d971cecf6c62111527c1e374570c311f0"
