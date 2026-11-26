@@ -184,7 +184,8 @@ describe('mount in a browser', () => {
 		expect(signalsBeforeResolve).toEqual([handle.signal]);
 	});
 
-	it('resolves when the app\'s signal callback throws and reports the error to the window', async () => {
+	/** Collects the errors that reach the window until the returned `stop` runs, and keeps them from failing the test run. */
+	function collectWindowErrors(): { reported: unknown[]; stop: () => void } {
 		const reported: unknown[] = [];
 		const report = (event: ErrorEvent) => {
 			event.preventDefault();
@@ -192,17 +193,27 @@ describe('mount in a browser', () => {
 			reported.push(event.error);
 		};
 		window.addEventListener('error', report, { capture: true });
-		const thrown = new Error('the app failed');
-		const handle = await mount(newCanvas(), buildConformantVrm(), {
-			onSignal: () => {
-				throw thrown;
-			}
-		});
-		window.removeEventListener('error', report, { capture: true });
-		handles.push(handle);
+		return { reported, stop: () => window.removeEventListener('error', report, { capture: true }) };
+	}
 
-		expect(handle.signal).toBe(figureSignal.drawn);
-		expect(reported).toEqual([thrown]);
+	it('resolves when the app\'s signal callback throws and reports the error to the window', async () => {
+		const { reported, stop } = collectWindowErrors();
+		try {
+			const thrown = new Error('the app failed');
+			const handle = await mount(newCanvas(), buildConformantVrm(), {
+				onSignal: () => {
+					throw thrown;
+				}
+			});
+			handles.push(handle);
+			handle.dispose();
+			await new Promise((settled) => requestAnimationFrame(settled));
+
+			expect(handle.signal).toBe(figureSignal.drawn);
+			expect(reported).toEqual([thrown]);
+		} finally {
+			stop();
+		}
 	});
 
 	it('disposes twice without an error', async () => {
@@ -570,6 +581,32 @@ describe('mount in a browser', () => {
 				expect(clock.requested).toBe(requested);
 				expect(clock.pending).toBe(0);
 				expect(signals).toEqual([figureSignal.drawn, figureSignal.slow]);
+			});
+
+			it('reports each throw of the app\'s signal callback to the window while the figure lives and none after its disposal', async () => {
+				const { reported, stop } = collectWindowErrors();
+				try {
+					const thrown = new Error('the app failed');
+					const handle = await mount(attachedCanvas(), buildConformantVrm(), {
+						onSignal: () => {
+							throw thrown;
+						}
+					});
+					handles.push(handle);
+					await vi.waitFor(() => expect(clock.pending).toBe(1));
+
+					runFrames(40, 60);
+					await new Promise((settled) => setTimeout(settled, 0));
+
+					expect(handle.signal).toBe(figureSignal.slow);
+					expect(reported).toEqual([thrown, thrown]);
+					handle.dispose();
+					runFrames(2, 60);
+					await new Promise((settled) => setTimeout(settled, 0));
+					expect(reported).toEqual([thrown, thrown]);
+				} finally {
+					stop();
+				}
 			});
 
 			it('gives no slow for forty frames 33 ms apart', async () => {
