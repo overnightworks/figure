@@ -669,4 +669,3 @@ describe('a figure driven by the host', () => {
 		expect(Math.max(...listening.slice(settledFromSample)) - Math.min(...listening.slice(settledFromSample))).toBeLessThan(0.5);
 	});
 });
-

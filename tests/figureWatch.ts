@@ -128,4 +128,3 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 		}
 	};
 }
-
