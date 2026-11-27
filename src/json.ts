@@ -42,9 +42,23 @@ export function listOf(value: unknown): unknown[] {
 	return value === undefined ? [] : requiredListOf(value);
 }
 
+/** The entries of a JSON object, or none for a value that is no object. */
+export function entriesOf(value: unknown): ReadonlyMap<string, unknown> {
+	return new Map(isJsonObject(value) ? Object.entries(value) : []);
+}
+
 export function indexOf(value: unknown): number {
 	if (!Number.isInteger(value) || (value as number) < 0) {
 		return unreadable('an index is not a non-negative integer');
 	}
 	return value as number;
+}
+
+/** The index, unreadable unless it names an object entry of the list `json[listName]`, as the loader reads it; `message` says what the caller refuses. */
+export function mustNameEntry(json: JsonObject, listName: string, index: unknown, message = `names no entry of ${listName}`): number {
+	const position = indexOf(index);
+	if (!isJsonObject(listOf(json[listName])[position])) {
+		unreadable(message);
+	}
+	return position;
 }

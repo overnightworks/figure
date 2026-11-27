@@ -1,7 +1,15 @@
 import { isJsonObject, unreadable, type JsonObject } from './json.js';
 
 /** The component types glTF 2.0 defines, as the integers it requires. The loader also reads a number as text such as "5126", but that is no glTF value and is refused with the rest. */
-const COMPONENT_TYPES = new Set([5120, 5121, 5122, 5123, 5125, 5126]);
+export const componentType = {
+	byte: 5120,
+	unsignedByte: 5121,
+	short: 5122,
+	unsignedShort: 5123,
+	unsignedInt: 5125,
+	float: 5126
+} as const;
+const COMPONENT_TYPES: ReadonlySet<unknown> = new Set(Object.values(componentType));
 
 /**
  * Unreadable when an accessor that `primitive` names as its `indices` or one of its attributes, and that exists, has no glTF component type:
@@ -13,7 +21,7 @@ export function mustNameAccessorsOfGltfComponentType(json: JsonObject, primitive
 	const accessors: unknown = json['accessors'];
 	for (const index of [primitive['indices'], ...attributes]) {
 		const accessor = Array.isArray(accessors) && Number.isInteger(index) ? (accessors[index as number] as unknown) : undefined;
-		if (isJsonObject(accessor) && !COMPONENT_TYPES.has(accessor['componentType'] as number)) {
+		if (isJsonObject(accessor) && !COMPONENT_TYPES.has(accessor['componentType'])) {
 			unreadable("names an accessor whose componentType is none of glTF's");
 		}
 	}

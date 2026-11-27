@@ -1,10 +1,16 @@
 import type { Refusal } from './codes.js';
+import { componentType } from './accessorRules.js';
 import { attemptRead, indexOf, isJsonObject, objectOf, requiredListOf, unreadable, type JsonObject } from './json.js';
 import { clipProfile } from './profile.js';
 
-const FLOAT = 5126;
+const FLOAT = componentType.float;
 /** The component types glTF gives a rotation besides float; each stores a normalised integer. */
-const NORMALISED_INTEGERS: ReadonlySet<unknown> = new Set([5120, 5121, 5122, 5123]);
+const NORMALISED_INTEGERS: ReadonlySet<unknown> = new Set([
+	componentType.byte,
+	componentType.unsignedByte,
+	componentType.short,
+	componentType.unsignedShort
+]);
 const BYTES_PER_COMPONENT = 4;
 const ALIGNMENT_BYTES = 4;
 const COMPONENTS_OF_TYPE = { SCALAR: 1, VEC3: 3, VEC4: 4 } as const;

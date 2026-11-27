@@ -1,5 +1,6 @@
 import type { Refusal } from './codes.js';
-import { attemptRead, indexOf, isJsonObject, listOf, unreadable, type JsonObject } from './json.js';
+import { attemptRead, entriesOf, isJsonObject, type JsonObject } from './json.js';
+import { missingBoneRefusal, nodeOfEntry } from './humanoidRules.js';
 import { figureProfile } from './profile.js';
 import { sharedChildRefusals } from './sceneRules.js';
 
@@ -29,19 +30,15 @@ function presetRefusals(vrm: JsonObject): Refusal[] {
 
 function humanoidRefusals(vrm: JsonObject, json: JsonObject): Refusal[] {
 	const humanoid = vrm['humanoid'];
-	const humanBones = isJsonObject(humanoid) ? humanoid['humanBones'] : undefined;
+	const humanBones = entriesOf(isJsonObject(humanoid) ? humanoid['humanBones'] : undefined);
 	const refusals: Refusal[] = [];
 	for (const bone of figureProfile.requiredHumanBones) {
-		const entry = isJsonObject(humanBones) ? humanBones[bone] : undefined;
-		if (!isJsonObject(entry) || !('node' in entry)) {
-			refusals.push({ code: 'humanoid_bone_missing', detail: `the bone ${bone} is missing` });
-			continue;
+		const missing = missingBoneRefusal(humanBones, bone);
+		if (missing === undefined) {
+			attemptRead(refusals, `humanoid bone ${bone}`, () => nodeOfEntry(json, humanBones.get(bone)));
+		} else {
+			refusals.push(missing);
 		}
-		attemptRead(refusals, `humanoid bone ${bone}`, () => {
-			if (!isJsonObject(listOf(json['nodes'])[indexOf(entry['node'])])) {
-				unreadable('a node index names no entry of nodes');
-			}
-		});
 	}
 	return refusals;
 }
