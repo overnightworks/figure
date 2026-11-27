@@ -2,17 +2,10 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng, buildPng } from '../tests/glbBuilder.js';
-import { centreOf, coversSomething, emulateReducedMotion, readPixels, restorePageVisibility, setPageVisibility, spotsOf } from '../tests/browserCanvas.js';
+import { centreOf, coversSomething, emulateReducedMotion, readPixels, restorePageVisibility, setPageVisibility, spotsOf, nextFrame, requestFrameOwn } from '../tests/browserCanvas.js';
 import * as draw from './draw.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal, type FigureSignal } from './signals.js';
-
-/** The page's own frame request, which the tests wait on without the watcher counting it. */
-const requestFrameOwn = window.requestAnimationFrame;
-
-function nextFrame(): Promise<void> {
-	return new Promise((resolve) => requestFrameOwn.call(window, () => resolve()));
-}
 
 describe('mount in a browser', () => {
 	const canvases: HTMLCanvasElement[] = [];

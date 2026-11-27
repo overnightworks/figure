@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp, userEvent } from 'vitest/browser';
-import { centreOf, emulateReducedMotion, faceDifference, restorePageVisibility, setPageVisibility } from '../tests/browserCanvas.js';
+import { centreOf, emulateReducedMotion, faceDifference, nextFrame, restorePageVisibility, setPageVisibility } from '../tests/browserCanvas.js';
 import { vrmParts } from '../tests/figureFixtures.js';
 import { buildGlb } from '../tests/glbBuilder.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
@@ -11,8 +11,6 @@ import type { FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
 import { analysisWindowLength } from './vowelWeights.js';
 
-/** The page's own frame request, which the tests wait on without the watch counting it. */
-const requestFrameOwn = window.requestAnimationFrame;
 /** How far a speaker at the far side of the page turns the nose, in pixels at a canvas 200 wide, and how far the thinking look turns it the other way. */
 const turnedPixels = 10;
 /** The dark pixels of the face a neutral picture differs from the neutral baseline by, at most, even with the sway's drift, and the fewest a shown mood's differs by; the least any of the five moods moves is well over the first. */
@@ -228,8 +226,8 @@ describe('a figure whose agent speaks', () => {
 
 			setPageVisibility('hidden');
 			const hiddenAt = reads.mock.calls.length;
-			await new Promise<void>((resolve) => requestFrameOwn.call(window, () => resolve()));
-			await new Promise<void>((resolve) => requestFrameOwn.call(window, () => resolve()));
+			await nextFrame();
+			await nextFrame();
 			expect(reads.mock.calls).toHaveLength(hiddenAt);
 
 			setPageVisibility('visible');
@@ -484,7 +482,7 @@ describe('a figure whose agent speaks', () => {
 				expect(() => handle.speak({ mood: unknown as FigureMood })).not.toThrow();
 
 				expect(neutral(await differenceFrom(canvas, baseline))).toBe(true);
-				await new Promise((resolve) => requestFrameOwn.call(window, resolve));
+				await nextFrame();
 				expect(neutral(await differenceFrom(canvas, baseline))).toBe(true);
 			});
 		});

@@ -6,10 +6,8 @@ import { mountWithLoads, type ClipLoad, type RoomLoad } from '../src/figureMount
 import { loadRoom } from '../src/roomLoader.js';
 import { buildConformantVrm } from './figureFixtures.js';
 import { slowMedianMilliseconds } from '../src/frameTimeGuard.js';
-import { coversSomething, readPixels, spotsOf, type FaceFeature, type Spot } from './browserCanvas.js';
-
-/** The page's own frame request, which the watch waits on without counting it. */
-const requestFrameOwn = window.requestAnimationFrame;
+import { coversSomething, readPixels, spotsOf, type FaceFeature, type Spot, nextFrame, requestFrameOwn } from './browserCanvas.js';
+import { seededRandom } from './figureMotionWatch.js';
 
 /** The milliseconds a frame lasts when the watch makes the frames slow: far past what the frame-time guard keeps. */
 const slowFrameMilliseconds = 60;
@@ -114,7 +112,7 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 		},
 		async pictureOfNextFrame(canvas) {
 			// The figure's own frame request is older than this one, so its frame draws and is read before this callback runs.
-			await new Promise<void>((resolve) => requestFrameOwn.call(window, () => resolve()));
+			await nextFrame();
 			return shown.get(canvas)!;
 		},
 		async featuresOfNextFrame(canvas) {
@@ -128,16 +126,5 @@ export function startFigureWatch(slowFrames = false): FigureWatch {
 			handles.splice(0).forEach((handle) => handle.dispose());
 			canvases.splice(0).forEach((canvas) => canvas.remove());
 		}
-	};
-}
-
-/** A small seeded source of numbers in [0, 1) (mulberry32): a run draws the same idle glances and blinks every time, and three still gets distinct identifiers. */
-function seededRandom(seed: number): () => number {
-	let state = seed;
-	return () => {
-		state = (state + 0x6d2b79f5) | 0;
-		let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
-		mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
-		return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
 	};
 }

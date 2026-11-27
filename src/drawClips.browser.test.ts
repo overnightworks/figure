@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildArmUpClip, buildClipGlb, buildClipGlbOfSize, filesTheLibraryThrowsOn } from '../tests/clipFixtures.js';
-import { type FaceFeature, type Spot } from '../tests/browserCanvas.js';
+import { type FaceFeature, type Spot, nextFrame } from '../tests/browserCanvas.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
 import { gestureClips, gestureLengthSeconds } from './gestureClips.js';
 import { loadClip } from './clipLoader.js';
@@ -25,13 +25,7 @@ const holdingClip = () => buildArmUpClip(holdSeconds);
 const afterNeutralWaveSeconds = gestureLengthSeconds(gestureClips[figureGesture.wave]) + 1;
 /** The longest a test waits for something the page does on its own. */
 const settleMilliseconds = 5000;
-/** The page's own frame request, which the tests wait on without the spy on `window` counting it. */
-const requestFrameOwn = window.requestAnimationFrame;
 const framesAfterDispose = 5;
-
-function nextFrame(): Promise<void> {
-	return new Promise((resolve) => requestFrameOwn.call(window, () => resolve()));
-}
 
 /**
  * The parse of a clip's bytes with a gate before it: it waits for `release` or `fail`, and then parses with figure's own loader or ends in

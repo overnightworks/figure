@@ -121,3 +121,11 @@ export function faceDifference(first: Record<FaceFeature, Spot[]>, second: Recor
 	const [firstDark, secondDark] = [fromNose(first), fromNose(second)];
 	return unmatched(firstDark, secondDark) + unmatched(secondDark, firstDark);
 }
+
+/** The page's own frame request, captured before a test patches it, which a watch waits on without counting it and restores on ending. */
+export const requestFrameOwn = window.requestAnimationFrame;
+
+/** Resolves in the page's next frame, through its own frame request. */
+export function nextFrame(): Promise<void> {
+	return new Promise((resolve) => requestFrameOwn.call(window, () => resolve()));
+}

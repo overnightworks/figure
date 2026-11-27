@@ -2,13 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng } from '../tests/glbBuilder.js';
-import { centreOf, coversSomething, emulateReducedMotion, mouthDepthBelowNose, readPixels, spotsOf, type FaceFeature, type Spot } from '../tests/browserCanvas.js';
+import { centreOf, coversSomething, emulateReducedMotion, mouthDepthBelowNose, readPixels, spotsOf, type FaceFeature, type Spot, nextFrame, requestFrameOwn } from '../tests/browserCanvas.js';
 import { handedFrameTimes } from '../tests/figureWatch.js';
+import { seededRandom } from '../tests/figureMotionWatch.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal } from './signals.js';
-
-/** The page's own frame request, which the tests wait on without the watcher counting it. */
-const requestFrameOwn = window.requestAnimationFrame;
 
 /** How far the nose has to move to the side or up, in pixels at a canvas 200 wide, for a test to call it turned, and how near its resting place it has to be to call it back. */
 const turnedPixels = { side: 10, up: 4 };
@@ -671,18 +669,3 @@ describe('a figure driven by the host', () => {
 		expect(Math.max(...listening.slice(settledFromSample)) - Math.min(...listening.slice(settledFromSample))).toBeLessThan(0.5);
 	});
 });
-
-/** A small seeded source of numbers in [0, 1) (mulberry32). */
-function seededRandom(seed: number): () => number {
-	let state = seed;
-	return () => {
-		state = (state + 0x6d2b79f5) | 0;
-		let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
-		mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
-		return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
-	};
-}
-
-function nextFrame(): Promise<void> {
-	return new Promise((resolve) => requestFrameOwn.call(window, () => resolve()));
-}
