@@ -31,7 +31,7 @@
     "./vocabulary.json": "./dist/figure-vocabulary.json"
   },
   "scripts": {
-    "build": "tsc && node scripts/write_vocabulary.mjs",
+    "build": "tsc && node scripts/write_vocabulary.mjs && node scripts/write_command_shebang.mjs",
     "prepack": "pnpm run build",
     "check": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.node.json && tsc --noEmit -p tests",
     "test": "vitest run --project node",
