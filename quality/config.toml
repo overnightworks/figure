@@ -1,53 +1,53 @@
 [gate]
 mandatory_jobs = ["checks"]
 
-[[root.allow]]
-entry = "tsconfig.json"
-reason = "tsc and the editor find the TypeScript configuration at the root"
-
-[[root.allow]]
-entry = "vitest.config.ts"
-reason = "vitest finds its configuration at the root"
-
 [[layout.allow]]
 path = "tests/e2e/stage.spec.ts"
 rule = "test-layout"
 reason = "the browser layer sits beside the Node test builders in tests/, and a root e2e/ would need its own root entry"
+ends = "overnightworks/quality#1102"
 
 [[layout.allow]]
 path = "src/bin.ts"
 rule = "script-name"
 reason = "npm links the figure command to this file, whose shebang makes it executable"
+ends = "#166"
 
 [[layout.allow]]
 path = "src/bin.ts"
 rule = "script-header"
 reason = "the script header rule reads # and .mjs comments only, and this TypeScript entry is four lines of wiring"
+ends = "#166"
 
 [[layout.allow]]
 path = "tests/e2e/check.spec.ts"
 rule = "test-layout"
 reason = "the browser layer sits beside the Node test builders in tests/, and a root e2e/ would need its own root entry"
+ends = "overnightworks/quality#1102"
 
 [[layout.allow]]
 path = "src/conformantFigure.test.ts"
 rule = "test-layout"
 reason = "it tests the test builder in tests/, and vitest runs only src/**/*.test.ts"
+ends = "#166"
 
 [[layout.allow]]
 path = "src/figurePng.test.ts"
 rule = "test-layout"
 reason = "it tests the test builder in tests/, and vitest runs only src/**/*.test.ts"
+ends = "#166"
 
 [[layout.allow]]
 path = "src/figureValidator.test.ts"
 rule = "test-layout"
 reason = "it tests the test builder in tests/, and vitest runs only src/**/*.test.ts"
+ends = "#166"
 
 [[layout.allow]]
 path = "src/figureDriving.browser.test.ts"
 rule = "test-layout"
 reason = "it drives the handle's think through the draw, motion and frame modules together on a canvas, so no single module is its subject"
+ends = "#166"
 
 [[gate.loosened]]
 what = 'size baseline adds ccn src/clipKeyRules.ts locate 16'
