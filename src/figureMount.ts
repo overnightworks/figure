@@ -152,7 +152,7 @@ function createFrameDrawer(stage: FigureStage, canvas: HTMLCanvasElement, state:
 	};
 }
 
-/** The handle's verbs over the loop's state: each acts while the loop runs and is ignored once it has stopped. */
+/** The handle's verbs over the loop's state: `listen` and `speak` are ignored once the loop has stopped; `gesture` and `frame` only set what a frame would draw, and none follows. */
 function createLoopVerbs(stage: FigureStage, state: LoopState): Omit<Loop, 'stop'> {
 	const { motion, voiceTap, soundMouth, reducedMotion } = state;
 	return {
@@ -160,9 +160,11 @@ function createLoopVerbs(stage: FigureStage, state: LoopState): Omit<Loop, 'stop
 			state.facts = { ...state.facts, thinking: working === true };
 		},
 		listen: (element: Element | null) => {
+			// Without the check a stopped loop would hold the host's element in memory again, which `stop` released; no frame reads it.
 			if (!state.stopped) state.speaker = element;
 		},
 		speak: (sentence: Sentence) => {
+			// Without the check a voice would be tapped again after `stop` released its tap.
 			if (state.stopped) return;
 			const speaking = typeof sentence === 'object' && sentence !== null;
 			state.facts = { ...state.facts, speaking, mood: speaking ? sentence.mood : undefined };
@@ -170,10 +172,10 @@ function createLoopVerbs(stage: FigureStage, state: LoopState): Omit<Loop, 'stop
 			soundMouth.follow(speaking ? soundsOf(sentence) : undefined);
 		},
 		gesture: (name: unknown) => {
-			if (!state.stopped && document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);
+			if (document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);
 		},
 		frame: (name: unknown) => {
-			if (!state.stopped && isFigureFraming(name)) stage.frame(name);
+			if (isFigureFraming(name)) stage.frame(name);
 		}
 	};
 }
