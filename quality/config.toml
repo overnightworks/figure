@@ -74,12 +74,6 @@ date = 2026-11-18
 reason = "the operator's ruled adoption path for script size entries"
 
 [[gate.loosened]]
-what = 'size baseline adds function_lines src/figureMount.ts runLoop 87'
-item = "overnightworks/quality#884"
-date = 2026-11-18
-reason = "the operator's ruled adoption path for script size entries"
-
-[[gate.loosened]]
 what = 'size baseline adds function_lines src/idleMotion.ts createIdleMotion 64'
 item = "overnightworks/quality#884"
 date = 2026-11-18
