@@ -1,0 +1,8 @@
+claim_id = "0dd0ed660bc74914bea1d514e29457c7"
+agent = "Claude 542a621c-e91b-4fa6-90e7-40d4764d6d9e"
+role = "builder"
+base = "3fece7c1c199940c1a5751516032f3ef88244893"
+branch = "claude/issue-161-test-and-script-helpers-import-their-own"
+scope = ["scripts/measure_budget_figure.mjs", "src/draw.browser.test.ts", "src/drawClips.browser.test.ts", "src/drawRoom.browser.test.ts", "src/drawSpeaking.browser.test.ts", "src/figureDriving.browser.test.ts", "src/idleMotion.test.ts", "src/vowelWeights.test.ts", "tests/browserCanvas.ts", "tests/figureMotionWatch.ts", "tests/figureWatch.ts"]
+opened_commit = "84e147484b543b2a2b241c328df6427f8f9c423e"
+whole_reason = "Every copy of a helper moves to its one owner in one change, or the copies outlive the owner; it is test and script code only."
