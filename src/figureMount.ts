@@ -4,15 +4,15 @@ import { checkClip, checkFigure, checkRoom } from './check.js';
 import { createFigureStage, type FigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
 import type { FigureMood } from './expressions.js';
-import { createFigureMotion, type FigureFacts, type SpeakerOffset } from './figureMotion.js';
+import { createFigureMotion, type FigureFacts, type FigureMotion, type SpeakerOffset } from './figureMotion.js';
 import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
 import type { LoadedClip } from './gestureLayer.js';
 import { defaultFraming, isFigureFraming, type FigureFraming } from './framings.js';
 import { isFigureGesture, type FigureGesture } from './gestures.js';
 import type { FigureHandle, MountOptions, SpokenSounds } from './mountOptions.js';
 import { figureSignal, type FigureSignal } from './signals.js';
-import { createSoundMouth } from './soundMouth.js';
-import { createVoiceTap } from './voiceTap.js';
+import { createSoundMouth, type SoundMouth } from './soundMouth.js';
+import { createVoiceTap, type VoiceTap } from './voiceTap.js';
 
 /** What the agent speaks: the voice its mouth follows, the sounds that time the voice's mouth and the mood its face shows. */
 type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood; readonly sounds?: SpokenSounds } | null;
@@ -117,9 +117,9 @@ type LoopState = {
 	facts: FigureFacts;
 	speaker: Element | null;
 	stopped: boolean;
-	readonly motion: ReturnType<typeof createFigureMotion>;
-	readonly voiceTap: ReturnType<typeof createVoiceTap>;
-	readonly soundMouth: ReturnType<typeof createSoundMouth>;
+	readonly motion: FigureMotion;
+	readonly voiceTap: VoiceTap;
+	readonly soundMouth: SoundMouth;
 	readonly reducedMotion: MediaQueryList;
 };
 
