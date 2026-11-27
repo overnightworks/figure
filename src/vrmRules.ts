@@ -1,5 +1,5 @@
 import type { Refusal } from './codes.js';
-import { attemptRead, entriesOf, isJsonObject, type JsonObject } from './json.js';
+import { attemptRead, entriesOf, isJsonObject, objectOf, type JsonObject } from './json.js';
 import { missingBoneRefusal, nodeOfEntry } from './humanoidRules.js';
 import { figureProfile } from './profile.js';
 import { sharedChildRefusals } from './sceneRules.js';
@@ -35,7 +35,7 @@ function humanoidRefusals(vrm: JsonObject, json: JsonObject): Refusal[] {
 	for (const bone of figureProfile.requiredHumanBones) {
 		const missing = missingBoneRefusal(humanBones, bone);
 		if (missing === undefined) {
-			attemptRead(refusals, `humanoid bone ${bone}`, () => nodeOfEntry(json, humanBones.get(bone)));
+			attemptRead(refusals, `humanoid bone ${bone}`, () => nodeOfEntry(json, objectOf(humanBones.get(bone))['node']));
 		} else {
 			refusals.push(missing);
 		}

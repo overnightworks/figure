@@ -103,6 +103,14 @@ describe('the room rules', () => {
 			expect(new Set(places).size).toBe(places.length);
 		});
 
+		it('reports a list that is no list before an index that is no index', () => {
+			const change = (json: Json) => {
+				json.accessors = 'x';
+				json.meshes[0].primitives[0].indices = -1;
+			};
+			expect(refusalsOf(change).map(({ detail }) => detail)).toContain('meshes[0].primitives[0]: a value that must be a list is not');
+		});
+
 		it.each([
 			['a material that is not an object', (json: Json) => (json.materials[0] = null), ['materials[0]']],
 			['materials that are not a list', (json: Json) => (json.materials = {}), ['materials']],

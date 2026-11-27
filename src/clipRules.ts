@@ -49,7 +49,7 @@ function extensionRefusals(json: JsonObject, refusals: Refusal[]): ReadonlyMap<n
 	}
 	const assign = (place: string, entry: unknown, role: NodeRole) =>
 		attemptRead(refusals, place, () => {
-			const node = nodeOfEntry(json, entry);
+			const node = nodeOfEntry(json, indexOf(objectOf(entry)['node']));
 			roles.set(node, [...(roles.get(node) ?? []), role]);
 		});
 	const humanBones = entriesOf(isJsonObject(extension['humanoid']) ? extension['humanoid']['humanBones'] : undefined);
@@ -153,7 +153,7 @@ function trackNotAllowed(json: JsonObject, roles: ReadonlyMap<number, readonly N
 	if (target['node'] === undefined) {
 		return 'has no target node';
 	}
-	const node = mustNameEntry(json, 'nodes', target['node'], 'the target names a node that is no entry of nodes');
+	const node = mustNameEntry(json, 'nodes', indexOf(target['node']), 'the target names a node that is no entry of nodes');
 	if (path === 'weights') {
 		return 'animates weights, and the clip has no mesh';
 	}

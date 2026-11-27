@@ -54,10 +54,11 @@ export function indexOf(value: unknown): number {
 	return value as number;
 }
 
-/** The index, unreadable unless it names an object entry of the list `json[listName]`, as the loader reads it; `message` says what the caller refuses. */
+/** The index, read after the list, unreadable unless it names an object entry of the list `json[listName]`, as the loader reads it; `message` says what the caller refuses. */
 export function mustNameEntry(json: JsonObject, listName: string, index: unknown, message = `names no entry of ${listName}`): number {
+	const list = listOf(json[listName]);
 	const position = indexOf(index);
-	if (!isJsonObject(listOf(json[listName])[position])) {
+	if (!isJsonObject(list[position])) {
 		unreadable(message);
 	}
 	return position;

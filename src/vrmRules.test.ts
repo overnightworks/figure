@@ -109,6 +109,14 @@ describe('the VRM rules', () => {
 			expect(refusals[0]?.detail).toContain(bone);
 		});
 
+		it('reports nodes that are no list before a node index that is no index', () => {
+			const refusals = refusalsOf((json) => {
+				json.nodes = 'x';
+				humanBonesOf(json)[bones[0] as string].node = -1;
+			});
+			expect(refusals.map(({ detail }) => detail)).toContain(`humanoid bone ${bones[0]}: a value that must be a list is not`);
+		});
+
 		it('refuses one humanoid_bone_missing per missing bone', () => {
 			const [first, second] = bones;
 			const refusals = refusalsOf((json) => {
