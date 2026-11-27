@@ -1,8 +1,0 @@
-claim_id = "b11a205ad44040c7b25b8f0a542519c8"
-agent = "Claude 542a621c-e91b-4fa6-90e7-40d4764d6d9e"
-role = "builder"
-base = "3fece7c1c199940c1a5751516032f3ef88244893"
-branch = "claude/issue-159-the-check-s-rule-helpers-have-one-owner"
-scope = ["docs/ARCHITECTURE.md", "src/accessorRules.ts", "src/clipKeyRules.ts", "src/clipRules.ts", "src/humanoidRules.ts", "src/json.ts", "src/roomRules.ts", "src/vrmRules.ts"]
-opened_commit = "4cfac1c1eaad62915cfc139c34be90d869e336e3"
-whole_reason = "The three owners are one refactor of the check's pure rule modules, proven by the same unchanged check tests, within the slice limit."
