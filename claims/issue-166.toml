@@ -1,0 +1,8 @@
+claim_id = "dd2396113ab24e069ae70ab32c5225ad"
+agent = "Claude 542a621c-e91b-4fa6-90e7-40d4764d6d9e"
+role = "builder"
+base = "bf34298847a9841ea0e1d82efd3970c562def48b"
+branch = "claude/issue-166-figure-s-tests-and-command-need-no-layou"
+scope = ["docs/ARCHITECTURE.md", "package.json", "quality/config.toml", "scripts/write_command_shebang.mjs", "src/bin.ts", "src/conformantFigure.test.ts", "src/drawDriving.browser.test.ts", "src/figureDriving.browser.test.ts", "src/figurePng.test.ts", "src/figureValidator.test.ts", "tests/figureFixtures.test.ts", "tests/figureFixtures.validator.test.ts", "tests/glbBuilder.png.test.ts", "vitest.config.ts"]
+opened_commit = "f7542b8eef9cf19f39822e40763fa30b47c342d9"
+whole_reason = "The six entries are ended by one change, whose renames, moves and build step together empty the layout allow list."
