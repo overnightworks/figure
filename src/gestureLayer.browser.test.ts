@@ -16,7 +16,6 @@ import { boneClock, clipWeight, gestureClips, gestureLengthSeconds } from './ges
 import { createGestureLayer, type GestureLayer } from './gestureLayer.js';
 import { figureFraming } from './framings.js';
 import { figureGesture, type FigureGesture } from './gestures.js';
-import { figureSignal } from './signals.js';
 
 type Features = Record<FaceFeature, Spot[]>;
 
