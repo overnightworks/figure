@@ -4,15 +4,15 @@ import { checkClip, checkFigure, checkRoom } from './check.js';
 import { createFigureStage, type FigureStage } from './figureFrame.js';
 import { loadFigure } from './figureLoader.js';
 import type { FigureMood } from './expressions.js';
-import { createFigureMotion, type FigureFacts, type SpeakerOffset } from './figureMotion.js';
+import { createFigureMotion, type FigureFacts, type FigureMotion, type SpeakerOffset } from './figureMotion.js';
 import { isSlow, recordFrameInterval } from './frameTimeGuard.js';
 import type { LoadedClip } from './gestureLayer.js';
 import { defaultFraming, isFigureFraming, type FigureFraming } from './framings.js';
 import { isFigureGesture, type FigureGesture } from './gestures.js';
 import type { FigureHandle, MountOptions, SpokenSounds } from './mountOptions.js';
 import { figureSignal, type FigureSignal } from './signals.js';
-import { createSoundMouth } from './soundMouth.js';
-import { createVoiceTap } from './voiceTap.js';
+import { createSoundMouth, type SoundMouth } from './soundMouth.js';
+import { createVoiceTap, type VoiceTap } from './voiceTap.js';
 
 /** What the agent speaks: the voice its mouth follows, the sounds that time the voice's mouth and the mood its face shows. */
 type Sentence = { readonly voice?: AudioNode; readonly mood?: FigureMood; readonly sounds?: SpokenSounds } | null;
@@ -112,6 +112,72 @@ const reducedMotionQuery = '(prefers-reduced-motion: reduce)';
 /** The signals that end a drawn figure from inside its loop. */
 type LoopEnding = typeof figureSignal.lost | typeof figureSignal.slow;
 
+/** What the loop's frames and the handle's verbs share: the facts the host reported, the speaker the camera follows and what turns them into a pose. */
+type LoopState = {
+	facts: FigureFacts;
+	speaker: Element | null;
+	stopped: boolean;
+	readonly motion: FigureMotion;
+	readonly voiceTap: VoiceTap;
+	readonly soundMouth: SoundMouth;
+	readonly reducedMotion: MediaQueryList;
+};
+
+/** The frames of one stage: each draws the pose the motion gives for the facts reported by then, and `next` returns the interval since the previous one. */
+function createFrameDrawer(stage: FigureStage, canvas: HTMLCanvasElement, state: LoopState) {
+	let previousTime = performance.now();
+	/** Draws the frame at `time`; the camera glides to a new framing unless the page asks for reduced motion or `resuming` a pause, which shows the framing as it is now. */
+	const drawAt = (time: number, resuming = false) => {
+		const elapsedSeconds = (time - previousTime) / 1000;
+		previousTime = time;
+		const { motion, voiceTap, soundMouth, reducedMotion } = state;
+		stage.draw(
+			motion.advance(state.facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, state.speaker), soundMouth.goal(voiceTap.clock()) ?? voiceTap.weights()),
+			elapsedSeconds,
+			!resuming && !reducedMotion.matches
+		);
+	};
+	return {
+		first: () => drawAt(previousTime),
+		/** Draws at once, with no time counted for the pause. */
+		resume: () => {
+			previousTime = performance.now();
+			drawAt(previousTime, true);
+		},
+		next: (time: number) => {
+			const intervalMilliseconds = time - previousTime;
+			drawAt(time);
+			return intervalMilliseconds;
+		}
+	};
+}
+
+/** The handle's verbs over the loop's state: each acts while the loop runs and is ignored once it has stopped. */
+function createLoopVerbs(stage: FigureStage, state: LoopState): Omit<Loop, 'stop'> {
+	const { motion, voiceTap, soundMouth, reducedMotion } = state;
+	return {
+		think: (working: boolean) => {
+			state.facts = { ...state.facts, thinking: working === true };
+		},
+		listen: (element: Element | null) => {
+			if (!state.stopped) state.speaker = element;
+		},
+		speak: (sentence: Sentence) => {
+			if (state.stopped) return;
+			const speaking = typeof sentence === 'object' && sentence !== null;
+			state.facts = { ...state.facts, speaking, mood: speaking ? sentence.mood : undefined };
+			voiceTap.follow(speaking ? sentence.voice : undefined);
+			soundMouth.follow(speaking ? soundsOf(sentence) : undefined);
+		},
+		gesture: (name: unknown) => {
+			if (!state.stopped && document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);
+		},
+		frame: (name: unknown) => {
+			if (!state.stopped && isFigureFraming(name)) stage.frame(name);
+		}
+	};
+}
+
 /**
  * Draws the stage now, then each animation frame while the page is visible and the canvas is in the viewport: the loop is the one
  * place that draws. A context lost while it runs, or a frame-time guard that finds the figure slow, ends it: the loop and its
@@ -119,42 +185,31 @@ type LoopEnding = typeof figureSignal.lost | typeof figureSignal.slow;
  * the pose the motion gives for the facts the host reported by then.
  */
 function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: LoopEnding) => void): Loop {
-	const motion = createFigureMotion(Math.random, stage.gestures.clipOf);
-	const voiceTap = createVoiceTap();
-	const soundMouth = createSoundMouth();
-	let facts: FigureFacts = { thinking: false, speaking: false };
-	let speaker: Element | null = null;
-	const reducedMotion = matchMedia(reducedMotionQuery);
-	let previousTime = performance.now();
+	const state: LoopState = {
+		facts: { thinking: false, speaking: false },
+		speaker: null,
+		stopped: false,
+		motion: createFigureMotion(Math.random, stage.gestures.clipOf),
+		voiceTap: createVoiceTap(),
+		soundMouth: createSoundMouth(),
+		reducedMotion: matchMedia(reducedMotionQuery)
+	};
+	const frames = createFrameDrawer(stage, canvas, state);
 	/** The last frame intervals the guard judges, in milliseconds; a pause starts them anew. */
 	let recentIntervals: readonly number[] = [];
-	/** Draws the frame at `time`; the camera glides to a new framing unless the page asks for reduced motion or `resuming` a pause, which shows the framing as it is now. */
-	const drawAt = (time: number, resuming = false) => {
-		const elapsedSeconds = (time - previousTime) / 1000;
-		previousTime = time;
-		stage.draw(
-			motion.advance(facts, elapsedSeconds, reducedMotion.matches, speakerOffset(canvas, speaker), soundMouth.goal(voiceTap.clock()) ?? voiceTap.weights()),
-			elapsedSeconds,
-			!resuming && !reducedMotion.matches
-		);
-	};
 	let pendingFrame: number | undefined;
-	let stopped = false;
 	let inViewport = false;
 	const onFrame = (time: number) => {
-		const intervalMilliseconds = time - previousTime;
-		drawAt(time);
-		recentIntervals = recordFrameInterval(recentIntervals, intervalMilliseconds);
+		recentIntervals = recordFrameInterval(recentIntervals, frames.next(time));
 		if (isSlow(recentIntervals)) end(figureSignal.slow);
 		else pendingFrame = requestAnimationFrame(onFrame);
 	};
-	/** Runs the loop while it may, stops a frame it has requested while it may not; a resumed loop draws at once, with no time counted for the pause. */
+	/** Runs the loop while it may, stops a frame it has requested while it may not; a resumed loop draws at once. */
 	const syncWithPage = () => {
-		const mayRun = !stopped && inViewport && document.visibilityState === 'visible';
+		const mayRun = !state.stopped && inViewport && document.visibilityState === 'visible';
 		if (mayRun && pendingFrame === undefined) {
-			previousTime = performance.now();
 			recentIntervals = [];
-			drawAt(previousTime, true);
+			frames.resume();
 			pendingFrame = requestAnimationFrame(onFrame);
 		} else if (!mayRun && pendingFrame !== undefined) {
 			cancelAnimationFrame(pendingFrame);
@@ -171,39 +226,20 @@ function runLoop(stage: FigureStage, canvas: HTMLCanvasElement, onEnd: (ending: 
 	};
 	const onContextLost = () => end(figureSignal.lost);
 	const stop = () => {
-		stopped = true;
-		speaker = null;
-		voiceTap.follow(undefined);
-		soundMouth.follow(undefined);
+		state.stopped = true;
+		state.speaker = null;
+		state.voiceTap.follow(undefined);
+		state.soundMouth.follow(undefined);
 		syncWithPage();
 		document.removeEventListener('visibilitychange', syncWithPage);
 		viewport.disconnect();
 		canvas.removeEventListener('webglcontextlost', onContextLost);
 	};
-	drawAt(previousTime);
+	frames.first();
 	document.addEventListener('visibilitychange', syncWithPage);
 	canvas.addEventListener('webglcontextlost', onContextLost);
 	viewport.observe(canvas);
-	const think = (working: boolean) => {
-		facts = { ...facts, thinking: working === true };
-	};
-	const listen = (element: Element | null) => {
-		if (!stopped) speaker = element;
-	};
-	const speak = (sentence: Sentence) => {
-		if (stopped) return;
-		const speaking = typeof sentence === 'object' && sentence !== null;
-		facts = { ...facts, speaking, mood: speaking ? sentence.mood : undefined };
-		voiceTap.follow(speaking ? sentence.voice : undefined);
-		soundMouth.follow(speaking ? soundsOf(sentence) : undefined);
-	};
-	const gesture = (name: unknown) => {
-		if (!stopped && document.visibilityState === 'visible' && !reducedMotion.matches && isFigureGesture(name)) motion.gesture(name);
-	};
-	const frame = (name: unknown) => {
-		if (!stopped && isFigureFraming(name)) stage.frame(name);
-	};
-	return { stop, think, listen, speak, gesture, frame };
+	return { stop, ...createLoopVerbs(stage, state) };
 }
 
 async function start(canvas: HTMLCanvasElement, bytes: Uint8Array, framing: FigureFraming, give: (signal: FigureSignal) => void): Promise<Outcome> {
