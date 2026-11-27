@@ -1,8 +1,0 @@
-claim_id = "e2ee4bdd968e49fa854daeb035343d24"
-agent = "Claude 542a621c-e91b-4fa6-90e7-40d4764d6d9e"
-role = "builder"
-base = "3fece7c1c199940c1a5751516032f3ef88244893"
-branch = "claude/issue-160-the-motion-helpers-have-one-owner-each"
-scope = ["quality/baseline.toml", "src/figureFrame.ts", "src/figureMotion.ts", "src/gestureLayer.ts", "src/idleMotion.ts", "src/soundMouth.ts", "src/vowelWeights.ts"]
-opened_commit = "88450ec803f8b86f03a3133b44a5b90317e72cca"
-whole_reason = "The three owners are one refactor of the motion helpers, proven by the same unchanged motion and browser tests, within the slice limit."
