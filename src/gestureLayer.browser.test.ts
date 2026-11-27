@@ -86,9 +86,14 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 	/** The seconds an ignored call is watched: the whole of what a wave would take. */
 	const ignoredWatchSeconds = gestureLengthSeconds(gestureClips[figureGesture.wave]) + ignoredWatchMarginSeconds;
 
+	/** The steps between two reads of the canvas: a wave holds the hand fully raised from the end of its fade in to the start of its fade out, and a read every half of that span lands in it at least once whatever the phase. */
+	const raisedSpanSeconds = gestureClips[figureGesture.wave].durationSeconds - gestureClips[figureGesture.wave].fadeSeconds.in - gestureClips[figureGesture.wave].fadeSeconds.out;
+	const stepsBetweenReads = Math.floor((raisedSpanSeconds * 1000) / steppedFrameMilliseconds / 2);
+
 	/**
-	 * No picture of the next whole wave's length shows the hand waving. The figure's frames are stepped on a fake clock and the canvas is read
-	 * in the step that drew it, so every machine sees the same pictures; a loop that does not run draws none.
+	 * No picture of the next whole wave's length shows the hand waving. The figure's frames are stepped on a fake clock, every one at 60 Hz, and
+	 * the canvas is read in the step that drew it every `stepsBetweenReads` steps, so every machine sees the same pictures and no raised hand
+	 * falls between two reads; a loop that does not run draws none.
 	 */
 	async function expectNoWaveOver(canvas: HTMLCanvasElement, resting: Features): Promise<void> {
 		// Frames a loop restarted by the test's last act asks for still go through the page's clock until the fake takes over.
@@ -98,6 +103,7 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 		await nextFrame();
 		for (let step = 0; step * steppedFrameMilliseconds < ignoredWatchSeconds * 1000; step++) {
 			stepped.advance(steppedFrameMilliseconds);
+			if (step % stepsBetweenReads !== 0) continue;
 			const pixels = readPixels(canvas);
 			if (coversSomething(pixels)) expect(showsWaving(spotsOf(pixels, canvas.width, canvas.height), resting)).toBe(false);
 		}
