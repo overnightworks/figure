@@ -1,6 +1,7 @@
 import type { Refusal } from './codes.js';
 import { keyRefusals, type KeyChannel } from './clipKeyRules.js';
-import { attemptRead, indexOf, isJsonObject, listOf, objectOf, requiredListOf, unreadable, type JsonObject } from './json.js';
+import { missingBoneRefusal, nodeOfEntry } from './humanoidRules.js';
+import { attemptRead, entriesOf, indexOf, isJsonObject, listOf, mustNameEntry, objectOf, requiredListOf, unreadable, type JsonObject } from './json.js';
 import { clipProfile } from './profile.js';
 import { sceneRefusals, type SceneKind } from './sceneRules.js';
 
@@ -13,9 +14,6 @@ const SCENE_KIND: SceneKind = {
 	forbiddenNodeProperties: ['mesh', 'camera', 'skin']
 };
 const CHANNEL_PATHS: ReadonlySet<string> = new Set(['translation', 'rotation', 'scale', 'weights']);
-
-/** The humanoid bones every clip names. */
-const requiredBones: ReadonlySet<string> = new Set(clipProfile.requiredHumanBones);
 
 /** What a node is to the clip, which decides the one kind of channel it takes. */
 type NodeRole = 'bone' | 'hips' | 'expression' | 'lookAt';
@@ -48,17 +46,20 @@ function extensionRefusals(json: JsonObject, refusals: Refusal[]): ReadonlyMap<n
 	}
 	const assign = (place: string, entry: unknown, role: NodeRole) =>
 		attemptRead(refusals, place, () => {
-			const node = indexOf(objectOf(entry)['node']);
-			if (!isJsonObject(listOf(json['nodes'])[node])) {
-				unreadable('a node index names no entry of nodes');
-			}
+			const node = nodeOfEntry(json, indexOf(objectOf(entry)['node']));
 			roles.set(node, [...(roles.get(node) ?? []), role]);
 		});
 	const humanBones = entriesOf(isJsonObject(extension['humanoid']) ? extension['humanoid']['humanBones'] : undefined);
-	missingBoneRefusals(humanBones, refusals);
+	const missingBones = new Set<string>();
+	for (const bone of clipProfile.requiredHumanBones) {
+		const missing = missingBoneRefusal(humanBones, bone);
+		if (missing !== undefined) {
+			refusals.push(missing);
+			missingBones.add(bone);
+		}
+	}
 	for (const [bone, entry] of humanBones) {
-		const isMissingRequiredBone = requiredBones.has(bone) && !namesNode(entry);
-		if (!isMissingRequiredBone) {
+		if (!missingBones.has(bone)) {
 			assign(`humanoid bone ${bone}`, entry, bone === 'hips' ? 'hips' : 'bone');
 		}
 	}
@@ -71,26 +72,10 @@ function extensionRefusals(json: JsonObject, refusals: Refusal[]): ReadonlyMap<n
 	return roles;
 }
 
-function namesNode(entry: unknown): boolean {
-	return isJsonObject(entry) && 'node' in entry;
-}
-
-function missingBoneRefusals(humanBones: ReadonlyMap<string, unknown>, refusals: Refusal[]): void {
-	for (const bone of clipProfile.requiredHumanBones) {
-		if (!namesNode(humanBones.get(bone))) {
-			refusals.push({ code: 'humanoid_bone_missing', detail: `the bone ${bone} is missing` });
-		}
-	}
-}
-
 function* expressionEntries(expressions: unknown): Generator<[string, unknown]> {
 	for (const group of ['preset', 'custom']) {
 		yield* entriesOf(isJsonObject(expressions) ? expressions[group] : undefined);
 	}
-}
-
-function entriesOf(value: unknown): ReadonlyMap<string, unknown> {
-	return new Map(isJsonObject(value) ? Object.entries(value) : []);
 }
 
 function contentRefusals(json: JsonObject, refusals: Refusal[]): void {
@@ -166,10 +151,7 @@ function trackNotAllowed(json: JsonObject, roles: ReadonlyMap<number, readonly N
 	if (target['node'] === undefined) {
 		return 'has no target node';
 	}
-	const node = indexOf(target['node']);
-	if (!isJsonObject(listOf(json['nodes'])[node])) {
-		unreadable('the target names a node that is no entry of nodes');
-	}
+	const node = mustNameEntry(json, 'nodes', indexOf(target['node']), 'the target names a node that is no entry of nodes');
 	if (path === 'weights') {
 		return 'animates weights, and the clip has no mesh';
 	}

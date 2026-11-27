@@ -1,6 +1,6 @@
 import type { Refusal } from './codes.js';
 import { mustNameAccessorsOfGltfComponentType } from './accessorRules.js';
-import { attemptRead, indexOf, isJsonObject, listOf, objectOf, unreadable, type JsonObject } from './json.js';
+import { attemptRead, indexOf, isJsonObject, listOf, mustNameEntry, objectOf, unreadable, type JsonObject } from './json.js';
 import { sceneRefusals, type SceneKind } from './sceneRules.js';
 
 /** The glTF properties that make a room move or look through a camera; a room holds none. */
@@ -89,13 +89,6 @@ function materialRefusals(json: JsonObject): Refusal[] {
 		}
 	}
 	return refusals;
-}
-
-/** Unreadable unless `index` names an entry of the list `json[listName]`, as the loader reads it. */
-function mustNameEntry(json: JsonObject, listName: string, index: unknown): void {
-	if (!isJsonObject(listOf(json[listName])[indexOf(index)])) {
-		unreadable(`names no entry of ${listName}`);
-	}
 }
 
 /** Unreadable unless `index` lies inside the list `json[listName]`. A list that is no list, and what an entry holds, are for the walk that owns the list. */
