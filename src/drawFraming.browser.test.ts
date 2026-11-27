@@ -170,5 +170,4 @@ describe('a figure seen from its face to its whole body', () => {
 		setPageVisibility('visible');
 		await expectFramed(eyeSpan(await watch.featuresNow(canvas)), figureFraming.fullBody);
 	});
-
 });
