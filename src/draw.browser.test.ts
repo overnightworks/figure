@@ -2,10 +2,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng, buildPng } from '../tests/glbBuilder.js';
+import { buildRoomGlb } from '../tests/roomBuilder.js';
 import { centreOf, coversSomething, emulateReducedMotion, readPixels, restorePageVisibility, setPageVisibility, spotsOf, nextFrame, requestFrameOwn, fakeFrameClock, type FrameClock } from '../tests/browserCanvas.js';
 import * as draw from './draw.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal, type FigureSignal } from './signals.js';
+import { figureGesture } from './gestures.js';
+import { figureFraming } from './framings.js';
 
 describe('mount in a browser', () => {
 	const canvases: HTMLCanvasElement[] = [];
@@ -35,6 +38,20 @@ describe('mount in a browser', () => {
 		const canvas = document.createElement('canvas');
 		canvases.push(canvas);
 		return canvas;
+	}
+
+	/** A canvas in the document, 200 CSS pixels wide by its stylesheet class where the test sets one (its attribute size is the default 300 by 150), whose frames the test reads. */
+	function attachedCanvas(): HTMLCanvasElement {
+		const canvas = newCanvas();
+		canvas.className = 'small';
+		document.body.append(canvas);
+		watchedCanvas = canvas;
+		return canvas;
+	}
+
+	/** Runs `count` frames of the fake clock, each `milliseconds` after the one before. */
+	function runFrames(clock: FrameClock, count: number, milliseconds: number): void {
+		for (let frame = 0; frame < count; frame++) clock.advance(milliseconds);
 	}
 
 	async function mountOn(canvas: HTMLCanvasElement, bytes: Uint8Array) {
@@ -254,15 +271,6 @@ describe('mount in a browser', () => {
 			restorePageVisibility();
 			await cdp().send('Emulation.clearDeviceMetricsOverride');
 		});
-
-		/** A canvas in the document, 200 CSS pixels wide by its stylesheet class (its attribute size is the default 300 by 150), whose frames the test reads. */
-		function attachedCanvas(): HTMLCanvasElement {
-			const canvas = newCanvas();
-			canvas.className = 'small';
-			document.body.append(canvas);
-			watchedCanvas = canvas;
-			return canvas;
-		}
 
 		/** Waits until a page frame passes in which the figure neither asks for nor runs a frame: the viewport observer reports the move out of view in a frame of its own, so one frame later is too early. */
 		async function untilNoFrameComes(): Promise<void> {
@@ -556,21 +564,16 @@ describe('mount in a browser', () => {
 
 			afterEach(() => clock.restore());
 
-			/** Runs `count` frames, each `milliseconds` after the one before. */
-			function runFrames(count: number, milliseconds: number): void {
-				for (let frame = 0; frame < count; frame++) clock.advance(milliseconds);
-			}
-
 			it('gives slow once through onSignal, reads slow, and requests no frame after it', async () => {
 				const { handle, signals } = await mountOn(attachedCanvas(), buildConformantVrm());
 				await vi.waitFor(() => expect(clock.pending).toBe(1));
 
-				runFrames(40, 60);
+				runFrames(clock, 40, 60);
 
 				expect(signals).toEqual([figureSignal.drawn, figureSignal.slow]);
 				expect(handle.signal).toBe(figureSignal.slow);
 				const requested = clock.requested;
-				runFrames(2, 60);
+				runFrames(clock, 2, 60);
 				expect(clock.requested).toBe(requested);
 				expect(clock.pending).toBe(0);
 				expect(signals).toEqual([figureSignal.drawn, figureSignal.slow]);
@@ -588,13 +591,13 @@ describe('mount in a browser', () => {
 					handles.push(handle);
 					await vi.waitFor(() => expect(clock.pending).toBe(1));
 
-					runFrames(40, 60);
+					runFrames(clock, 40, 60);
 					await new Promise((settled) => setTimeout(settled, 0));
 
 					expect(handle.signal).toBe(figureSignal.slow);
 					expect(reported).toEqual([thrown, thrown]);
 					handle.dispose();
-					runFrames(2, 60);
+					runFrames(clock, 2, 60);
 					await new Promise((settled) => setTimeout(settled, 0));
 					expect(reported).toEqual([thrown, thrown]);
 				} finally {
@@ -606,7 +609,7 @@ describe('mount in a browser', () => {
 				const { handle, signals } = await mountOn(attachedCanvas(), buildConformantVrm());
 				await vi.waitFor(() => expect(clock.pending).toBe(1));
 
-				runFrames(40, 33);
+				runFrames(clock, 40, 33);
 
 				expect(signals).toEqual([figureSignal.drawn]);
 				expect(handle.signal).toBe(figureSignal.drawn);
@@ -615,14 +618,14 @@ describe('mount in a browser', () => {
 			it('starts the window anew after a pause, so a slow gap is not a slow frame', async () => {
 				const { signals } = await mountOn(attachedCanvas(), buildConformantVrm());
 				await vi.waitFor(() => expect(clock.pending).toBe(1));
-				runFrames(39, 60);
+				runFrames(clock, 39, 60);
 
 				setPageVisibility('hidden');
 				await vi.waitFor(() => expect(clock.pending).toBe(0));
 				clock.advance(10000);
 				setPageVisibility('visible');
 				await vi.waitFor(() => expect(clock.pending).toBe(1));
-				runFrames(1, 33);
+				runFrames(clock, 1, 33);
 
 				expect(signals).toEqual([figureSignal.drawn]);
 			});
@@ -630,28 +633,93 @@ describe('mount in a browser', () => {
 			it('leaves a second figure drawn and moving when the first one is ended by slow', async () => {
 				const first = await mountOn(attachedCanvas(), buildConformantVrm());
 				await vi.waitFor(() => expect(clock.pending).toBe(1));
-				runFrames(20, 60);
+				runFrames(clock, 20, 60);
 				const second = await mountOn(attachedCanvas(), buildConformantVrm());
 				await vi.waitFor(() => expect(clock.pending).toBe(2));
 
-				runFrames(20, 60);
+				runFrames(clock, 20, 60);
 
 				expect(first.signals).toEqual([figureSignal.drawn, figureSignal.slow]);
 				expect(second.handle.signal).toBe(figureSignal.drawn);
 				expect(clock.pending).toBe(1);
-				runFrames(1, 60);
+				runFrames(clock, 1, 60);
 				expect(second.signals).toEqual([figureSignal.drawn]);
 			});
 
 			it('disposes a slow figure twice without an error, and gives no further signal', async () => {
 				const { handle, signals } = await mountOn(attachedCanvas(), buildConformantVrm());
 				await vi.waitFor(() => expect(clock.pending).toBe(1));
-				runFrames(40, 60);
+				runFrames(clock, 40, 60);
 
 				handle.dispose();
 
 				expect(() => handle.dispose()).not.toThrow();
 				expect(signals).toEqual([figureSignal.drawn, figureSignal.slow]);
+			});
+		});
+	});
+
+	describe('a figure that ended', () => {
+		let clock: FrameClock;
+
+		beforeEach(() => {
+			clock = fakeFrameClock();
+		});
+
+		afterEach(() => clock.restore());
+
+		/** Mounts bytes on a canvas in the document and returns the handle and the signals its `onSignal` got. */
+		async function mountAttached(bytes: Uint8Array) {
+			const canvas = attachedCanvas();
+			return { canvas, ...(await mountOn(canvas, bytes)) };
+		}
+
+		const endings: Record<string, () => Promise<{ handle: FigureHandle; signals: FigureSignal[] }>> = {
+			refused: () => mountAttached(new Uint8Array(4)),
+			disposed: async () => {
+				const mounted = await mountAttached(buildConformantVrm());
+				mounted.handle.dispose();
+				return mounted;
+			},
+			lost: async () => {
+				const mounted = await mountAttached(buildConformantVrm());
+				loseContext(mounted.canvas);
+				await vi.waitFor(() => expect(mounted.signals).toContain(figureSignal.lost));
+				return mounted;
+			},
+			slow: async () => {
+				const mounted = await mountAttached(buildConformantVrm());
+				await vi.waitFor(() => expect(clock.pending).toBe(1));
+				runFrames(clock, 40, 60);
+				expect(mounted.signals).toContain(figureSignal.slow);
+				return mounted;
+			}
+		};
+
+		const verbs: Record<string, (handle: FigureHandle) => void> = {
+			think: (handle) => handle.think(true),
+			listen: (handle) => handle.listen(document.body),
+			'speak with a sentence': (handle) => handle.speak({ mood: 'happy' }),
+			'speak with null': (handle) => handle.speak(null),
+			gesture: (handle) => handle.gesture(figureGesture.wave),
+			frame: (handle) => handle.frame(figureFraming.fullBody),
+			'room with bytes': (handle) => handle.room(buildRoomGlb()),
+			'room with null': (handle) => handle.room(null),
+			dispose: (handle) => handle.dispose()
+		};
+
+		describe.each(Object.keys(endings))('%s', (ending) => {
+			it.each(Object.keys(verbs))('ignores %s: throws nothing, gives no signal and asks for no frame', async (verb) => {
+				const { handle, signals } = await endings[ending]!();
+				const signalsAtEnd = [...signals];
+				const requestedAtEnd = clock.requested;
+
+				expect(() => verbs[verb]!(handle)).not.toThrow();
+				clock.advance(60);
+				clock.advance(60);
+
+				expect(signals).toEqual(signalsAtEnd);
+				expect(clock.requested).toBe(requestedAtEnd);
 			});
 		});
 	});

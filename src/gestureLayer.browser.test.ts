@@ -16,7 +16,6 @@ import { boneClock, clipWeight, gestureClips, gestureLengthSeconds } from './ges
 import { createGestureLayer, type GestureLayer } from './gestureLayer.js';
 import { figureFraming } from './framings.js';
 import { figureGesture, type FigureGesture } from './gestures.js';
-import { figureSignal } from './signals.js';
 
 type Features = Record<FaceFeature, Spot[]>;
 
@@ -176,22 +175,6 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 		await expectNoWaveOver(canvas, resting);
 	});
 
-	it('ignores a call on a disposed figure', async () => {
-		const { canvas, handle } = await watch.mountFigure();
-		const resting = await watch.featuresNow(canvas);
-		handle.dispose();
-
-		expect(() => handle.gesture(figureGesture.wave)).not.toThrow();
-		await expectNoWaveOver(canvas, resting);
-	});
-
-	it('ignores a call on a figure that was refused', async () => {
-		const { handle } = await watch.mountFigure(new Uint8Array(4));
-
-		expect(handle.signal).toBe(figureSignal.refused);
-		expect(() => handle.gesture(figureGesture.wave)).not.toThrow();
-		expect(handle.signal).toBe(figureSignal.refused);
-	});
 });
 
 /** The turn about X by `angle` radians, as the quaternion a file stores it. */
