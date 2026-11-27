@@ -1,6 +1,6 @@
 import { crc32, inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { buildCompressedImagePng, buildFigureTexturePng, buildImagePng, figureTexture, plainScanlines } from '../tests/glbBuilder.js';
+import { buildCompressedImagePng, buildFigureTexturePng, buildImagePng, figureTexture, plainScanlines } from './glbBuilder.js';
 
 const signatureBytes = 8;
 const chunkOverheadBytes = 12;

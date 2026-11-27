@@ -1,8 +1,8 @@
 import { validateBytes } from 'gltf-validator';
 import { describe, expect, it } from 'vitest';
-import { buildVrmGlb } from '../tests/figureFixtures.js';
-import { buildRoomGlb, type RoomLook } from '../tests/roomBuilder.js';
-import { figureTexture } from '../tests/glbBuilder.js';
+import { buildVrmGlb } from './figureFixtures.js';
+import { buildRoomGlb, type RoomLook } from './roomBuilder.js';
+import { figureTexture } from './glbBuilder.js';
 
 const errorSeverity = 0;
 
