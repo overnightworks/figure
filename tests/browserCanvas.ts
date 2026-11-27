@@ -129,3 +129,57 @@ export const requestFrameOwn = window.requestAnimationFrame;
 export function nextFrame(): Promise<void> {
 	return new Promise((resolve) => requestFrameOwn.call(window, () => resolve()));
 }
+
+export interface FrameClock {
+	/** The animation frames the figure asked for since the clock began. */
+	readonly requested: number;
+	/** The animation frames asked for and not yet run or cancelled. */
+	readonly pending: number;
+	/** Moves the time on by `milliseconds` and runs the frames pending before the move, each with the new time. */
+	advance(milliseconds: number): void;
+	/** Gives back the real `performance.now` and frame functions. */
+	restore(): void;
+}
+
+/**
+ * Replaces `performance.now` and the animation frame functions with a clock the test moves, so a frame interval is the one the test
+ * drives, starting at `startMilliseconds`. `restore` gives the real functions back.
+ */
+export function fakeFrameClock(startMilliseconds = 0): FrameClock {
+	const realNow = performance.now;
+	const realRequestFrame = window.requestAnimationFrame;
+	const realCancelFrame = window.cancelAnimationFrame;
+	let now = startMilliseconds;
+	let nextId = 1;
+	let pending = new Map<number, FrameRequestCallback>();
+	let requested = 0;
+	performance.now = () => now;
+	window.requestAnimationFrame = (callback) => {
+		requested++;
+		const id = nextId++;
+		pending.set(id, callback);
+		return id;
+	};
+	window.cancelAnimationFrame = (id) => {
+		pending.delete(id);
+	};
+	return {
+		get requested() {
+			return requested;
+		},
+		get pending() {
+			return pending.size;
+		},
+		advance(milliseconds) {
+			now += milliseconds;
+			const due = [...pending.values()];
+			pending = new Map();
+			for (const callback of due) callback(now);
+		},
+		restore() {
+			performance.now = realNow;
+			window.requestAnimationFrame = realRequestFrame;
+			window.cancelAnimationFrame = realCancelFrame;
+		}
+	};
+}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cdp } from 'vitest/browser';
-import { centreOf, emulateReducedMotion, restorePageVisibility, setPageVisibility, type FaceFeature, type Spot } from '../tests/browserCanvas.js';
+import { centreOf, coversSomething, emulateReducedMotion, fakeFrameClock, nextFrame, readPixels, restorePageVisibility, setPageVisibility, spotsOf, type FaceFeature, type FrameClock, type Spot } from '../tests/browserCanvas.js';
 import { startFigureWatch, type FigureWatch } from '../tests/figureWatch.js';
 import { WebGLRenderer, type Object3D } from 'three';
 import { VRMUtils, type VRM, type VRMHumanBoneName } from '@pixiv/three-vrm';
@@ -32,6 +32,8 @@ const longestWaitSeconds = 30;
 const ignoredWatchMarginSeconds = 1;
 /** The time a test of the wave has: twice the longest wait, since a test mounts a figure, reads it at rest and then watches the length of a wave or waits for one. */
 const testTimeoutMilliseconds = 2 * longestWaitSeconds * 1000;
+/** The milliseconds the fake frame clock moves on per stepped picture, the frame time of a 60 Hz display. */
+const steppedFrameMilliseconds = 1000 / 60;
 /** The frames waited after a canvas leaves the viewport, for the observer to report it and the loop to pause. */
 const outOfViewFrames = 10;
 
@@ -55,12 +57,15 @@ function showsArmAt(features: Features, resting: Features): boolean {
 
 describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () => {
 	let watch: FigureWatch;
+	let clock: FrameClock | undefined;
 
 	beforeEach(() => {
 		watch = startFigureWatch();
 	});
 
 	afterEach(async () => {
+		clock?.restore();
+		clock = undefined;
 		watch.end();
 		restorePageVisibility();
 		await cdp().send('Emulation.setEmulatedMedia', { features: [] });
@@ -89,11 +94,21 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 	/** The seconds an ignored call is watched: the whole of what a wave would take. */
 	const ignoredWatchSeconds = gestureLengthSeconds(gestureClips[figureGesture.wave]) + ignoredWatchMarginSeconds;
 
-	/** No picture of the next whole wave's length shows the hand waving. */
+	/**
+	 * No picture of the next whole wave's length shows the hand waving. The figure's frames are stepped on a fake clock and the canvas is read
+	 * in the step that drew it, so every machine sees the same pictures; a loop that does not run draws none.
+	 */
 	async function expectNoWaveOver(canvas: HTMLCanvasElement, resting: Features): Promise<void> {
-		const trace = await traceFor(canvas, ignoredWatchSeconds);
-
-		trace.forEach((features) => expect(showsWaving(features, resting)).toBe(false));
+		// Frames a loop restarted by the test's last act asks for still go through the page's clock until the fake takes over.
+		for (let frame = 0; frame < outOfViewFrames; frame++) await nextFrame();
+		const stepped = fakeFrameClock(performance.now());
+		clock = stepped;
+		await nextFrame();
+		for (let step = 0; step * steppedFrameMilliseconds < ignoredWatchSeconds * 1000; step++) {
+			stepped.advance(steppedFrameMilliseconds);
+			const pixels = readPixels(canvas);
+			if (coversSomething(pixels)) expect(showsWaving(spotsOf(pixels, canvas.width, canvas.height), resting)).toBe(false);
+		}
 	}
 
 	it('raises the hand beside the face with the nose in view and lowers it to rest', async () => {
