@@ -1,6 +1,6 @@
 import { mouthShape, type MouthShape } from './expressions.js';
 import type { SpokenSounds } from './mountOptions.js';
-import type { VowelWeights } from './vowelWeights.js';
+import { silence, type VowelWeights } from './vowelWeights.js';
 
 /**
  * The mouth the sounds speech times give, with no three and no DOM: the one table from a sound to a mouth goal and the choice, per
@@ -24,14 +24,13 @@ export interface VoiceClock {
 /** How far the mouth leads the sound, in seconds: a picture ahead of its sound is noticed only beyond about 0.125 s, one behind it beyond about 0.045 s. */
 export const soundLeadSeconds = 0.05;
 
-const stillMouth: VowelWeights = Object.freeze({ aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 });
-const closedLips: MouthGoal = Object.freeze({ ...stillMouth, lipsClosed: true });
+const closedLips: MouthGoal = Object.freeze({ ...silence, lipsClosed: true });
 const { aa, ih, ou, ee, oh } = mouthShape;
 
 /** Each row gives the goal of the sounds it lists, written without length, stress and combining marks. */
 type Row = readonly [sounds: readonly string[], goal: MouthGoal];
 
-const shaped = (shares: Partial<Record<MouthShape, number>>): MouthGoal => Object.freeze({ ...stillMouth, ...shares });
+const shaped = (shares: Partial<Record<MouthShape, number>>): MouthGoal => Object.freeze({ ...silence, ...shares });
 
 /**
  * Every sound espeak's German and English voices give, as the shapes it is closest to, by the opening it has; vowels and diphthongs
@@ -180,7 +179,7 @@ export function createSoundMouth(): SoundMouth {
 			if (!voice.running) return null;
 			if (previous === undefined || position > previous.position) stalled = false;
 			else if (voice.seconds > previous.seconds) stalled = true;
-			if (stalled && position <= followed.end) return stillMouth;
+			if (stalled && position <= followed.end) return silence;
 			const goal = goalAt(followed.spans, position + soundLeadSeconds);
 			closedLipsGiven = goal?.lipsClosed === true;
 			return afterClosedLips && goal !== null && goal.lipsClosed !== true ? { ...goal, followsClosedLips: true } : goal;

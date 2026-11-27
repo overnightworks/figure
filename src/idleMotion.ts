@@ -38,7 +38,7 @@ export const longestStepSeconds = 0.1;
 /** The clock starts at a random time within this many seconds, so two figures do not breathe in step. */
 const clockStartSpreadSeconds = 10;
 
-type Interval = readonly [number, number];
+export type Interval = readonly [number, number];
 
 /** What the idle life gives for one frame. */
 export interface IdlePose {
@@ -61,17 +61,21 @@ export interface IdleMotion {
 	blinkWithGazeShift(): void;
 }
 
+/** A point of `interval`, drawn from `random`. */
+export function between(random: () => number, [minimum, maximum]: Interval): number {
+	return minimum + random() * (maximum - minimum);
+}
+
 export function createIdleMotion(random: () => number): IdleMotion {
-	const between = ([minimum, maximum]: Interval) => minimum + random() * (maximum - minimum);
 	const clockStart = random();
 	let clock = clockStart * clockStartSpreadSeconds;
-	let blinkStart = between(blink.firstStart);
+	let blinkStart = between(random, blink.firstStart);
 	let blinkSeconds = -1;
-	let glanceStart = between(glance.firstStart);
+	let glanceStart = between(random, glance.firstStart);
 	let glanceEnd = 0;
 	let target = { yaw: 0, pitch: 0 };
 	let blinkEnd = clock;
-	let jumpStart = clock + between(eyeJump.gapSeconds);
+	let jumpStart = clock + between(random, eyeJump.gapSeconds);
 	let eyes = { yaw: 0, pitch: 0 };
 
 	const blinkWeight = (step: number, reducedMotion: boolean): number => {
@@ -82,15 +86,15 @@ export function createIdleMotion(random: () => number): IdleMotion {
 		if (blinkSeconds < duration) return Math.sin((blinkSeconds / duration) * Math.PI);
 		blinkSeconds = -1;
 		blinkEnd = clock;
-		blinkStart = clock + between(blink.gapAfterEnd);
+		blinkStart = clock + between(random, blink.gapAfterEnd);
 		return 0;
 	};
 
 	const glanceTarget = (reducedMotion: boolean) => {
 		if (!reducedMotion && clock > glanceStart) {
-			target = { yaw: between(glance.yaw), pitch: between(glance.pitch) };
-			glanceEnd = clock + between(glance.holdSeconds);
-			glanceStart = clock + between(glance.gapAfterStart);
+			target = { yaw: between(random, glance.yaw), pitch: between(random, glance.pitch) };
+			glanceEnd = clock + between(random, glance.holdSeconds);
+			glanceStart = clock + between(random, glance.gapAfterStart);
 		}
 		const held = !reducedMotion && clock < glanceEnd;
 		return held ? target : { yaw: 0, pitch: 0 };
@@ -99,8 +103,8 @@ export function createIdleMotion(random: () => number): IdleMotion {
 	const eyesNow = (reducedMotion: boolean) => {
 		if (reducedMotion) return { yaw: 0, pitch: 0 };
 		if (clock > jumpStart) {
-			eyes = { yaw: between([-eyeJumpReach.yaw, eyeJumpReach.yaw]), pitch: between([-eyeJumpReach.pitch, eyeJumpReach.pitch]) };
-			jumpStart = clock + between(eyeJump.gapSeconds);
+			eyes = { yaw: between(random, [-eyeJumpReach.yaw, eyeJumpReach.yaw]), pitch: between(random, [-eyeJumpReach.pitch, eyeJumpReach.pitch]) };
+			jumpStart = clock + between(random, eyeJump.gapSeconds);
 		}
 		return eyes;
 	};

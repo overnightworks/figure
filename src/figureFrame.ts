@@ -3,7 +3,7 @@ import { VRMUtils, type VRM } from '@pixiv/three-vrm';
 import { figureMood } from './expressions.js';
 import { easeExtents, extentsOf, fieldOfViewDegrees, placeCamera, type Extents } from './framingCamera.js';
 import type { FigureFraming } from './framings.js';
-import { createGestureLayer, quaternionOfTurn, type GestureLayer } from './gestureLayer.js';
+import { createGestureLayer, quaternionOfTurn, setTurn, type GestureLayer } from './gestureLayer.js';
 import { spreadPosture, type FigurePose, type Turn } from './figureMotion.js';
 
 /** The picture's camera planes in metres: the field of view is the framing camera's. */
@@ -37,11 +37,6 @@ function isSameSize(first: DrawingSize, second: DrawingSize): boolean {
 
 function currentSize(canvas: HTMLCanvasElement): DrawingSize {
 	return { width: Math.max(2, canvas.clientWidth), height: Math.max(2, canvas.clientHeight), pixelRatio: drawingPixelRatio() };
-}
-
-/** Sets a bone's rotation to `turn`. */
-function turnBone(bone: Object3D, turn: Turn): void {
-	bone.rotation.set(turn.pitch, turn.yaw, turn.roll);
 }
 
 const turnAsQuaternion = new Quaternion();
@@ -138,9 +133,9 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 			shown = glides ? easeExtents(shown, target, elapsedSeconds) : target;
 			const { heightFromEyes, distance } = placeCamera(shown, view.aspect);
 			view.position.set(eyes.x, eyes.y + heightFromEyes, eyes.z + distance);
-			turnBone(leftUpperArm, pose.arms.leftUpperArm);
-			turnBone(rightUpperArm, pose.arms.rightUpperArm);
-			turnBone(rightLowerArm, pose.arms.rightLowerArm);
+			setTurn(leftUpperArm, pose.arms.leftUpperArm);
+			setTurn(rightUpperArm, pose.arms.rightUpperArm);
+			setTurn(rightLowerArm, pose.arms.rightLowerArm);
 			restBone(rightHand);
 			// The layer turns a bone from the turn it holds, so each bone it may turn starts from the base pose, the trunk's deltas coming after it.
 			restedTrunk.forEach(restBone);
@@ -151,8 +146,8 @@ export function createFigureStage(renderer: WebGLRenderer, canvas: HTMLCanvasEle
 			addTurn(chest, { pitch: spread.chest.pitch + pose.trunkLean + pose.moodTrunk.chest, yaw: spread.chest.yaw, roll: spread.chest.roll });
 			addTurn(leftShoulder, pose.shoulders.left);
 			addTurn(rightShoulder, pose.shoulders.right);
-			head.rotation.set(pose.head.pitch + spread.head.pitch, pose.head.yaw + spread.head.yaw, pose.head.roll + spread.head.roll);
-			neck?.rotation.set(spread.neck.pitch, spread.neck.yaw, spread.neck.roll);
+			setTurn(head, { pitch: pose.head.pitch + spread.head.pitch, yaw: pose.head.yaw + spread.head.yaw, roll: pose.head.roll + spread.head.roll });
+			if (neck) setTurn(neck, spread.neck);
 			vrm.expressionManager!.setValue('blink', pose.blink);
 			for (const [shape, weight] of Object.entries(pose.mouth)) vrm.expressionManager!.setValue(shape, weight);
 			for (const mood of Object.values(figureMood)) vrm.expressionManager!.setValue(mood, pose.mood[mood]);
