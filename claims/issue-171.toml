@@ -3,5 +3,5 @@ agent = "Claude 542a621c-e91b-4fa6-90e7-40d4764d6d9e"
 role = "builder"
 base = "bf34298847a9841ea0e1d82efd3970c562def48b"
 branch = "claude/issue-171-runloop-fits-the-size-limit"
-scope = ["quality/baseline.toml", "src/figureMount.ts"]
+scope = ["quality/baseline.toml", "quality/config.toml", "src/figureMount.ts"]
 opened_commit = "012e28b53818c230acef49526ce698c6d4717a7f"
