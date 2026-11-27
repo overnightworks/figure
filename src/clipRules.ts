@@ -15,9 +15,6 @@ const SCENE_KIND: SceneKind = {
 };
 const CHANNEL_PATHS: ReadonlySet<string> = new Set(['translation', 'rotation', 'scale', 'weights']);
 
-/** The humanoid bones every clip names. */
-const requiredBones: ReadonlySet<string> = new Set(clipProfile.requiredHumanBones);
-
 /** What a node is to the clip, which decides the one kind of channel it takes. */
 type NodeRole = 'bone' | 'hips' | 'expression' | 'lookAt';
 
@@ -53,15 +50,16 @@ function extensionRefusals(json: JsonObject, refusals: Refusal[]): ReadonlyMap<n
 			roles.set(node, [...(roles.get(node) ?? []), role]);
 		});
 	const humanBones = entriesOf(isJsonObject(extension['humanoid']) ? extension['humanoid']['humanBones'] : undefined);
+	const missingBones = new Set<string>();
 	for (const bone of clipProfile.requiredHumanBones) {
 		const missing = missingBoneRefusal(humanBones, bone);
 		if (missing !== undefined) {
 			refusals.push(missing);
+			missingBones.add(bone);
 		}
 	}
 	for (const [bone, entry] of humanBones) {
-		const isMissingRequiredBone = requiredBones.has(bone) && missingBoneRefusal(humanBones, bone) !== undefined;
-		if (!isMissingRequiredBone) {
+		if (!missingBones.has(bone)) {
 			assign(`humanoid bone ${bone}`, entry, bone === 'hips' ? 'hips' : 'bone');
 		}
 	}
