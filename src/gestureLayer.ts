@@ -11,6 +11,11 @@ export function quaternionOfTurn(turn: Turn, target: Quaternion): Quaternion {
 	return target.setFromEuler(turnAsEuler.set(turn.pitch, turn.yaw, turn.roll));
 }
 
+/** Sets the rotation of `object` to `turn`, in the order (pitch, yaw, roll). */
+export function setTurn(object: Object3D, turn: Turn): void {
+	object.rotation.set(turn.pitch, turn.yaw, turn.roll);
+}
+
 const quaternionSize = 4;
 
 /** The linear sampler of quaternions that `keys` make: the sampler the layer builds for a clip authored as keys. */

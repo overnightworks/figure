@@ -35,7 +35,8 @@ const maximumRounds = 100;
 const rootTolerance = 1e-9;
 
 const shapes = Object.values(mouthShape);
-const silence: VowelWeights = Object.freeze({ aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 });
+/** The closed mouth: every vowel at zero. */
+export const silence: VowelWeights = Object.freeze({ aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 });
 
 const frame = new Float64Array(frameLength);
 const hammingWindow = Float64Array.from({ length: frameLength }, (_, index) => 0.54 - 0.46 * Math.cos((2 * Math.PI * index) / (frameLength - 1)));
@@ -222,7 +223,7 @@ function weightsOfFormants(firstHz: number, secondHz: number, level: number): Vo
 		sharpened[index] = (sharpened[index] / affinityTotal) ** sharpeningPower;
 		sharpenedTotal += sharpened[index];
 	}
-	const weights = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
+	const weights = { ...silence };
 	for (let index = 0; index < shapes.length; index++) weights[shapes[index]] = (sharpened[index] / sharpenedTotal) * level;
 	return weights;
 }

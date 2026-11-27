@@ -1,9 +1,9 @@
 import { figureMood, mouthShape, type FigureMood } from './expressions.js';
 import { armShare, gestureLengthSeconds, type ClipTiming } from './gestureClips.js';
 import type { FigureGesture } from './gestures.js';
-import { breathLean, createIdleMotion, longestStepSeconds } from './idleMotion.js';
+import { breathLean, between, createIdleMotion, longestStepSeconds } from './idleMotion.js';
 import type { MouthGoal } from './soundMouth.js';
-import type { VowelWeights } from './vowelWeights.js';
+import { silence, type VowelWeights } from './vowelWeights.js';
 
 /**
  * The figure's motion as a function of the facts the host reports, the time and a source of chance, with no three and no DOM: it
@@ -149,7 +149,6 @@ const moodLean: Readonly<Record<FigureMood, { head: number; roll: number; chest:
 const trunkShare = { spine: 0.4, chest: 0.6 };
 const shoulderShare = 0.5;
 const noMood: MoodWeights = { happy: 0, angry: 0, sad: 0, relaxed: 0, surprised: 0 };
-const stillMouth: VowelWeights = { aa: 0, ih: 0, ou: 0, ee: 0, oh: 0 };
 /** The head turns half the gaze's yaw, three quarters of it while listening, and tilts 0.55 of its pitch; the look-at turns 2.4 times the gaze. */
 const headShare = { yaw: 0.5, listeningYaw: 0.75, pitch: 0.55 };
 /** The look-at turns 2.4 times the gaze plus the eyes' jump, and no further than 90 degrees either way, so a turn never looks over the shoulder. */
@@ -257,7 +256,7 @@ function createNod(random: () => number): NodMotion {
 	let clock = 0;
 	let nextStart = 0;
 	let startedAt: number | null = null;
-	const gapSeconds = () => nod.gapSeconds[0] + random() * (nod.gapSeconds[1] - nod.gapSeconds[0]);
+	const gapSeconds = () => between(random, nod.gapSeconds);
 	return {
 		advance(step, listening, reducedMotion) {
 			clock += step;
@@ -308,14 +307,14 @@ interface MouthMotion {
  * takes that goal in the frame after, so a frame that skips the sound's end leaves them closed, while any other goal, the analyser's included, eases from the shape the mouth has; the level of the eased weights' sum at 12 a second, and the head's nod with the voice from the level, which reduced motion leaves out.
  */
 function createMouth(): MouthMotion {
-	let weights = stillMouth;
+	let weights = silence;
 	let level = 0;
 	let clock = 0;
 	let closingUnfinished = false;
 	return {
 		advance(step, goal, reducedMotion) {
 			clock += step;
-			const wanted: MouthGoal = goal ?? stillMouth;
+			const wanted: MouthGoal = goal ?? silence;
 			const lipsClosed = wanted.lipsClosed === true;
 			let closing: number | undefined;
 			if (lipsClosed) closing = closingShare(step, wanted.closeWithinSeconds, reducedMotion);
