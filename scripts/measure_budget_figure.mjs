@@ -23,12 +23,13 @@
 // stage within seconds, since a room that fails or is late leaves a plain figure's interval and no signal says so. The room's strips are sub-pixel thin, so what it adds to a frame is
 // its vertex and texture work, not covered pixels.
 // Usage: pnpm run build && node scripts/measure_budget_figure.mjs; needs `pnpm exec playwright install chromium` once.
-// It runs itself through the fleet's probe-run, which starts it once the machine's load leaves room, inside a 4 GiB memory cap;
+// It runs itself inside a 4 GiB memory cap (a systemd user scope without swap) that holds the fleet's probe-run, which starts the
+// measurement once the machine's load leaves room; the cap wraps probe-run because probe-run's own namespace cannot reach the systemd user bus;
 // a frame interval measured beside another browser proof is not the figure's own, so run it alone. It fetches nothing, serves
 // the page by request routing, and writes the page's bundle only to a temporary directory that its outer process removes even
 // when the capped one is killed (the figure stays in memory).
 // Exit codes: 0 when the measurement ran (`slow` is a result, not a failure), 1 when the figure fails the check, no `drawn`
-// came, the mounted room was not drawn, fewer than 300 frames came, the browser failed or probe-run could not be started, 2 when dist/ is not built, and probe-run's
+// came, the mounted room was not drawn, fewer than 300 frames came, the browser failed or systemd-run could not start the scope (or probe-run under it), 2 when dist/ is not built, and probe-run's
 // own (`probe-run -h`) when it found no room within an hour.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -64,14 +65,15 @@ const componentBytes = { 5121: 1, 5123: 2, 5125: 4, 5126: 4 };
 const componentCounts = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 
 /**
- * Re-runs this script through probe-run and under the memory cap, unless it already runs inside them. The temporary directory
- * belongs to this process, which outlives the capped one: the cap's timeout or the kernel's memory kill ends the capped process
- * without a `finally`.
+ * Re-runs this script through probe-run inside the memory cap, unless it already runs inside them. The cap is the outer scope
+ * because probe-run runs its drive in a user and network namespace that cannot reach the systemd user bus. The temporary
+ * directory belongs to this process, which outlives the capped one: the cap's timeout or the kernel's memory kill ends the capped
+ * process without a `finally`.
  */
 function runGuarded() {
 	const command = [
-		'probe-run',
 		'systemd-run', '--user', '--scope', '--quiet', '-p', 'MemoryMax=4G', '-p', 'MemorySwapMax=0',
+		'probe-run',
 		process.execPath, scriptPath
 	];
 	const workDirectory = mkdtempSync(join(tmpdir(), 'figure-budget-'));
