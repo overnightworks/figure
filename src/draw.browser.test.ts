@@ -2,10 +2,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { cdp } from 'vitest/browser';
 import { buildConformantVrm, buildVrmGlbWithImages } from '../tests/figureFixtures.js';
 import { buildFigureTexturePng, buildPng } from '../tests/glbBuilder.js';
+import { buildRoomGlb } from '../tests/roomBuilder.js';
 import { centreOf, coversSomething, emulateReducedMotion, readPixels, restorePageVisibility, setPageVisibility, spotsOf, nextFrame, requestFrameOwn, fakeFrameClock, type FrameClock } from '../tests/browserCanvas.js';
 import * as draw from './draw.js';
 import { mount, type FigureHandle } from './draw.js';
 import { figureSignal, type FigureSignal } from './signals.js';
+import { figureGesture } from './gestures.js';
+import { figureFraming } from './framings.js';
 
 describe('mount in a browser', () => {
 	const canvases: HTMLCanvasElement[] = [];
@@ -652,6 +655,72 @@ describe('mount in a browser', () => {
 
 				expect(() => handle.dispose()).not.toThrow();
 				expect(signals).toEqual([figureSignal.drawn, figureSignal.slow]);
+			});
+		});
+	});
+
+	describe('a figure that ended', () => {
+		let clock: FrameClock;
+
+		beforeEach(() => {
+			clock = fakeFrameClock();
+		});
+
+		afterEach(() => clock.restore());
+
+		/** Mounts bytes on a canvas in the document and returns the handle and the signals its `onSignal` got. */
+		async function mountAttached(bytes: Uint8Array) {
+			const canvas = newCanvas();
+			document.body.append(canvas);
+			return { canvas, ...(await mountOn(canvas, bytes)) };
+		}
+
+		const endings: Record<string, () => Promise<{ handle: FigureHandle; signals: FigureSignal[] }>> = {
+			refused: () => mountAttached(new Uint8Array(4)),
+			disposed: async () => {
+				const mounted = await mountAttached(buildConformantVrm());
+				mounted.handle.dispose();
+				return mounted;
+			},
+			lost: async () => {
+				const mounted = await mountAttached(buildConformantVrm());
+				loseContext(mounted.canvas);
+				await vi.waitFor(() => expect(mounted.signals).toContain(figureSignal.lost));
+				return mounted;
+			},
+			slow: async () => {
+				const mounted = await mountAttached(buildConformantVrm());
+				await vi.waitFor(() => expect(clock.pending).toBe(1));
+				for (let frame = 0; frame < 40; frame++) clock.advance(60);
+				expect(mounted.signals).toContain(figureSignal.slow);
+				return mounted;
+			}
+		};
+
+		const verbs: Record<string, (handle: FigureHandle) => void> = {
+			think: (handle) => handle.think(true),
+			listen: (handle) => handle.listen(document.body),
+			'speak with a sentence': (handle) => handle.speak({ mood: 'happy' }),
+			'speak with null': (handle) => handle.speak(null),
+			gesture: (handle) => handle.gesture(figureGesture.wave),
+			frame: (handle) => handle.frame(figureFraming.fullBody),
+			'room with bytes': (handle) => handle.room(buildRoomGlb()),
+			'room with null': (handle) => handle.room(null),
+			dispose: (handle) => handle.dispose()
+		};
+
+		describe.each(Object.keys(endings))('%s', (ending) => {
+			it.each(Object.keys(verbs))('ignores %s: throws nothing, gives no signal and asks for no frame', async (verb) => {
+				const { handle, signals } = await endings[ending]!();
+				const signalsAtEnd = [...signals];
+				const requestedAtEnd = clock.requested;
+
+				expect(() => verbs[verb]!(handle)).not.toThrow();
+				clock.advance(60);
+				clock.advance(60);
+
+				expect(signals).toEqual(signalsAtEnd);
+				expect(clock.requested).toBe(requestedAtEnd);
 			});
 		});
 	});

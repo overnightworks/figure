@@ -558,19 +558,6 @@ describe('a figure driven by the host', () => {
 		expect(handle.signal).toBe(figureSignal.drawn);
 	});
 
-	it('does nothing on a disposed figure and throws nothing when told of a speaker', async () => {
-		const { canvas, handle } = await mountFigure();
-		await noseNow(canvas);
-		handle.dispose();
-		const framesAtDispose = frames;
-
-		expect(() => handle.listen(speakerAt(farLeft, level))).not.toThrow();
-		await nextFrame();
-		await nextFrame();
-
-		expect(frames).toBe(framesAtDispose);
-	});
-
 	it.each([
 		['refused', new Uint8Array([1, 2, 3])],
 		['lost', undefined]
@@ -610,19 +597,6 @@ describe('a figure driven by the host', () => {
 		first.handle.think(false);
 		expect(await noseNow(first.canvas)).toEqual(firstResting);
 		expect((await noseNow(second.canvas)).x).toBeLessThan(secondResting.x - turnedPixels.side);
-	});
-
-	it('does nothing on a disposed figure and throws nothing', async () => {
-		const { canvas, handle } = await mountFigure();
-		await noseNow(canvas);
-		handle.dispose();
-		const framesAtDispose = frames;
-
-		expect(() => handle.think(true)).not.toThrow();
-		await nextFrame();
-		await nextFrame();
-
-		expect(frames).toBe(framesAtDispose);
 	});
 
 	it.each([

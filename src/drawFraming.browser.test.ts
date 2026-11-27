@@ -171,9 +171,4 @@ describe('a figure seen from its face to its whole body', () => {
 		await expectFramed(eyeSpan(await watch.featuresNow(canvas)), figureFraming.fullBody);
 	});
 
-	it('throws nothing on a call after the figure is disposed', async () => {
-		const { handle } = await watch.mountFigure();
-		handle.dispose();
-		expect(() => handle.frame(figureFraming.fullBody)).not.toThrow();
-	});
 });
