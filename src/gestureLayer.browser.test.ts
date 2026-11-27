@@ -71,14 +71,6 @@ describe('a figure whose agent waves', { timeout: testTimeoutMilliseconds }, () 
 		await cdp().send('Emulation.setEmulatedMedia', { features: [] });
 	});
 
-	/** The features of each picture `canvas` shows over the next `seconds` of the page's time. */
-	async function traceFor(canvas: HTMLCanvasElement, seconds: number): Promise<Features[]> {
-		const trace: Features[] = [];
-		const start = performance.now();
-		while (performance.now() - start < seconds * 1000) trace.push(await watch.featuresOfNextFrame(canvas));
-		return trace;
-	}
-
 	/** The features of each picture `canvas` shows until `restPictures` in a row show the arm at `resting` after one that did not, or until the wait is over. */
 	async function traceWave(canvas: HTMLCanvasElement, resting: Features, started: Features[] = []): Promise<Features[]> {
 		const trace = [...started];
