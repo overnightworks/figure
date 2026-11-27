@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { checkFigure } from './check.js';
-import { figureProfile } from './profile.js';
-import { buildVrmGlb, readGlb } from '../tests/figureFixtures.js';
-import { buildBudgetVrm } from '../tests/glbBuilder.js';
+import { checkFigure } from '../src/check.js';
+import { figureProfile } from '../src/profile.js';
+import { buildVrmGlb, readGlb } from './figureFixtures.js';
+import { buildBudgetVrm } from './glbBuilder.js';
 
 type Json = Record<string, any>;
 
