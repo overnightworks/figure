@@ -1,0 +1,7 @@
+claim_id = "dadcc9861fc14b32a703725dc26b3fea"
+agent = "Claude 542a621c-e91b-4fa6-90e7-40d4764d6d9e"
+role = "builder"
+base = "4f77bfe1512466e4dc23251d14474cc7fb1712ea"
+branch = "claude/issue-167-the-budget-measurement-runs-under-probe"
+scope = ["scripts/measure_budget_figure.mjs"]
+opened_commit = "8e3e595e3b65dfc8a034abcfffa11946eb9f0f63"
