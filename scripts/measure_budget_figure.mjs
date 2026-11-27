@@ -49,7 +49,6 @@ const workDirectoryVariable = 'FIGURE_MEASURE_WORK_DIRECTORY';
 const canvasCssWidth = 390;
 const deviceScaleFactor = 2;
 const frameCount = 300;
-const endingSignals = ['unsupported', 'refused', 'lost', 'slow'];
 /** The seconds after a gesture starts at which the figure's own wave is over and a clip of the budget's length still plays, and the seconds the parse is watched after the mount. */
 const pictureSecondsAfterGesture = 4;
 const parseWatchSeconds = 2;
@@ -164,7 +163,10 @@ import { mountWithLoads } from 'figure-mount';
 import { loadClip } from 'figure-clip-loader';
 import { loadRoom } from 'figure-room-loader';
 import { parseGlbRefusingTextureFailures } from 'figure-loader';
-const endingSignals = ['unsupported', 'refused', 'lost', 'slow'];
+import { figureSignal } from 'figure-signals';
+import { figureGesture } from 'figure-gestures';
+/** Every signal but the first frame ends the figure. */
+const endingSignals = Object.values(figureSignal).filter((signal) => signal !== figureSignal.drawn);
 
 function describeRenderer() {
 	const gl = document.createElement('canvas').getContext('webgl2');
@@ -194,7 +196,7 @@ async function mountOnFreshCanvas(bytes, framesWanted, intervals) {
 			if (intervals.length >= framesWanted || signals.some((signal) => endingSignals.includes(signal))) resolve();
 			else requestAnimationFrame(onFrame);
 		};
-		if (signals.includes('drawn')) requestAnimationFrame(onFrame);
+		if (signals.includes(figureSignal.drawn)) requestAnimationFrame(onFrame);
 		else resolve();
 	});
 	handle.dispose();
@@ -212,7 +214,7 @@ window.measureFigure = async (frames) => {
 	const mounts = [];
 	while (intervals.length < frames && mounts.length < maximumMounts) {
 		mounts.push(await mountOnFreshCanvas(bytes, frames, intervals));
-		if (!mounts.at(-1).signals.includes('drawn')) break;
+		if (!mounts.at(-1).signals.includes(figureSignal.drawn)) break;
 	}
 	return { ...environment, mounts, intervals, devicePixelRatio: window.devicePixelRatio };
 };
@@ -279,12 +281,12 @@ window.measureClip = async (frames, parseWatchSeconds, pictureSecondsAfterGestur
 	const signals = [];
 	const canvas = newCanvas();
 	longTasks.length = 0;
-	const handle = await mount(canvas, figure, { gestures: { wave: clip }, onSignal: (signal) => signals.push(signal) });
+	const handle = await mount(canvas, figure, { gestures: { [figureGesture.wave]: clip }, onSignal: (signal) => signals.push(signal) });
 	await new Promise((resolve) => setTimeout(resolve, parseWatchSeconds * 1000));
 	const parseLongestTask = Math.max(0, ...longTasks);
 	await nextFrame();
 	const resting = pictureOf(canvas);
-	handle.gesture('wave');
+	handle.gesture(figureGesture.wave);
 	const withClip = await intervalsOf(canvas, frames, signals, pictureSecondsAfterGesture);
 	const shownDifference = withClip.picture === undefined ? 0 : differingPixels(resting, withClip.picture);
 	handle.dispose();
@@ -377,7 +379,9 @@ async function bundlePage(workDirectory) {
 				'figure-mount': join(repositoryRoot, 'dist/figureMount.js'),
 				'figure-loader': join(repositoryRoot, 'dist/figureLoader.js'),
 				'figure-clip-loader': join(repositoryRoot, 'dist/clipLoader.js'),
-				'figure-room-loader': join(repositoryRoot, 'dist/roomLoader.js')
+				'figure-room-loader': join(repositoryRoot, 'dist/roomLoader.js'),
+				'figure-signals': join(repositoryRoot, 'dist/signals.js'),
+				'figure-gestures': join(repositoryRoot, 'dist/gestures.js')
 			}
 		},
 		build: { outDir: bundleDirectory, emptyOutDir: true }
@@ -412,7 +416,7 @@ function megabytes(bytes) {
 }
 
 function report(figure, fileBudgetBytes, measured, parts) {
-	const slowMounts = measured.mounts.filter(({ signals }) => signals.includes('slow')).length;
+	const slowMounts = measured.mounts.filter(({ signals }) => signals.includes(figureSignal.slow)).length;
 	console.log(`figure: ${figure.morphTargets} morph targets on one mesh, file ${figure.glb.length} of ${fileBudgetBytes} bytes, check passes`);
 	console.log(`browser: Chromium ${measured.chromium}, headless, canvas ${canvasCssWidth} CSS px wide, device scale factor ${deviceScaleFactor}, drawing buffer ${measured.mounts[0].bufferWidth} px wide`);
 	console.log(`webgl renderer: ${measured.renderer}`);
@@ -435,15 +439,11 @@ function reportClip(clip, fileBudgetBytes, maxSeconds, measured) {
 	console.log(`clip parse: longest main-thread task in the ${parseWatchSeconds} s after the mount ${milliseconds(measured.parseLongestTask)}`);
 	console.log(`conformant figure without a clip, frame interval: ${describeIntervals(measured.without)}`);
 	console.log(`conformant figure with the clip playing, frame interval: ${describeIntervals(measured.withClip)}`);
-	console.log(`slow came: ${[...measured.plainSignals, ...measured.signals].includes('slow') ? 'yes' : 'no'}`);
+	console.log(`slow came: ${[...measured.plainSignals, ...measured.signals].includes(figureSignal.slow) ? 'yes' : 'no'}`);
 	console.log(`picture ${pictureSecondsAfterGesture} s into the gesture differs from the figure at rest in ${measured.shownDifference} pixels (the figure's own wave is over by then)`);
 }
 
 async function main() {
-	if (!existsSync(join(repositoryRoot, 'dist/draw.js'))) {
-		console.error('dist/ is not built: run `pnpm run build` first');
-		return 2;
-	}
 	const { figureProfile } = await import(join(repositoryRoot, 'dist/profile.js'));
 	const { checkFigure } = await import(join(repositoryRoot, 'dist/check.js'));
 	const figure = buildBudgetVrm(figureProfile, figureProfile);
@@ -454,7 +454,7 @@ async function main() {
 	}
 	const bundleDirectory = await bundlePage(process.env[workDirectoryVariable]);
 	const measured = await measureInChromium(bundleDirectory, { '/figure.vrm': figure.glb }, (page) => page.evaluate((frames) => window.measureFigure(frames), frameCount));
-	const failed = measured.mounts.find(({ signals, clientWidth }) => !signals.includes('drawn') || clientWidth !== canvasCssWidth);
+	const failed = measured.mounts.find(({ signals, clientWidth }) => !signals.includes(figureSignal.drawn) || clientWidth !== canvasCssWidth);
 	if (failed !== undefined) {
 		console.error(`a mount was not drawn on a ${canvasCssWidth} px canvas: signals ${failed.signals.join(' ')}, canvas ${failed.clientWidth} px`);
 		return 1;
@@ -511,7 +511,7 @@ async function measureRoom(bundleDirectory, figureGpuBytes, maxTextureSize) {
 	console.log(`room parse: time to parsed ${milliseconds(measured.parsedMilliseconds)}, longest main-thread task from the start to ${parseWatchSeconds} s after it ${milliseconds(measured.longestTask)}`);
 	console.log(`conformant figure without a room, frame interval: ${describeIntervals(measured.without)}`);
 	console.log(`conformant figure with the room drawn, frame interval: ${describeIntervals(measured.withRoom)}`);
-	console.log(`slow came: ${[...measured.plainSignals, ...measured.signals].includes('slow') ? 'yes' : 'no'}`);
+	console.log(`slow came: ${[...measured.plainSignals, ...measured.signals].includes(figureSignal.slow) ? 'yes' : 'no'}`);
 	console.log(`room parsed into ${measured.meshes} meshes of ${measured.triangles} triangles in total, ${measured.unlitMeshes} with an unlit material`);
 	const roomBytes = reportGpuMemory(gpuMemoryParts(readGlb(room.glb), maxTextureSize));
 	const together = figureGpuBytes + roomBytes;
@@ -533,6 +533,13 @@ async function measureRoom(bundleDirectory, figureGpuBytes, maxTextureSize) {
 }
 
 if (process.env[guardedMarker] === undefined) runGuarded();
+if (!existsSync(join(repositoryRoot, 'dist/draw.js'))) {
+	console.error('dist/ is not built: run `pnpm run build` first');
+	process.exit(2);
+}
+const { figureSignal } = await import(join(repositoryRoot, 'dist/signals.js'));
+/** Every signal but the first frame ends the figure. */
+const endingSignals = Object.values(figureSignal).filter((signal) => signal !== figureSignal.drawn);
 process.exitCode = await main().catch((error) => {
 	console.error(error);
 	return 1;

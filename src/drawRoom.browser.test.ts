@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Mesh, type BufferGeometry, type Material, type Object3D, type Texture } from 'three';
-import { emulateReducedMotion, pixelAt, restorePageVisibility, setPageVisibility } from '../tests/browserCanvas.js';
+import { emulateReducedMotion, pixelAt, restorePageVisibility, setPageVisibility, nextFrame } from '../tests/browserCanvas.js';
 import { cdp } from 'vitest/browser';
 import { buildImagePng, buildPng, type Rgba } from '../tests/glbBuilder.js';
 import { startFigureWatch, type FigureWatch, type Picture } from '../tests/figureWatch.js';
@@ -31,8 +31,6 @@ const edgeOf = ({ pixels, width, height }: Picture) => pixelAt(pixels, width, he
 const frames = 3;
 /** The longest a test waits for something the page does on its own. */
 const settleMilliseconds = 5000;
-const requestFrameOwn = window.requestAnimationFrame;
-const nextFrame = () => new Promise<void>((resolve) => requestFrameOwn.call(window, () => resolve()));
 
 /** What a parsed room's geometries, materials and textures report through three's own `dispose` events. */
 function freedOf(room: Object3D): () => boolean {
